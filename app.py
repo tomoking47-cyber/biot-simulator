@@ -104,7 +104,7 @@ with tab1:
 
     listing_price = st.slider(
         jp("上場基準価格 (USD)","Listing Base Price (USD)"),
-        5.0, 20.0, 10.0, 0.5, format="$%.2f"
+        0.1, 20.0, 10.0, 0.1, format="$%.2f"
     )
 
     st.markdown(f"### {jp('📌 各株主の売却株数を設定','📌 Set Each Shareholder Sell Amount')}")
