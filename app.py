@@ -129,14 +129,13 @@ for role in ["統括参謀","CFO参謀","情報参謀"]:
         st.session_state[f"conv_id_{role}"] = ""
 
 # ── タブ ──
-tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
+tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs([
     jp("🏦 上場当日 株価予測","🏦 Day-1 Price Forecast"),
     jp("💰 資金調達シミュ","💰 Financing Sim"),
     jp("📊 希薄化分析","📊 Dilution"),
     jp("📈 シナリオ予測","📈 Scenarios"),
     jp("⚠️ リスク分析","⚠️ Risk"),
     jp("🎯 意思決定","🎯 Decision"),
-    jp("🤖 AI参謀チーム","🤖 AI Advisors"),
 ])
 
 # ════════════════════════════════════════════════════════
@@ -625,80 +624,34 @@ with tab6:
 # ════════════════════════════════════════════════════════
 # TAB 7: AI参謀チーム（Dify連携）
 # ════════════════════════════════════════════════════════
-with tab7:
-    st.subheader(jp("🤖 AI参謀チーム — Dify連携","🤖 AI Advisor Team — Dify Integration"))
-    st.caption(jp(
-        "統括参謀・CFO参謀・情報参謀に直接質問できます。シミュレーターの数値を自動で文脈として渡します。",
-        "Chat directly with your AI advisors. Simulator data is automatically passed as context."
-    ))
+# ════════════════════════════════════════════════════════
+# SIDEBAR: AI参謀チーム（常時表示）
+# ════════════════════════════════════════════════════════
+with st.sidebar:
+    st.markdown(f"## 🤖 {jp('AI参謀チーム','AI Advisor Team')}")
+    st.caption(jp("Dify連携 | シミュレーター数値を自動送信",
+                  "Dify Integration | Auto-sends simulator data"))
+    st.divider()
 
-    # APIキー設定状況チェック
     keys_ok = {role: bool(key) for role, key in DIFY_KEYS.items()}
-    if not any(keys_ok.values()):
-        st.warning(jp(
-            "⚠️ DifyのAPIキーが未設定です。下記の手順でStreamlit Secretsに設定してください。",
-            "⚠️ Dify API keys not configured. Please set them in Streamlit Secrets."
-        ))
-        with st.expander(jp("📋 APIキーの設定手順","📋 How to set API keys"), expanded=True):
-            st.markdown(jp("""
-**Streamlit Cloud でのAPIキー設定方法**
 
-1. https://share.streamlit.io にログイン
-2. `biot-simulator` アプリの「︙」→「Settings」をクリック
-3. 「Secrets」タブを開く
-4. 以下の形式で3つのキーを貼り付けて「Save」
-
-```toml
-DIFY_KEY_GENERAL = "app-xxxxxxxxxx"
-DIFY_KEY_CFO     = "app-xxxxxxxxxx"
-DIFY_KEY_INFO    = "app-xxxxxxxxxx"
-```
-
-5. アプリが自動で再起動されます
-
-**APIキーの確認場所（Dify）**
-Difyにログイン → 対象アプリを開く → 左メニュー「API Access」→ 「API Key」をコピー
-""", """
-**How to set API keys in Streamlit Cloud**
-
-1. Log in to https://share.streamlit.io
-2. Click "︙" → "Settings" on the `biot-simulator` app
-3. Open the "Secrets" tab
-4. Paste the following and click "Save"
-
-```toml
-DIFY_KEY_GENERAL = "app-xxxxxxxxxx"
-DIFY_KEY_CFO     = "app-xxxxxxxxxx"
-DIFY_KEY_INFO    = "app-xxxxxxxxxx"
-```
-
-5. The app will restart automatically
-
-**Where to find API keys in Dify**
-Log in to Dify → Open the app → Left menu "API Access" → Copy "API Key"
-"""))
-
-    # 参謀選択
-    advisor_options = list(DIFY_KEYS.keys())
-    advisor_labels  = {
-        "統括参謀": jp("🧠 統括参謀 — 総合判断・経営戦略","🧠 Chief Advisor — Strategy & Overall Judgment"),
-        "CFO参謀":  jp("💼 CFO参謀 — 財務・資金調達・IFRS","💼 CFO Advisor — Finance, Fundraising & IFRS"),
-        "情報参謀": jp("🔍 情報参謀 — 市場・競合・最新情報収集","🔍 Intel Advisor — Market, Competition & News"),
+    advisor_labels = {
+        "統括参謀": jp("🧠 統括参謀","🧠 Chief Advisor"),
+        "CFO参謀":  jp("💼 CFO参謀", "💼 CFO Advisor"),
+        "情報参謀": jp("🔍 情報参謀","🔍 Intel Advisor"),
     }
 
     selected_role = st.radio(
-        jp("どの参謀に質問しますか？","Which advisor do you want to consult?"),
-        advisor_options,
+        jp("参謀を選択","Select Advisor"),
+        list(DIFY_KEYS.keys()),
         format_func=lambda r: advisor_labels[r],
-        horizontal=True,
         key="advisor_select"
     )
+    api_key    = DIFY_KEYS[selected_role]
+    key_status = "✅ 接続済" if keys_ok[selected_role] else "❌ 未設定"
+    st.caption(f"{advisor_labels[selected_role]}　{key_status}")
+    st.divider()
 
-    api_key = DIFY_KEYS[selected_role]
-    key_status = "✅ 接続済" if keys_ok[selected_role] else "❌ APIキー未設定"
-    st.caption(f"{advisor_labels[selected_role]}　|　{key_status}")
-
-    # シミュレーター現在値を自動コンテキスト生成
     def build_context():
         try:
             lp  = st.session_state.get("listing_price_val", 10.0)
@@ -706,115 +659,65 @@ Log in to Dify → Open the app → Left menu "API Access" → Copy "API Key"
             ep  = st.session_state.get("est_price_val", 10.0)
             kw_d= st.session_state.get("kw18_dil_val", 0.0)
             yk_d= st.session_state.get("yk_dil_val", 0.0)
-            return jp(f"""
-【BIOTシミュレーター 現在の設定値】
-- 上場基準価格: ${lp:.2f}
-- 総売却圧力: {sp:.1f}%（流通株比）
-- 推定終値: ${ep:.2f}
-- Kadenwood希薄化率(18%): {kw_d:.1f}%
-- Yorkville希薄化率: {yk_d:.1f}%
-- 発行済株数: 31,225,944株 / 流通株: 18,882,313株
-- Kadenwood $5M転換社債（上場前）: GO
-- Roth $50M CEF（上場後）: GO
-- Yorkville $3M プリペイド: NO GO（月次償還$802,500 = 売上の430%）
-""", f"""
-[BIOT Simulator Current Values]
-- Listing base price: ${lp:.2f}
-- Total sell pressure: {sp:.1f}% (of float)
-- Est. closing price: ${ep:.2f}
-- Kadenwood dilution (18%): {kw_d:.1f}%
-- Yorkville dilution: {yk_d:.1f}%
-- Total shares: 31,225,944 / Float: 18,882,313
-- Kadenwood $5M Convertible Note (pre-listing): GO
-- Roth $50M CEF (post-listing): GO
-- Yorkville $3M Pre-Paid: NO GO (monthly amort $802,500 = 430% of revenue)
-""")
+            return jp(f"""【BIOTシミュレーター現在値】
+上場基準価格:${lp:.2f} / 売却圧力:{sp:.1f}% / 推定終値:${ep:.2f}
+Kadenwood希薄化:{kw_d:.1f}% / Yorkville希薄化:{yk_d:.1f}%
+発行済:31,225,944株 / 流通株:18,882,313株
+Kadenwood $5M:GO / Roth $50M CEF:GO / Yorkville:NO GO""",
+f"""[BIOT Simulator Values]
+Listing:${lp:.2f} / Sell Pressure:{sp:.1f}% / Est.Price:${ep:.2f}
+Kadenwood Dil:{kw_d:.1f}% / Yorkville Dil:{yk_d:.1f}%
+Total:31,225,944 / Float:18,882,313
+Kadenwood $5M:GO / Roth $50M CEF:GO / Yorkville:NO GO""")
         except:
             return ""
 
-    context = build_context()
-
-    # クイック質問ボタン
+    # クイック質問
     st.markdown(f"**{jp('クイック質問','Quick Questions')}**")
     quick_jp = {
-        "統括参謀": [
-            "上場当日の売却圧力を踏まえて、今すぐ打つべき最優先の経営判断を教えて",
-            "CHARDANとSponsorが全株売った場合のリスクシナリオと対策を分析して",
-            "NASDAQ上場後の株価防衛戦略を立案して",
-        ],
-        "CFO参謀": [
-            "Kadenwood・Roth・Yorkvilleの資金調達コストを比較して最適スタックを提案して",
-            "Yorkville署名した場合のキャッシュフロー影響を数字で示して",
-            "上場後のRoth CEF引出タイミングの最適戦略を教えて",
-        ],
-        "情報参謀": [
-            "SPAC上場当日の売却圧力に関する最新の市場動向を教えて",
-            "BIOTと類似のSPAC案件で上場当日に株価が崩壊した事例を調べて",
-            "CHARDANのSPAC案件での過去の行動パターンを調査して",
-        ],
+        "統括参謀": ["今すぐ打つべき最優先の経営判断を教えて","CHARDANとSponsorが全株売った場合のリスクと対策","NASDAQ上場後の株価防衛戦略を立案して"],
+        "CFO参謀":  ["Kadenwood・Roth・Yorkvilleの最適スタックを提案","Yorkville署名時のキャッシュフロー影響を数字で","Roth CEF引出タイミングの最適戦略を教えて"],
+        "情報参謀": ["SPAC上場当日の売却圧力の最新市場動向を教えて","上場当日に株価が崩壊したSPAC事例を調べて","CHARDANのSPAC案件での過去の行動パターンを調査"],
     }
     quick_en = {
-        "統括参謀": [
-            "Given the Day-1 sell pressure, what is the top management decision I should make right now?",
-            "Analyze the risk scenario and countermeasures if CHARDAN and Sponsor sell all shares",
-            "Develop a stock price defense strategy after NASDAQ listing",
-        ],
-        "CFO参謀": [
-            "Compare Kadenwood, Roth, and Yorkville financing costs and propose the optimal stack",
-            "Show me the cash flow impact if Yorkville is signed",
-            "What is the optimal timing strategy for drawing from Roth CEF post-listing?",
-        ],
-        "情報参謀": [
-            "What are the latest market trends on SPAC Day-1 sell pressure?",
-            "Find examples of SPAC listings where stock collapsed on Day-1 due to sell pressure",
-            "Research CHARDAN's past behavior patterns in SPAC transactions",
-        ],
+        "統括参謀": ["Top management decision I should make right now?","Risk scenario if CHARDAN and Sponsor sell all shares","Develop a post-listing stock price defense strategy"],
+        "CFO参謀":  ["Propose optimal financing stack among 3 parties","Cash flow impact if Yorkville is signed","Optimal timing strategy for Roth CEF draws"],
+        "情報参謀": ["Latest market trends on SPAC Day-1 sell pressure","SPAC listings where stock collapsed on Day-1","CHARDAN's past behavior patterns in SPAC deals"],
     }
     quick_questions = quick_jp[selected_role] if lang=="JP" else quick_en[selected_role]
-
-    qcols = st.columns(3)
     quick_input = None
-    for i, (col, q) in enumerate(zip(qcols, quick_questions)):
-        if col.button(f"Q{i+1}", key=f"quick_{selected_role}_{i}", use_container_width=True):
+    for i, q in enumerate(quick_questions):
+        if st.button(f"Q{i+1} {q[:20]}…" if len(q)>20 else f"Q{i+1} {q}",
+                     key=f"qk_{selected_role}_{i}", use_container_width=True):
             quick_input = q
-        col.caption(q[:30]+"…" if len(q)>30 else q)
 
-    # チャット履歴表示
+    st.divider()
+
+    # チャット履歴
     chat_history = st.session_state[f"chat_{selected_role}"]
-    chat_container = st.container()
-    with chat_container:
-        for msg in chat_history:
-            with st.chat_message(msg["role"], avatar="👔" if msg["role"]=="user" else "🤖"):
-                st.markdown(msg["content"])
+    for msg in chat_history[-6:]:  # 直近6件を表示
+        with st.chat_message(msg["role"], avatar="👔" if msg["role"]=="user" else "🤖"):
+            st.markdown(msg["content"])
 
     # 入力欄
     user_input = st.chat_input(
-        jp(f"{selected_role}に質問する…",f"Ask {selected_role}…"),
-        key=f"input_{selected_role}"
+        jp(f"{selected_role}に質問…", f"Ask {selected_role}…"),
+        key=f"sb_input_{selected_role}"
     )
-
-    # クイックボタンが押された場合
     if quick_input:
         user_input = quick_input
 
     if user_input:
         if not api_key:
-            st.error(jp(
-                "⚠️ APIキーが未設定です。上記の手順でStreamlit Secretsに設定してください。",
-                "⚠️ API key not set. Please configure it in Streamlit Secrets."
-            ))
+            st.error(jp("⚠️ APIキー未設定","⚠️ API key not set"))
         else:
-            # コンテキスト付きメッセージを組み立て
-            full_message = f"{context}\n\n{jp('BOSSからの質問：','Question from BOSS: ')}{user_input}" if context else user_input
-
-            # 画面にはBOSSの質問だけ表示
+            context      = build_context()
+            full_message = f"{context}\n\n{jp('BOSSからの質問：','BOSS: ')}{user_input}" if context else user_input
             chat_history.append({"role": "user", "content": user_input})
             with st.chat_message("user", avatar="👔"):
                 st.markdown(user_input)
-
-            # Dify API呼び出し
             with st.chat_message("assistant", avatar="🤖"):
-                with st.spinner(jp(f"{selected_role}が分析中…", f"{selected_role} analyzing…")):
+                with st.spinner(jp("分析中…","Analyzing…")):
                     conv_id = st.session_state[f"conv_id_{selected_role}"]
                     result  = call_dify(api_key, full_message, conv_id)
                 if result["ok"]:
@@ -823,14 +726,11 @@ Log in to Dify → Open the app → Left menu "API Access" → Copy "API Key"
                     st.session_state[f"conv_id_{selected_role}"] = result["conv_id"]
                 else:
                     st.error(result["answer"])
-
             st.session_state[f"chat_{selected_role}"] = chat_history
             st.rerun()
 
-    # 会話リセット
     if chat_history:
-        if st.button(jp(f"🔄 {selected_role}の会話をリセット",f"🔄 Reset {selected_role} conversation"),
-                     key=f"reset_{selected_role}"):
+        if st.button(jp("🔄 会話リセット","🔄 Reset"), key=f"sb_reset_{selected_role}", use_container_width=True):
             st.session_state[f"chat_{selected_role}"] = []
             st.session_state[f"conv_id_{selected_role}"] = ""
             st.rerun()
