@@ -2,6 +2,7 @@ import streamlit as st
 import plotly.graph_objects as go
 import pandas as pd
 from datetime import date
+import yfinance as yf
 
 st.set_page_config(page_title="BIOT Capital Simulator", page_icon="📊", layout="centered")
 st.markdown("""
@@ -621,13 +622,72 @@ with tab6:
             for a in actions: st.markdown(f"- {a}")
 
 
+
 # ════════════════════════════════════════════════════════
-# TAB 7: AI参謀チーム（Dify連携）
-# ════════════════════════════════════════════════════════
-# ════════════════════════════════════════════════════════
-# SIDEBAR: AI参謀チーム（常時表示）
+# SIDEBAR: 株価 + AI参謀チーム（常時表示）
 # ════════════════════════════════════════════════════════
 with st.sidebar:
+
+    # ── 株価ウィジェット ──
+    st.markdown(f"## 📈 {jp('現在株価 (ACQC)','Stock Price (ACQC)')}")
+    st.caption(jp("OTCマーケット | 15分遅延","OTC Markets | 15-min delay"))
+    try:
+        ticker     = yf.Ticker("ACQC")
+        info       = ticker.info
+        hist       = ticker.history(period="5d")
+        cur_price  = (info.get("currentPrice") or info.get("regularMarketPrice")
+                      or (float(hist["Close"].iloc[-1]) if not hist.empty else None))
+        prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+        day_high   = info.get("dayHigh") or info.get("regularMarketDayHigh")
+        day_low    = info.get("dayLow") or info.get("regularMarketDayLow")
+        volume     = info.get("volume") or info.get("regularMarketVolume") or 0
+
+        if cur_price:
+            change     = (cur_price - prev_close) if prev_close else 0
+            change_pct = (change / prev_close * 100) if prev_close else 0
+            clr        = "#1D9E75" if change >= 0 else "#E24B4A"
+            arrow      = "▲" if change >= 0 else "▼"
+            st.markdown(f"""
+<div style="background:#F8FAFC;border-radius:10px;padding:12px;margin-bottom:6px;border:1px solid #E2E8F0">
+<div style="font-size:26px;font-weight:700;color:{clr}">${cur_price:.2f}</div>
+<div style="font-size:13px;color:{clr};font-weight:600">{arrow} ${abs(change):.2f} ({change_pct:+.2f}%)</div>
+<div style="font-size:11px;color:#94A3B8;margin-top:4px">前日終値: ${prev_close:.2f if prev_close else 'N/A'} | H:${day_high:.2f if day_high else 'N/A'} L:${day_low:.2f if day_low else 'N/A'}</div>
+<div style="font-size:11px;color:#94A3B8">出来高: {volume:,}株</div>
+</div>""", unsafe_allow_html=True)
+
+            if not hist.empty:
+                fig_px = go.Figure()
+                fig_px.add_trace(go.Scatter(
+                    x=hist.index, y=hist["Close"], mode="lines",
+                    line=dict(color=clr, width=2),
+                    fill="tozeroy",
+                    fillcolor=f"rgba({'29,158,117' if change>=0 else '226,75,74'},0.08)"
+                ))
+                fig_px.update_layout(
+                    height=110, margin=dict(l=0,r=0,t=0,b=0),
+                    plot_bgcolor="white", paper_bgcolor="white",
+                    xaxis=dict(showgrid=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, tickfont=dict(size=9)),
+                    showlegend=False
+                )
+                st.plotly_chart(fig_px, use_container_width=True)
+
+            listing_sim = st.session_state.get("listing_price_val", 10.0)
+            gap = listing_sim - cur_price
+            st.caption(jp(
+                f"上場シミュ ${listing_sim:.2f} vs 現在 ${cur_price:.2f} → 差分: ${gap:+.2f}",
+                f"Sim ${listing_sim:.2f} vs Now ${cur_price:.2f} → Gap: ${gap:+.2f}"
+            ))
+        else:
+            st.warning(jp("株価データ取得できず","Could not fetch price"))
+
+        if st.button(jp("🔄 更新","🔄 Refresh"), key="refresh_px", use_container_width=True):
+            st.rerun()
+
+    except Exception as e:
+        st.warning(jp(f"株価取得エラー: {e}",f"Price error: {e}"))
+
+    st.divider()
     st.markdown(f"## 🤖 {jp('AI参謀チーム','AI Advisor Team')}")
     st.caption(jp("Dify連携 | シミュレーター数値を自動送信",
                   "Dify Integration | Auto-sends simulator data"))
