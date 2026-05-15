@@ -655,68 +655,102 @@ with tab6:
 
 
 # ════════════════════════════════════════════════════════
-# SIDEBAR: 株価 + AI参謀チーム（常時表示）
+# SIDEBAR: 株価モニター + AI参謀チーム（常時表示）
 # ════════════════════════════════════════════════════════
 with st.sidebar:
 
-    # ── 株価ウィジェット ──
-    st.markdown(f"## 📈 {jp('現在株価 (ACQC)','Stock Price (ACQC)')}")
-    st.caption(jp("OTCマーケット | 15分遅延","OTC Markets | 15-min delay"))
-    try:
-        ticker     = yf.Ticker("ACQC")
-        info       = ticker.info
-        hist       = ticker.history(period="5d")
-        cur_price  = (info.get("currentPrice") or info.get("regularMarketPrice")
-                      or (float(hist["Close"].iloc[-1]) if not hist.empty else None))
-        prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
-        day_high   = info.get("dayHigh") or info.get("regularMarketDayHigh")
-        day_low    = info.get("dayLow") or info.get("regularMarketDayLow")
-        volume     = info.get("volume") or info.get("regularMarketVolume") or 0
+    # ── 競合・業界株価モニター ──
+    st.markdown(f"## 📈 {jp('株価モニター','Stock Monitor')}")
 
-        if cur_price:
-            change     = (cur_price - prev_close) if prev_close else 0
-            change_pct = (change / prev_close * 100) if prev_close else 0
-            clr        = "#1D9E75" if change >= 0 else "#E24B4A"
-            arrow      = "▲" if change >= 0 else "▼"
+    # 競合・業界銘柄リスト
+    WATCHLIST = {
+        jp("🏢 自社（SPAC）","🏢 Own (SPAC)"): [
+            ("ACQC", "Relativity / BIOT (OTC)"),
+        ],
+        jp("💉 幹細胞・再生医療","💉 Stem Cell / Regen."): [
+            ("MESO",  "Mesoblast"),
+            ("ILIU",  "iLius / Lineage Cell"),
+            ("PLU",   "Pluri Inc."),
+            ("FATE",  "Fate Therapeutics"),
+            ("KRTX",  "Karuna / Cell Therapy"),
+        ],
+        jp("💄 化粧品・美容医療","💄 Cosmetics / Aesthetics"): [
+            ("ELF",   "e.l.f. Beauty"),
+            ("SKIN",  "The Beauty Health (Hydrafacial)"),
+            ("AEYE",  "AudioEye / MedSpa Tech"),
+            ("ISRG",  "Intuitive Surgical"),
+        ],
+        jp("🧬 バイオ・医薬品","🧬 Biopharma"): [
+            ("AMGN",  "Amgen"),
+            ("REGN",  "Regeneron"),
+            ("VRTX",  "Vertex Pharma"),
+        ],
+        jp("📊 業界ETF","📊 Sector ETFs"): [
+            ("IBB",   "iShares Biotech ETF"),
+            ("XBI",   "SPDR Biotech ETF"),
+            ("ARKG",  "ARK Genomics ETF"),
+        ],
+    }
+
+    def fetch_price(sym):
+        """yfinanceで株価取得。失敗時はNoneを返す"""
+        try:
+            t    = yf.Ticker(sym)
+            hist = t.history(period="2d")
+            if hist.empty or len(hist) < 1:
+                return None
+            cur  = float(hist["Close"].iloc[-1])
+            prev = float(hist["Close"].iloc[-2]) if len(hist) >= 2 else cur
+            chg  = cur - prev
+            pct  = chg / prev * 100 if prev else 0
+            return {"price": cur, "change": chg, "pct": pct}
+        except:
+            return None
+
+    # カテゴリ選択
+    selected_cat = st.selectbox(
+        jp("カテゴリ","Category"),
+        list(WATCHLIST.keys()),
+        key="watch_cat"
+    )
+
+    if st.button(jp("🔄 株価を更新","🔄 Refresh Prices"), key="refresh_all", use_container_width=True):
+        st.rerun()
+
+    st.caption(jp("15分遅延 | yfinance","15-min delay | yfinance"))
+
+    # 選択カテゴリの銘柄を表示
+    for sym, name in WATCHLIST[selected_cat]:
+        data = fetch_price(sym)
+        if data:
+            clr   = "#1D9E75" if data["change"] >= 0 else "#E24B4A"
+            arrow = "▲" if data["change"] >= 0 else "▼"
             st.markdown(f"""
-<div style="background:#F8FAFC;border-radius:10px;padding:12px;margin-bottom:6px;border:1px solid #E2E8F0">
-<div style="font-size:26px;font-weight:700;color:{clr}">${cur_price:.2f}</div>
-<div style="font-size:13px;color:{clr};font-weight:600">{arrow} ${abs(change):.2f} ({change_pct:+.2f}%)</div>
-<div style="font-size:11px;color:#94A3B8;margin-top:4px">前日終値: ${prev_close:.2f if prev_close else 'N/A'} | H:${day_high:.2f if day_high else 'N/A'} L:${day_low:.2f if day_low else 'N/A'}</div>
-<div style="font-size:11px;color:#94A3B8">出来高: {volume:,}株</div>
+<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1px solid #E2E8F0">
+<div style="font-size:11px;color:#64748B;font-weight:600">{sym} | {name}</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
+  <span style="font-size:18px;font-weight:700;color:#1E293B">${data['price']:.2f}</span>
+  <span style="font-size:12px;font-weight:600;color:{clr}">{arrow} {data['pct']:+.2f}%</span>
+</div>
+</div>""", unsafe_allow_html=True)
+        else:
+            st.markdown(f"""
+<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1px solid #E2E8F0">
+<div style="font-size:11px;color:#64748B">{sym} | {name}</div>
+<div style="font-size:12px;color:#94A3B8">{jp('データ取得中…','Fetching…')}</div>
 </div>""", unsafe_allow_html=True)
 
-            if not hist.empty:
-                fig_px = go.Figure()
-                fig_px.add_trace(go.Scatter(
-                    x=hist.index, y=hist["Close"], mode="lines",
-                    line=dict(color=clr, width=2),
-                    fill="tozeroy",
-                    fillcolor=f"rgba({'29,158,117' if change>=0 else '226,75,74'},0.08)"
-                ))
-                fig_px.update_layout(
-                    height=110, margin=dict(l=0,r=0,t=0,b=0),
-                    plot_bgcolor="white", paper_bgcolor="white",
-                    xaxis=dict(showgrid=False, showticklabels=False),
-                    yaxis=dict(showgrid=False, tickfont=dict(size=9)),
-                    showlegend=False
-                )
-                st.plotly_chart(fig_px, use_container_width=True)
-
+    # ACQC専用：上場シミュとの比較
+    if selected_cat == list(WATCHLIST.keys())[0]:
+        acqc = fetch_price("ACQC")
+        if acqc:
             listing_sim = st.session_state.get("listing_price_val", 10.0)
-            gap = listing_sim - cur_price
-            st.caption(jp(
-                f"上場シミュ ${listing_sim:.2f} vs 現在 ${cur_price:.2f} → 差分: ${gap:+.2f}",
-                f"Sim ${listing_sim:.2f} vs Now ${cur_price:.2f} → Gap: ${gap:+.2f}"
+            gap     = listing_sim - acqc["price"]
+            gap_pct = gap / acqc["price"] * 100
+            st.info(jp(
+                f"上場シミュ ${listing_sim:.2f} vs 現在 ${acqc['price']:.2f}\n差分: ${gap:+.2f} ({gap_pct:+.1f}%)",
+                f"Sim ${listing_sim:.2f} vs Now ${acqc['price']:.2f}\nGap: ${gap:+.2f} ({gap_pct:+.1f}%)"
             ))
-        else:
-            st.warning(jp("株価データ取得できず","Could not fetch price"))
-
-        if st.button(jp("🔄 更新","🔄 Refresh"), key="refresh_px", use_container_width=True):
-            st.rerun()
-
-    except Exception as e:
-        st.warning(jp(f"株価取得エラー: {e}",f"Price error: {e}"))
 
     st.divider()
     st.markdown(f"## 🤖 {jp('AI参謀チーム','AI Advisor Team')}")
