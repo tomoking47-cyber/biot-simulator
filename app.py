@@ -707,50 +707,66 @@ with st.sidebar:
         except:
             return None
 
-    # カテゴリ選択
+    # ── 自社株価（常時固定表示）──
+    st.caption(jp("15分遅延 | yfinance","15-min delay | yfinance"))
+    acqc = fetch_price("ACQC")
+    if acqc:
+        clr_a   = "#1D9E75" if acqc["change"] >= 0 else "#E24B4A"
+        arrow_a = "▲" if acqc["change"] >= 0 else "▼"
+        listing_sim = st.session_state.get("listing_price_val", 10.0)
+        gap     = listing_sim - acqc["price"]
+        gap_pct = gap / acqc["price"] * 100
+        st.markdown(f"""
+<div style="background:#EFF6FF;border-radius:10px;padding:10px 12px;margin-bottom:4px;border:2px solid #2563EB">
+<div style="font-size:11px;color:#1E40AF;font-weight:700">🏢 ACQC | Relativity / BIOT</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+  <span style="font-size:22px;font-weight:800;color:#1E293B">${acqc['price']:.2f}</span>
+  <span style="font-size:13px;font-weight:700;color:{clr_a}">{arrow_a} {acqc['pct']:+.2f}%</span>
+</div>
+<div style="font-size:11px;color:#64748B;margin-top:4px">
+  {jp('上場シミュ','Sim')} ${listing_sim:.2f} → {jp('差分','Gap')}: <b style="color:{'#E24B4A' if gap>0 else '#1D9E75'}">${gap:+.2f} ({gap_pct:+.1f}%)</b>
+</div>
+</div>""", unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+<div style="background:#EFF6FF;border-radius:10px;padding:10px 12px;margin-bottom:4px;border:2px solid #2563EB">
+<div style="font-size:11px;color:#1E40AF;font-weight:700">🏢 ACQC | Relativity / BIOT</div>
+<div style="font-size:12px;color:#94A3B8;margin-top:4px">{jp('取得中…','Fetching…')}</div>
+</div>""", unsafe_allow_html=True)
+
+    if st.button(jp("🔄 更新","🔄 Refresh"), key="refresh_all", use_container_width=True):
+        st.rerun()
+
+    st.divider()
+
+    # ── 業種別カテゴリ（自社除く）──
+    industry_cats = {k: v for k, v in WATCHLIST.items() if "自社" not in k and "Own" not in k}
     selected_cat = st.selectbox(
-        jp("カテゴリ","Category"),
-        list(WATCHLIST.keys()),
+        jp("📂 業種カテゴリ","📂 Sector Category"),
+        list(industry_cats.keys()),
         key="watch_cat"
     )
 
-    if st.button(jp("🔄 株価を更新","🔄 Refresh Prices"), key="refresh_all", use_container_width=True):
-        st.rerun()
-
-    st.caption(jp("15分遅延 | yfinance","15-min delay | yfinance"))
-
     # 選択カテゴリの銘柄を表示
-    for sym, name in WATCHLIST[selected_cat]:
+    for sym, name in industry_cats[selected_cat]:
         data = fetch_price(sym)
         if data:
             clr   = "#1D9E75" if data["change"] >= 0 else "#E24B4A"
             arrow = "▲" if data["change"] >= 0 else "▼"
             st.markdown(f"""
-<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1px solid #E2E8F0">
+<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:5px;border:1px solid #E2E8F0">
 <div style="font-size:11px;color:#64748B;font-weight:600">{sym} | {name}</div>
 <div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">
-  <span style="font-size:18px;font-weight:700;color:#1E293B">${data['price']:.2f}</span>
+  <span style="font-size:17px;font-weight:700;color:#1E293B">${data['price']:.2f}</span>
   <span style="font-size:12px;font-weight:600;color:{clr}">{arrow} {data['pct']:+.2f}%</span>
 </div>
 </div>""", unsafe_allow_html=True)
         else:
             st.markdown(f"""
-<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:6px;border:1px solid #E2E8F0">
+<div style="background:#F8FAFC;border-radius:8px;padding:8px 10px;margin-bottom:5px;border:1px solid #E2E8F0">
 <div style="font-size:11px;color:#64748B">{sym} | {name}</div>
-<div style="font-size:12px;color:#94A3B8">{jp('データ取得中…','Fetching…')}</div>
+<div style="font-size:12px;color:#94A3B8">{jp('取得中…','Fetching…')}</div>
 </div>""", unsafe_allow_html=True)
-
-    # ACQC専用：上場シミュとの比較
-    if selected_cat == list(WATCHLIST.keys())[0]:
-        acqc = fetch_price("ACQC")
-        if acqc:
-            listing_sim = st.session_state.get("listing_price_val", 10.0)
-            gap     = listing_sim - acqc["price"]
-            gap_pct = gap / acqc["price"] * 100
-            st.info(jp(
-                f"上場シミュ ${listing_sim:.2f} vs 現在 ${acqc['price']:.2f}\n差分: ${gap:+.2f} ({gap_pct:+.1f}%)",
-                f"Sim ${listing_sim:.2f} vs Now ${acqc['price']:.2f}\nGap: ${gap:+.2f} ({gap_pct:+.1f}%)"
-            ))
 
     st.divider()
     st.markdown(f"## 🤖 {jp('AI参謀チーム','AI Advisor Team')}")
