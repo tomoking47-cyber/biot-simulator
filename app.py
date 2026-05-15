@@ -432,31 +432,33 @@ with tab2:
 
     col1,col2,col3=st.columns(3)
     with col1:
-        st.success("✅ GO — Kadenwood")
-        st.caption("$5M Convertible Note | Pre-Listing")
+        st.error("❌ CANCELLED — Kadenwood")
+        st.caption(jp("$5M 転換社債 | 取引実行しない決断済み","$5M Convertible Note | Deal cancelled"))
         st.metric("18% disc 転換価格" if lang=="JP" else "18% disc Conv.", f"${kw18_c:.2f}")
         st.metric(jp("発行株数","Shares"), f"{kw18_s:,}")
         st.metric(jp("希薄化率","Dilution"), f"{kw18_d:.1f}%")
         st.metric("30% disc 転換価格" if lang=="JP" else "30% disc Conv.", f"${kw30_c:.2f}")
         st.metric(jp("発行株数","Shares"), f"{kw30_s:,}")
         st.metric(jp("希薄化率","Dilution"), f"{kw30_d:.1f}%")
+        st.error(jp("⛔ 取引実行しない決断済み。参考値のみ。","⛔ Deal cancelled. Reference only."))
     with col2:
-        st.success("✅ GO — Roth")
-        st.caption("$50M CEF | Post-Listing")
+        st.warning("🟡 条件変更 — Roth Principal")
+        st.caption(jp("$50M CEF | 上場前現金困難 → 上場後に変更","$50M CEF | Pre-listing cash difficult → Post-listing only"))
         st.metric("97%VWAP", f"${roth_p:.2f}")
         st.metric(jp("発行株数/$10M","Shares/$10M"), f"{roth_s:,}")
         st.metric(jp("コスト","Cost"), "~5%")
         st.metric(jp("19.99%キャップ額","19.99% Cap"), f"${roth_cap/1e6:.1f}M")
-        st.success(jp("発行者コントロール：完全","Issuer Control: Full"))
+        st.warning(jp("⚠️ 上場前の現金提供は困難との回答。上場後に資金投入予定。","⚠️ Pre-listing cash not available. Post-listing funding confirmed."))
+        st.success(jp("✅ 上場後のCEF提供は継続合意","✅ Post-listing CEF remains agreed"))
     with col3:
-        st.error("❌ NO GO — Yorkville")
-        st.caption("$3M Pre-Paid | DO NOT SIGN")
+        st.warning("🔄 再交渉中 — Yorkville")
+        st.caption(jp("$3M プリペイド | Amortisation削除で再交渉中","$3M Pre-Paid | Renegotiating to remove Amortisation"))
         st.metric(jp("転換価格","Conv. Price"), f"${yk_c:.2f}",
             delta="⚠️ Floor!" if yk_floor_hit else None, delta_color="inverse")
         st.metric(jp("発行株数","Shares"), f"{yk_s:,}")
         st.metric(jp("希薄化率","Dilution"), f"{yk_d:.1f}%")
-        st.metric(jp("月次償還","Monthly Amort."), "$802,500")
-        st.error(jp("売上の430%","430% of Revenue"))
+        st.metric(jp("月次償還（削除交渉中）","Monthly Amort. (removal requested)"), "$802,500")
+        st.warning(jp("🔄 Amortisation条項削除を要求中。削除されれば条件が大幅改善。","🔄 Requesting removal of Amortisation clause. If removed, terms significantly improve."))
 
     st.divider()
     # 希薄化グラフ
@@ -582,14 +584,32 @@ with tab5:
 # TAB 6: 意思決定
 # ════════════════════════════════════════════════════════
 with tab6:
-    st.subheader(jp("🎯 経営判断サマリー","🎯 Management Decision Summary"))
+    st.subheader(jp("🎯 経営判断サマリー（最新）","🎯 Management Decision Summary (Latest)"))
+
+    # ステータスバッジ
+    st.markdown(f"**{jp('📋 各社 最新ステータス','📋 Latest Status per Party')}**")
+    s1,s2,s3 = st.columns(3)
+    with s1:
+        st.error(jp("❌ Kadenwood\n取引実行しない決断済み","❌ Kadenwood\nDeal cancelled"))
+    with s2:
+        st.warning(jp("🟡 Roth\n上場後に資金投入予定","🟡 Roth\nPost-listing funding confirmed"))
+    with s3:
+        st.warning(jp("🔄 Yorkville\nAmortisation削除で再交渉中","🔄 Yorkville\nRenegotiating Amortisation removal"))
+
+    st.markdown("---")
     decisions=[
-        ("🔴",jp("Yorkville署名禁止 — 現状条件は会社存続リスク","Do NOT sign Yorkville — existential risk")),
-        ("🔴",jp("上場当日の売却圧力対策 — Sponsor・New Publicへのロックアップ交渉を急ぐ","Urgently negotiate lockup with Sponsor & New Public to prevent Day-1 collapse")),
-        ("🟢",jp("Kadenwood最優先 — 今週中にエンゲージメントレター署名","Prioritize Kadenwood — sign engagement letter this week")),
-        ("🟢",jp("Roth CEF並行開始 — 上場後10営業日以内にS-1提出","Initiate Roth CEF in parallel — S-1 within 10 business days")),
-        ("🟡",jp("Yorkville再交渉は上場後 — プリペイド削除・Roth除外が条件","Renegotiate Yorkville post-listing only")),
-        ("🔵",jp("トークンレイズ並行検討 — 株式希薄化ゼロの補完調達","Pursue token raise in parallel — zero dilution")),
+        ("🔴",jp("上場当日の売却圧力対策 — Sponsor・New Publicへのロックアップ交渉を急ぐ",
+                  "Urgently negotiate lockup with Sponsor & New Public to prevent Day-1 collapse")),
+        ("🔴",jp("上場前の資金調達手段がゼロ — 代替調達手段を至急検討（ブリッジローン・戦略的投資家等）",
+                  "Zero pre-listing funding — urgently explore alternatives (bridge loan, strategic investor)")),
+        ("🟢",jp("Roth CEF — 上場後の資金調達として継続推進。上場10営業日以内にS-1提出準備",
+                  "Roth CEF — continue as post-listing financing. Prepare S-1 within 10 business days of listing")),
+        ("🟡",jp("Yorkville — Amortisation削除が実現すれば条件が大幅改善。削除確認後に最終判断",
+                  "Yorkville — if Amortisation removed, terms significantly improve. Final decision after confirmation")),
+        ("🔴",jp("Yorkville — Amortisation削除なしでの署名は依然として会社存続リスク。絶対に署名禁止",
+                  "Yorkville — signing without Amortisation removal remains existential risk. Do NOT sign")),
+        ("🔵",jp("トークンレイズを並行トラックで推進 — 上場前の株式希薄化なし補完調達",
+                  "Pursue token raise in parallel — zero dilution pre-listing supplementary capital")),
     ]
     for icon,text in decisions:
         if icon=="🔴": st.error(f"{icon} {text}")
@@ -599,21 +619,32 @@ with tab6:
 
     st.markdown("---")
     tl={
-        jp("🚨 今すぐ","🚨 Now"):[
-            jp("Kadenwoodエンゲージメントレター署名（即時）","Sign Kadenwood engagement letter (immediate)"),
-            jp("Sponsor・New Publicへのロックアップ交渉開始","Begin lockup negotiation with Sponsor & New Public"),
-            jp("Yorkville再交渉通知","Notify Yorkville of renegotiation conditions"),
+        jp("🚨 今すぐ（最優先）","🚨 Now (Top Priority)"):[
+            jp("上場前ブリッジ資金の代替調達手段を緊急検討（Kadenwood撤退により空白発生）",
+               "Urgently explore alternative pre-listing bridge funding (gap created by Kadenwood cancellation)"),
+            jp("Yorkville：Amortisation削除の回答期限を設定して交渉を加速",
+               "Yorkville: Set deadline for Amortisation removal response and accelerate negotiation"),
+            jp("Sponsor・New Publicへのロックアップ交渉を開始",
+               "Begin lockup negotiation with Sponsor & New Public"),
         ],
-        jp("📅 5月","📅 May"):[
-            jp("Kadenwood最終条件確定","Finalize Kadenwood terms"),
-            jp("Roth CEF署名","Sign Roth CEF"),
+        jp("📅 上場前","📅 Pre-Listing"):[
+            jp("Roth CEF契約の最終確認（上場後CEF開始の条件整理）",
+               "Finalize Roth CEF terms for post-listing activation"),
+            jp("Yorkville：Amortisation削除確認後に最終判断",
+               "Yorkville: Final decision after Amortisation removal confirmed"),
+            jp("トークンレイズのロードマップ策定・法務確認",
+               "Token raise roadmap and legal review"),
         ],
-        jp("📅 6月","📅 June"):[
-            jp("Kadenwood $5Mクローズ（6/2目標）","Kadenwood $5M close (June 2 target)"),
-            jp("NASDAQ上場","NASDAQ listing"),
+        jp("📅 NASDAQ上場","📅 NASDAQ Listing"):[
+            jp("上場当日の売却圧力モニタリング体制を整備",
+               "Set up Day-1 sell pressure monitoring"),
+            jp("NASDAQ上場承認・取引開始","NASDAQ listing approval and trading begins"),
         ],
         jp("📅 上場後","📅 Post-Listing"):[
-            jp("Roth CEF開始・S-1提出","Roth CEF commences — S-1 filed"),
+            jp("Roth CEF開始 — S-1提出（上場後10営業日以内）",
+               "Roth CEF commences — S-1 filed within 10 business days"),
+            jp("Yorkville（条件改善済みの場合）署名・実行",
+               "Yorkville signing and execution (if terms improved)"),
             jp("トークンレイズ開始","Token raise launch"),
         ],
     }
