@@ -11,6 +11,9 @@ Streamlit 用ページ。biot-simulator アプリの「pages/」フォルダに�
 """
 
 import math
+import os
+import json
+import requests
 import streamlit as st
 import plotly.graph_objects as go
 
@@ -58,6 +61,43 @@ EVENT_PRESETS = {
         ("ニュートラル", 2, 2, 3, 6, "なし",
          "サプライズが小さい開示は平均でほぼ0%。"),
 }
+
+# ====== AI採点（Dify連携：既存の参謀と同じ作法）======
+DIFY_BASE   = "https://api.dify.ai/v1"
+DIFY_IR_KEY = os.environ.get("DIFY_KEY_IR", "")
+try:
+    if st.secrets.get("DIFY_KEY_IR"):
+        DIFY_IR_KEY = st.secrets["DIFY_KEY_IR"]
+except Exception:
+    pass
+
+def score_ir_with_dify(ir_text: str) -> dict:
+    """IR文案をDify(IR採点アプリ)へ送り、採点JSONを受け取る。"""
+    if not DIFY_IR_KEY:
+        return {"ok": False, "error": "DIFY_KEY_IR が未設定。Streamlitの Settings → Secrets に追加してください。"}
+    if not ir_text.strip():
+        return {"ok": False, "error": "IR文案が空です。"}
+    headers = {"Authorization": f"Bearer {DIFY_IR_KEY}", "Content-Type": "application/json"}
+    payload = {"inputs": {}, "query": ir_text, "response_mode": "blocking", "user": "biot-ir-sim"}
+    try:
+        r = requests.post(f"{DIFY_BASE}/chat-messages", headers=headers, json=payload, timeout=60)
+        r.raise_for_status()
+        ans = r.json().get("answer", "")
+    except Exception as e:
+        return {"ok": False, "error": f"Dify呼び出し失敗: {e}"}
+    txt = ans.strip().replace("```json", "").replace("```", "").strip()
+    try:
+        i, j = txt.find("{"), txt.rfind("}")
+        data = json.loads(txt[i:j + 1])
+    except Exception:
+        return {"ok": False, "error": "AIの返答をJSONとして解釈できませんでした。", "raw": ans}
+    return {"ok": True, "data": data}
+
+def _clamp10(v, d=5):
+    try:
+        return max(0, min(10, int(round(float(v)))))
+    except Exception:
+        return d
 
 st.set_page_config(page_title="エスクロー シミュレーター", page_icon="💠", layout="wide")
 
@@ -111,6 +151,40 @@ with st.sidebar:
     _preset  = EVENT_PRESETS[ir_event]
     st.caption(f"📚 {_preset[6]}")
     use_preset = ir_event != "手動（プリセットを使わない）"
+
+    st.markdown("**🤖 AIで採点（Dify）**")
+    ir_text = st.text_area("IR文案を貼る（公開情報のみ）", height=110, key="ir_text",
+                           placeholder="プレスリリース等の本文を貼り付け…")
+    if st.button("AIで採点する"):
+        with st.spinner("AI採点中…"):
+            res = score_ir_with_dify(ir_text)
+        if res.get("ok"):
+            d = res["data"]
+            st.session_state["ir_ai"] = {
+                "dir":  d.get("direction", "ニュートラル"),
+                "str":  _clamp10(d.get("strength")),
+                "nov":  _clamp10(d.get("novelty")),
+                "mat":  _clamp10(d.get("materiality")),
+                "cred": _clamp10(d.get("credibility")),
+                "guid": d.get("guidance", "なし"),
+                "event": d.get("event_type", ""),
+                "reason": d.get("reason", ""),
+            }
+            st.success("AI採点完了。下の『AI採点結果を使う』をON。")
+        else:
+            st.error(res.get("error", "失敗"))
+            if res.get("raw"):
+                st.caption(f"AI返答: {res['raw'][:300]}")
+    ir_ai  = st.session_state.get("ir_ai")
+    use_ai = False
+    if ir_ai:
+        use_ai = st.checkbox("🤖 AI採点結果を使う", value=True)
+        st.caption(f"AI判定: {ir_ai.get('event','')}／{ir_ai.get('dir','')}・"
+                   f"強{ir_ai['str']}/新{ir_ai['nov']}/重{ir_ai['mat']}/信{ir_ai['cred']}・"
+                   f"見通し{ir_ai.get('guid','なし')}")
+        if ir_ai.get("reason"):
+            st.caption(f"根拠: {ir_ai['reason']}")
+
     with st.expander("採点を手動で微調整", expanded=not use_preset):
         ir_dir  = st.radio("材料の方向", ["ポジティブ", "ニュートラル", "ネガティブ"],
                            index=["ポジティブ", "ニュートラル", "ネガティブ"].index(_preset[0]),
@@ -155,8 +229,12 @@ new_total  = TOTAL + bonus
 nag_new    = NAGANO + bonus
 
 # ====== IRインパクト計算（採点→反応→需給ネット）======
-# プリセット選択時は過去事例ベースの標準値で採点（手動微調整は手動モード時に有効）
-if use_preset:
+# 採点ソースの優先順位：AI採点 > イベント種別プリセット > 手動スライダー
+if use_ai and ir_ai:
+    ir_dir  = ir_ai["dir"] if ir_ai["dir"] in ("ポジティブ", "ニュートラル", "ネガティブ") else "ニュートラル"
+    ir_str, ir_nov, ir_mat, ir_cred = ir_ai["str"], ir_ai["nov"], ir_ai["mat"], ir_ai["cred"]
+    ir_guid = ir_ai["guid"] if ir_ai["guid"] in ("なし", "上方", "中立", "下方") else "なし"
+elif use_preset:
     ir_dir, ir_str, ir_nov, ir_mat, ir_cred, ir_guid = _preset[0], _preset[1], _preset[2], _preset[3], _preset[4], _preset[5]
 _dir  = {"ポジティブ": 1, "ニュートラル": 0, "ネガティブ": -1}[ir_dir]
 _guid = {"なし": 0.0, "上方": 0.15, "中立": 0.0, "下方": -0.25}[ir_guid]
