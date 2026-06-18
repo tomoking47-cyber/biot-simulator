@@ -80,9 +80,19 @@ BANKER_FEE = 5_625_000  # A.G.P. 繰延報酬（概算）
 R144_QUARTER = round(TOTAL * 0.01)      # 287,945
 R144_YEAR    = R144_QUARTER * 4         # 1,151,780
 
+# Nasdaq Capital Market 防衛線（2026/1版）
+NSDQ_BID        = 1.00          # 株価
+NSDQ_MVUPHS     = 25_000_000    # 制限なし公開株時価（De-SPAC合併後の必須関門）
+NSDQ_HOLDERS    = 300           # 公開株主（round-lot）
+NSDQ_PUB_SHARES = 500_000       # 公開株数
+NSDQ_MVPHS      = 1_000_000     # 公開株時価
+NSDQ_EQUITY     = 2_500_000     # 株主資本
+HOLDERS_BASE    = 36            # 制限なし公開round-lot株主（620名は制限株で除外後）
+
 st.set_page_config(page_title="BIOT 統合ダッシュボード", page_icon="🧭", layout="wide")
 st.title("🧭 BIOT 統合ディール・ダッシュボード（v4）")
-st.caption("CAP TABLE・トラスト・A/P・エスクロー50/50・売り圧・Rule144・回収ベース・banker fee を統合。"
+st.caption("最上位の目的は『上場して、生き残る（非解散）』。上場維持判定・CAP TABLE・トラスト・A/P・"
+           "エスクロー50/50・売り圧・Rule144・回収ベース・banker fee・PIPE を統合。"
            "前提に基づく計画ツールであり株価予測ではない。最終判断は DEC・会計・弁護士の確認による。")
 
 # ============================================================
@@ -124,6 +134,17 @@ with st.sidebar:
     st.subheader("banker fee の扱い")
     banker_mode = st.radio("≈$5.6M（A.G.P.）",
                            ["A.G.P.が完全放棄（希薄化なし）", "Tarekが株売却で現金払い（要警戒）"], index=0)
+
+    st.subheader("🛡️ 上場維持・PIPE 設計")
+    pipe_raise = st.slider("PIPE 調達額 ($M)", 0, 50, 25, 1) * 1_000_000
+    pipe_price = st.slider("PIPE 価格 ($/株)", 1.0, 8.0, 3.25, 0.25)
+    pipe_holders = st.slider("PIPEで増える適格株主数", 0, 2000, 300, 50,
+                             help="機関中心なら少数、公募/小口なら多数")
+    register_620 = st.checkbox("620名を登録（株主数に算入を試みる）", value=False,
+                               help="登録で“制限なし”を狙うが、MVUPHSには算入されず売り圧は増える（要DEC）")
+    equity_pre = st.slider("BIOT 推定株主資本（PIPE前, $M）", -5, 60, 10, 1,
+                           help="会計上の純資産の概算。会計士と要確定") * 1_000_000
+    mm_count = st.slider("マーケットメイカー数", 0, 5, 2, 1)
 
 # ============================================================
 # 計算
@@ -170,12 +191,78 @@ years_144    = SPONSOR_DISC / R144_YEAR  # 4.5M消化年数
 trust_for_ap = 0 if trust_to_tarek else TRUST
 ap_gap       = AP_TOTAL - trust_for_ap
 
+# --- 上場維持メトリクス（Survival） ---
+pipe_shares      = pipe_raise / max(0.25, pipe_price)
+unrestricted_pub = PUBLIC + pipe_shares                 # MVUPHS算入（登録620は不算入）
+mvuphs           = unrestricted_pub * p0
+pub_held_shares  = PUBLIC + pipe_shares + CHARDAN        # 公開株（非関係者）
+mvphs            = pub_held_shares * p0
+holders          = HOLDERS_BASE + (620 if register_620 else 0) + pipe_holders
+equity           = equity_pre + pipe_raise
+biot_ap_pay      = (ap_burden if scen_B else 0)
+cash             = TRUST + pipe_raise - biot_ap_pay
+req_pipe_mvuphs  = max(0, NSDQ_MVUPHS - PUBLIC * p0)     # $25M達成に要るPIPE($)
+req_holders      = max(0, NSDQ_HOLDERS - HOLDERS_BASE - (620 if register_620 else 0))
+
+surv_metrics = [
+    ("株価 (bid price)",            "≥ $1.00",        f"${p0:,.2f}",          p0 >= NSDQ_BID),
+    ("MVUPHS（制限なし公開株時価）", "≥ $25M（De-SPAC）", f"${mvuphs:,.0f}",     mvuphs >= NSDQ_MVUPHS),
+    ("公開株主数",                  "≥ 300名",         f"{holders:,.0f}名",    holders >= NSDQ_HOLDERS),
+    ("公開株数",                    "≥ 500,000株",     f"{pub_held_shares:,.0f}株", pub_held_shares >= NSDQ_PUB_SHARES),
+    ("公開株時価 (MVPHS)",          "≥ $1M",           f"${mvphs:,.0f}",       mvphs >= NSDQ_MVPHS),
+    ("株主資本",                    "≥ $2.5M",         f"${equity:,.0f}",      equity >= NSDQ_EQUITY),
+    ("マーケットメイカー",          "≥ 2社",           f"{mm_count}社",        mm_count >= 2),
+    ("現金（運転資金）",            "> $0（健全）",     f"${cash:,.0f}",        cash > 0),
+]
+surv_pass = sum(1 for m in surv_metrics if m[3])
+
 # ============================================================
 # タブ
 # ============================================================
-tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
-    ["📊 サマリー/判定", "💠 エスクロー50/50", "📉 売り圧・株価",
+tab_surv, tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs(
+    ["🛡️ 上場維持判定", "📊 サマリー", "💠 エスクロー50/50", "📉 売り圧・株価",
      "🧾 A/P & トラスト", "🏦 CAP TABLE", "📐 回収ベース", "📝 注記"])
+
+# ---------- Tab0 上場維持判定（Survival） ----------
+with tab_surv:
+    st.subheader("🛡️ 上場維持判定（Nasdaq Capital Market 防衛線）")
+    st.caption("各メトリクスを防衛線と照合。🟢=満たす / 🔴=未達。"
+               "De-SPAC合併後は MVUPHS（制限なし公開株時価）≧$25M が必須関門。")
+
+    cc = st.columns(3)
+    cc[0].metric("クリア関門", f"{surv_pass} / {len(surv_metrics)}")
+    cc[1].metric("売り圧反映の株価", f"${avg_price:,.2f}",
+                 "≥$1" if avg_price >= 1 else "$1割れ警戒",
+                 delta_color="normal" if avg_price >= 1 else "inverse")
+    cc[2].metric("MVUPHS（試算）", f"${mvuphs:,.0f}",
+                 f"必要$25M {'達成' if mvuphs >= NSDQ_MVUPHS else '未達'}",
+                 delta_color="normal" if mvuphs >= NSDQ_MVUPHS else "inverse")
+
+    st.dataframe({
+        "関門":   [m[0] for m in surv_metrics],
+        "防衛線": [m[1] for m in surv_metrics],
+        "試算":   [m[2] for m in surv_metrics],
+        "判定":   ["🟢 OK" if m[3] else "🔴 未達" for m in surv_metrics],
+    }, use_container_width=True, hide_index=True)
+
+    if surv_pass == len(surv_metrics):
+        st.success(f"🟢 全{len(surv_metrics)}関門クリア — この前提なら上場維持の最低線を満たす。"
+                   f"（株価は売り圧次第で$1を割りうる点に注意）")
+    else:
+        fails = [m[0] for m in surv_metrics if not m[3]]
+        st.error(f"🔴 未達 {len(surv_metrics)-surv_pass}件：{ '・'.join(fails) }。下記の手当てが必要。")
+
+    st.divider()
+    st.markdown("#### 達成に必要な手当て")
+    h1, h2, h3 = st.columns(3)
+    h1.metric("MVUPHS$25Mに必要なPIPE", f"${req_pipe_mvuphs:,.0f}", f"@ ${p0:,.2f}")
+    h2.metric("300名に必要な追加株主", f"{req_holders:,.0f}名",
+              "620登録で短縮可" if not register_620 else "620登録済")
+    h3.metric("現金（トラスト＋PIPE−負担）", f"${cash:,.0f}",
+              delta_color="normal" if cash > 0 else "inverse")
+    st.caption("🔴 MVUPHSは“新規の本物の資金（PIPE/公募）”でしか積めない（再販登録株は不算入）＝PIPEが生存のキーストーン。"
+               "620名の登録は『株主数』には効くが MVUPHS には効かず、売り圧は増える（要DEC）。"
+               "株価は『買い手の厚み』が薄いと$1を割りやすい＝オーバーハング封じ込めが要。")
 
 # ---------- Tab1 サマリー ----------
 with tab1:
@@ -409,4 +496,15 @@ with tab7:
         "BIOTへ跳ね返りリスク。A.G.P.によるPubco免責(release)を必ず取る。\n"
         "- **株価**：未上場・極薄フロートのため実値は予測不能。本ツールは前提に基づく計画用で予測ではない。\n"
         "- **最終判断**：規制・税務・会計・法務は DEC（Darryl, Edward & Co.）および監査人の確認による。"
+    )
+    st.divider()
+    st.markdown("##### 🛡️ 上場維持の防衛線（Nasdaq Capital Market・2026/1版）")
+    st.markdown(
+        "- 維持は3基準のいずれか（**株主資本$2.5M / 上場証券時価$35M / 純利益$50万**）＋ 全て"
+        "（公開株50万株・公開株時価$1M・**株価$1**・**公開株主300名**・MM2社）。\n"
+        "- **De-SPAC合併後は MVUPHS（制限なし公開株時価）≧ $25M が必須関門**。"
+        "**再販登録株・制限株は“制限なし公開株”に算入されない**＝新規の本物の資金（PIPE/公募）が必要。\n"
+        "- **620名は制限株のため公開株主・公開株の計算から除外**。除外後の適格round-lot株主は約36名（300名に大幅不足）。\n"
+        "- 猶予：株価・上場証券時価・公開株時価は**180日**の是正期間。株主資本・株主数・株式数は**自動猶予なし**（是正計画の提出）。\n"
+        "- 株主資本・現金は概算入力（会計士と要確定）。MM数・PIPE株主数・620登録の可否はDEC/引受人と要確認。"
     )
