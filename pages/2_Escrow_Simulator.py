@@ -92,10 +92,12 @@ with st.sidebar:
     st.header("入力")
 
     st.subheader("株価前提")
-    p0    = st.slider("上場後 想定株価 P0 ($)", 0.25, 12.0, 3.25, 0.05,
-                      help="エスクロー株の価値・損益分岐の判定に使用")
-    depth = st.slider("市場の深さ＝吸収力 (株)", 200_000, 8_000_000, 1_500_000, 100_000,
-                      help="この株数の売りで株価が約半分になる、という流動性前提。薄いフロートでは小さく。")
+    p0    = st.slider("上場後 想定株価 P0 ($)", 1.0, 8.0, 3.25, 0.25,
+                      help="この株価のとき各ブロック・ボーナスがいくらになるかを試算。$1〜$8で動かせる。")
+    depth = st.slider("買い手の厚み（株価が半値になる売り株数）", 200_000, 8_000_000, 500_000, 100_000,
+                      help="買いたい人がたくさん並ぶ市場ほど大きく、数人しかいない市場ほど小さい。"
+                           "この株数を売り浴びせると株価が約半分になる、という目安。"
+                           "BIOTは買い手が薄いので小さめ（30万〜50万）が現実的。")
 
     st.subheader("エスクロー 50/50 シナリオ")
     scenario = st.radio(
@@ -192,6 +194,17 @@ with tab1:
     pipe_need = biot_shortfall + (biot_cost_unrec if scen_B else 0)
     st.metric("概算 必要PIPE（現金穴埋め）", f"${pipe_need:,.0f}")
 
+    st.divider()
+    st.markdown("### 🔭 株価の見通し（売り圧を反映した着地レンジ）")
+    o1, o2, o3 = st.columns(3)
+    o1.metric("入力した想定株価 P0", f"${p0:,.2f}", "あなたの仮定")
+    o2.metric("売り圧反映後の推定株価", f"${avg_price:,.2f}",
+              f"{(avg_price/p0-1)*100:,.0f}% vs P0", delta_color="inverse")
+    o3.metric("総売却株数 / 買い手の厚み", f"{total_sold:,.0f} / {depth:,.0f}")
+    st.caption("『売り圧・株価』タブの前提（Chardan・Sponsorの売却％、買い手の厚み、Rule144 or 登録）で、"
+               "株価がどこに着地しうるかの目安。**予測ではなく、前提に基づく試算**。"
+               "買い手の厚みを小さく（薄いフロート＝現実的）すると、推定株価は大きく下がります。")
+
     if scen_B and p0 < be_biot:
         st.error(f"🔴 NG水準 — シナリオBかつ株価 ${p0:,.2f} < 分岐 ${be_biot:,.2f}。"
                  f"BIOTの50万株で$2.8Mを消せず、不足 ${biot_shortfall:,.0f} がBIOT負担。"
@@ -213,38 +226,66 @@ with tab1:
 
 # ---------- Tab2 エスクロー50/50 ----------
 with tab2:
-    st.subheader("エスクロー 100万株 の 50/50")
+    st.subheader("エスクロー 100万株 の 50/50 — 株価ごとの価値")
+    st.markdown(f"**今の想定株価：${p0:,.2f}**（左サイドバーで $1〜$8 に動かすと、下の数字が全部変わります）")
+
     cL, cR = st.columns(2)
     with cL:
         st.markdown("### 🟦 Tarek 側 50万株")
-        st.metric("用途", "$845k ボーナス支払い")
-        st.metric("損益分岐", f"${be_tarek:,.2f}/株", "楽勝（低い）")
-        st.metric("Tarekの取り分（超過）", f"${tarek_bonus_surplus:,.0f}",
-                  "ボーナス控除後", delta_color="normal" if tarek_bonus_surplus >= 0 else "inverse")
-        st.caption("ボーナス内訳：" + " / ".join([f"{k} ${v:,.0f}" for k, v in BONUS_ITEMS.items()]))
+        st.metric("50万株の価値", f"${tarek_500k_value:,.0f}", f"@ ${p0:,.2f}")
+        st.metric("ボーナス支払い", f"${BONUS_TOTAL:,.0f}", "固定")
+        st.metric("Tarekの手取り（差引後）", f"${tarek_bonus_surplus:,.0f}",
+                  delta_color="normal" if tarek_bonus_surplus >= 0 else "inverse")
+        st.caption(f"分岐 ${be_tarek:,.2f}/株（低い＝楽勝）。内訳："
+                   + " / ".join([f"{k} ${v:,.0f}" for k, v in BONUS_ITEMS.items()]))
     with cR:
         st.markdown("### 🟥 BIOT 側 50万株")
+        st.metric("50万株の価値", f"${biot_500k_value:,.0f}", f"@ ${p0:,.2f}")
         if scen_B:
-            st.metric("用途", "$2.8M A/P を消し込み（現提案）")
-            st.metric("損益分岐", f"${be_biot:,.2f}/株", "高い（届きにくい）", delta_color="inverse")
-            st.metric("不足（株価P0時）", f"${biot_shortfall:,.0f}", delta_color="inverse")
+            st.metric("負う額（$2.8M A/P）", f"${ap_burden:,.0f}", "現提案")
+            st.metric("差（価値−負担）", f"${biot_500k_value - ap_burden:,.0f}",
+                      "不足" if biot_500k_value < ap_burden else "充足",
+                      delta_color="inverse" if biot_500k_value < ap_burden else "normal")
+            st.caption(f"分岐 ${be_biot:,.2f}/株（高い＝届きにくい）")
         else:
-            st.metric("用途", "自社立替の回収")
-            st.metric("必要回収ベース", f"${rec_base:,.0f}")
-            st.metric("超過（取り分）", f"${max(0, biot_500k_value - rec_base):,.0f}")
+            st.metric("必要回収ベース", f"${rec_base:,.0f}", "自社立替")
+            st.metric("超過（取り分）", f"${max(0, biot_500k_value - rec_base):,.0f}",
+                      delta_color="normal")
 
-    # 50万株の価値 vs 各負担
+    st.divider()
+    st.markdown("#### 株価 $1〜$8 で、いくらになるか一覧")
+    prices = [1, 2, 3, 4, 5, 6, 7, 8]
+    tbl = {
+        "株価": [f"${p}" for p in prices],
+        "Tarek 500k 価値": [f"${500_000*p:,.0f}" for p in prices],
+        "Tarek 手取り(−$845k)": [f"${500_000*p - BONUS_TOTAL:,.0f}" for p in prices],
+        "BIOT 500k 価値": [f"${500_000*p:,.0f}" for p in prices],
+        "BIOT 差(−$2.8M)": [f"${500_000*p - ap_burden:,.0f}" for p in prices],
+        "BIOT判定": ["✅充足" if 500_000*p >= ap_burden else "🔴不足" for p in prices],
+    }
+    st.dataframe(tbl, use_container_width=True, hide_index=True)
+    st.caption(f"前提：BIOTが$2.8Mを背負う場合の負担＝${ap_burden:,.0f}"
+               f"（トラスト{'をTarekが全取り' if trust_to_tarek else '充当後'}）。"
+               f"BIOTは株価 ${be_biot:,.2f} を超えないと500kで足りない／Tarekは ${be_tarek:,.2f} で楽に黒字。")
+
+    # 価値カーブ（$1〜$8）
+    xs = [1 + 0.1 * i for i in range(71)]  # 1.0〜8.0
     fig = go.Figure()
-    fig.add_trace(go.Bar(name="50万株の価値@P0", x=["Tarek 500k", "BIOT 500k"],
-                         y=[tarek_500k_value, biot_500k_value], marker_color="#4C78A8"))
-    fig.add_trace(go.Bar(name="背負う額",
-                         x=["Tarek 500k", "BIOT 500k"],
-                         y=[BONUS_TOTAL, ap_burden if scen_B else rec_base], marker_color="#E45756"))
-    fig.update_layout(barmode="group", height=340, yaxis_title="USD",
+    fig.add_trace(go.Scatter(x=xs, y=[500_000 * x for x in xs],
+                             name="50万株の価値", line=dict(color="#4C78A8", width=3)))
+    fig.add_hline(y=BONUS_TOTAL, line_dash="dash", line_color="#2E8B57",
+                  annotation_text=f"Tarekボーナス $845k（分岐 ${be_tarek:,.2f}）",
+                  annotation_position="bottom right")
+    fig.add_hline(y=ap_burden, line_dash="dash", line_color="#E45756",
+                  annotation_text=f"BIOT $2.8M負担（分岐 ${be_biot:,.2f}）",
+                  annotation_position="top left")
+    fig.add_vline(x=p0, line_dash="dot", line_color="gray",
+                  annotation_text=f"今 ${p0:,.2f}")
+    fig.update_layout(height=360, xaxis_title="株価 ($)", yaxis_title="USD",
                       margin=dict(l=10, r=10, t=10, b=10), legend=dict(orientation="h"))
     st.plotly_chart(fig, use_container_width=True)
-    st.caption(f"分岐：Tarek ${be_tarek:,.2f} / BIOT ${be_biot:,.2f}。"
-               f"『取りやすいカネをTarekへ、重いカネをBIOTへ』の非対称に注意。")
+    st.caption("青線＝50万株の価値。緑線($845k)を超えればTarekは黒字、赤線($2.8M)を超えればBIOTは500kで負担を消せる。"
+               "青線が赤線と交わる株価が、BIOTの損益分岐($5.70)。")
 
 # ---------- Tab3 売り圧・株価 ----------
 with tab3:
