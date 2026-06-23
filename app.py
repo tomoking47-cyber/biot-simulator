@@ -127,13 +127,14 @@ for role in ["統括参謀","CFO参謀","情報参謀"]:
         st.session_state[f"conv_id_{role}"] = ""
 
 # ── タブ ──
-tab1,tab2,tab3,tab4,tab5,tab6 = st.tabs([
+tab1,tab2,tab3,tab4,tab5,tab6,tab7 = st.tabs([
     jp("🏦 上場当日 株価予測","🏦 Day-1 Price Forecast"),
     jp("💰 ROTH CEF 調達","💰 ROTH CEF Financing"),
     jp("📊 希薄化分析","📊 Dilution"),
     jp("📈 シナリオ予測","📈 Scenarios"),
     jp("⚠️ リスク分析","⚠️ Risk"),
     jp("🎯 意思決定","🎯 Decision"),
+    jp("🎲 Sponsor売り抜け","🎲 Sponsor Dump"),
 ])
 
 # ════════════════════════════════════════════════════════
@@ -561,6 +562,109 @@ with tab6:
     for phase,actions in tl.items():
         with st.expander(phase, expanded=("今すぐ" in phase or "Now" in phase)):
             for a in actions: st.markdown(f"- {a}")
+
+
+
+# ════════════════════════════════════════════════════════
+# TAB 7: Sponsor/CHARDAN 売り抜けモンテカルロ
+# ════════════════════════════════════════════════════════
+with tab7:
+    import numpy as np
+    st.subheader(jp("🎲 Sponsor/CHARDAN 売り抜けシミュレーター","🎲 Sponsor/CHARDAN Dump Simulator"))
+    st.caption(jp(
+        "取得単価ゼロ同然のSponsor・CHARDANが上場初日にどれだけ売り、株価がどこまで落ち、いくら現金を抜くかを1万通りで試算。",
+        "Monte Carlo of zero-cost Sponsor/CHARDAN dumping on Day-1: shares sold, price impact, cash extracted."
+    ))
+
+    SP_SPONSOR = 5_515_481
+    SP_CHARDAN = 1_615_385
+    SP_COMBINED = SP_SPONSOR + SP_CHARDAN
+    SP_FLOAT = FLOAT_SHARES
+    SP_SENS = SENSITIVITY
+
+    cset1, cset2 = st.columns(2)
+    with cset1:
+        sp_low  = st.slider(jp("悲観の初値 ($)","Bear open ($)"), 0.5, 5.0, 2.0, 0.1, key="sp_low")
+        sp_mode = st.slider(jp("最頻の初値 ($)","Mode open ($)"), 1.0, 10.0, 4.0, 0.1, key="sp_mode")
+        sp_high = st.slider(jp("楽観の初値 ($)","Bull open ($)"), 2.0, 15.0, 6.0, 0.1, key="sp_high")
+    with cset2:
+        sp_d1_lo = st.slider(jp("初日に投げる割合 最小","Day-1 dump min"), 0.0, 1.0, 0.70, 0.05, key="sp_d1lo")
+        sp_d1_md = st.slider(jp("初日に投げる割合 最頻","Day-1 dump mode"), 0.0, 1.0, 0.85, 0.05, key="sp_d1md")
+        rule144 = st.checkbox(jp("Rule 144制限を適用（四半期1%上限）","Apply Rule 144 (1%/qtr cap)"), value=False, key="sp_144")
+
+    if not (sp_low <= sp_mode <= sp_high) or not (sp_d1_lo <= sp_d1_md <= 1.0):
+        st.error(jp("入力は 悲観≤最頻≤楽観、最小≤最頻≤1.0 の順で。","Inputs must be ordered."))
+    else:
+        rng = np.random.default_rng(42)
+        N = 10000
+        p0 = rng.triangular(sp_low, sp_mode, sp_high, N)
+        sell_prob = np.clip(0.30 + (p0 - 1.0) * 0.07, 0.30, 0.97)
+        will_sell = rng.random(N) < sell_prob
+        d1_frac = rng.triangular(sp_d1_lo, sp_d1_md, 1.0, N)
+        day1_shares = np.where(will_sell, SP_COMBINED * d1_frac, 0)
+        if rule144:
+            cap144 = TOTAL_SHARES * 0.01  # 四半期1%
+            day1_shares = np.minimum(day1_shares, cap144)
+        sell_pct_float = day1_shares / SP_FLOAT * 100
+        price_after = np.maximum(0.10, p0 * (1 - sell_pct_float * SP_SENS / 100))
+        avg_price = (p0 + price_after) / 2
+        proceeds = day1_shares * avg_price
+
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric(jp("初日売却株数 中央値","Median shares sold"), f"{np.median(day1_shares):,.0f}",
+                  jp(f"フロートの{np.median(sell_pct_float):.0f}%", f"{np.median(sell_pct_float):.0f}% of float"))
+        m2.metric(jp("初日終値 中央値","Median Day-1 close"), f"${np.median(price_after):.2f}")
+        m3.metric(jp("彼らが抜く現金 中央値","Median cash extracted"), f"${np.median(proceeds):,.0f}")
+        m4.metric(jp("初日に売る確率","P(sell Day-1)"), f"{will_sell.mean()*100:.0f}%")
+
+        prob_half = (price_after < p0*0.5).mean()*100
+        prob_1 = (price_after < 1.0).mean()*100
+        prob_10m = (proceeds > 10_000_000).mean()*100
+        st.info(jp(
+            f"半値以下に落ちる確率 {prob_half:.0f}% ／ $1割れ確率 {prob_1:.0f}% ／ 彼らが$1000万超を抜く確率 {prob_10m:.0f}%",
+            f"P(price<half) {prob_half:.0f}% / P(price<$1) {prob_1:.0f}% / P(cash>$10M) {prob_10m:.0f}%"))
+
+        if rule144:
+            st.success(jp("✅ Rule 144制限ON — 四半期1%上限で初日の大量放出が物理的に抑えられている。",
+                          "✅ Rule 144 ON — 1%/qtr cap physically limits Day-1 dumping."))
+        else:
+            st.error(jp("🔴 Rule 144制限OFF — 登録済み等で制限がなければ、初日に大量放出が可能。DECに登録状況を要確認。",
+                        "🔴 Rule 144 OFF — without limits, mass Day-1 dump is possible. Confirm registration with DEC."))
+
+        # 初日終値の分布
+        fig_sp1 = go.Figure()
+        fig_sp1.add_trace(go.Histogram(x=price_after, nbinsx=50, marker_color="#C73E1D"))
+        fig_sp1.add_vline(x=np.median(price_after), line_dash="dot", line_color="navy",
+                          annotation_text=jp(f"中央値 ${np.median(price_after):.2f}", f"Median ${np.median(price_after):.2f}"))
+        fig_sp1.add_vline(x=1.0, line_dash="dash", line_color="red",
+                          annotation_text="$1")
+        fig_sp1.update_layout(height=280, xaxis_title=jp("初日終値 ($)","Day-1 close ($)"),
+                              yaxis_title=jp("頻度","Freq"), margin=dict(l=5,r=5,t=20,b=30),
+                              plot_bgcolor="white", paper_bgcolor="white", font=dict(size=11))
+        st.plotly_chart(fig_sp1, use_container_width=True)
+
+        # 彼らが抜く現金の分布
+        fig_sp2 = go.Figure()
+        fig_sp2.add_trace(go.Histogram(x=proceeds/1e6, nbinsx=50, marker_color="#F5A623"))
+        fig_sp2.add_vline(x=np.median(proceeds)/1e6, line_dash="dot", line_color="navy",
+                          annotation_text=jp(f"中央値 ${np.median(proceeds)/1e6:.1f}M", f"Median ${np.median(proceeds)/1e6:.1f}M"))
+        fig_sp2.update_layout(height=280, xaxis_title=jp("彼らが抜く現金 ($M・取得ゼロなので全額利益)","Cash extracted ($M, ~all profit)"),
+                              yaxis_title=jp("頻度","Freq"), margin=dict(l=5,r=5,t=20,b=30),
+                              plot_bgcolor="white", paper_bgcolor="white", font=dict(size=11))
+        st.plotly_chart(fig_sp2, use_container_width=True)
+
+        with st.expander(jp("前提・注記","Assumptions")):
+            st.markdown(jp(
+                f"- 対象：Sponsor {SP_SPONSOR:,}株 + CHARDAN {SP_CHARDAN:,}株 = {SP_COMBINED:,}株\n"
+                f"- 取得単価ゼロ同然（Sponsor $0.0001 / CHARDAN実質無償）→ 何で売っても利益\n"
+                f"- 5年待った我慢の限界 → 上場初日に集中売却の仮説\n"
+                f"- 売る確率は株価が高いほど上昇（$1で30%→$10で95%）\n"
+                f"- 薄商い：売圧1%につき株価{SP_SENS}%下落\n"
+                f"- Rule 144 ONで四半期1%上限。登録状況はDEC確認。これは計画用の仮説ツール。",
+                f"- Target: Sponsor {SP_SPONSOR:,} + CHARDAN {SP_CHARDAN:,} = {SP_COMBINED:,}\n"
+                f"- ~Zero cost basis → all proceeds are profit\n- Day-1 concentrated dump hypothesis\n"
+                f"- Sell probability rises with price\n- {SP_SENS}% drop per 1% sell pressure\n"
+                f"- Rule 144 caps at 1%/qtr. Confirm registration with DEC."))
 
 
 # ════════════════════════════════════════════════════════
