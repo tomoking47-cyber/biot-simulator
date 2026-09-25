@@ -1,6 +1,7 @@
 // Formula Bridge — Japan-side admins register a supplier company and its first user.
-// Returns a one-time temporary password for the admin to pass on. The supplier accepts the
-// agreements themselves on first sign-in (the app blocks everything else until they do).
+// Japan enters only the company name, contact name and email. Returns a one-time temporary password.
+// On first sign-in the supplier accepts the agreements, sets their own password and completes the
+// company profile (with logo); the app blocks everything else until they do.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -43,7 +44,9 @@ Deno.serve(async (req) => {
   const password = tempPassword();
   const { data, error } = await service.auth.admin.createUser({
     email, password, email_confirm: true,
+    // must_change_password: the supplier sets their own password (and completes the company profile) on first sign-in.
     user_metadata: {
+      must_change_password: true,
       full_name: s("full_name"), title: s("title"), phone: s("phone"), whatsapp: s("whatsapp"),
       company: { name: s("company_name"), address: s("address"), website: s("website"), nib: s("nib"), halal: s("halal"), materials: s("materials") },
     },
