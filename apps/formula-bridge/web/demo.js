@@ -6,7 +6,7 @@
   const q = new URLSearchParams(location.search);
   if (!q.has("demo")) return;
   const role = q.get("demo") === "supplier" ? "supplier" : "admin";
-  const KEY = "fb-demo-db-v1";
+  const KEY = "fb-demo-db-v2";
   const now = Date.now(), ago = (h) => new Date(now - h * 3600e3).toISOString();
 
   const CA = "c-demo-a", CB = "c-demo-b", CC = "c-demo-c", P1 = "p-demo-1", ADMIN = "u-demo-admin", SUP = "u-demo-sup";
@@ -39,7 +39,24 @@
       { id: "a-demo-a", project_id: P1, company_id: CA, status: "submitted", request_snapshot: snapshot, supplier: supplierA, requested_at: ago(168), submitted_at: ago(30), shipment: { carrier: "DHL", tracking: "DEMO1234567890", date: "2026-10-22", qty: "3 × 150 mL" }, shipped_at: ago(20), feedback: {}, feedback_at: null, updated_at: ago(20) },
       { id: "a-demo-b", project_id: P1, company_id: CB, status: "developing", request_snapshot: snapshot, supplier: { product: { name: "DEMO Lotion B" }, formula: [], materials: [], tests: [], files: [] }, requested_at: ago(168), shipment: {}, feedback: {}, updated_at: ago(40) },
       { id: "a-demo-c", project_id: P1, company_id: CC, status: "requested", request_snapshot: snapshot, supplier: {}, requested_at: ago(168), shipment: {}, feedback: {}, updated_at: ago(168) } ],
-    finals: [], plans: [], market: [], mail_log: [], admin_emails: [{ email: "demo-admin@example.com" }],
+    finals: [{ project_id: P1, adopted_assignment: "a-demo-a", base_formula: formula.map((r) => (r.inci === "Water" ? { ...r, pct: "83.65" } : { ...r })),
+      additions: [{ ja: "アセチルヒアルロン酸Na", inci: "Sodium Acetylated Hyaluronate", pct: "0.05", purpose: "保湿剤", note: "当社手配（デモ）" }],
+      plan: { productName: "（デモ）セラミド保湿ローション", brand: "BIOT", target: "30〜40代・乾燥とハリ不足が気になる女性", price: "1,980円", cost: "240円", channel: "ドラッグストア・EC", launch: "2027年春", goal: "【要確認】", usp: "掛川の自社工場で製造するMade in Japan品質" },
+      sup_ja: "（デモ）製品名：セラミド保湿ローション\nコンセプト：セラミドNPとナイアシンアミドを配合した、毎日のバリアケア向けの軽い保湿ローション。\n特徴：ややとろみのあるジェルローションで素早くなじむ／無香料・パラベンフリー・エタノールフリー\n原料見積：1本あたり92円（デモ）\n第三者試験：パッチテスト（デモ・実在しないデータ）",
+      finalized_at: null, updated_at: ago(3) }],
+    plans: [{ project_id: P1, created_at: ago(1), plan: { title: "（デモ）セラミド保湿ローション 新商品企画書", subtitle: "インドネシア原料メーカーとの共同開発・掛川工場で製造", date: "2026-09-25",
+      slides: [["cover", "表紙", "案件：セラミド保湿化粧水／販売市場：日本・インドネシア", ["カテゴリ：化粧水 150mL", "作成日：2026-09-25"]],
+        ["summary", "エグゼクティブサマリー", "セラミド×ナイアシンアミドの保湿化粧水を1,980円で2027年春に発売する。", ["原料はインドネシアから調達し、掛川工場で製造", "完成品コスト240円（目標250円以内）", "初年度販売目標は【要確認】"]],
+        ["market_jp", "市場動向（日本）", "国内化粧品市場は拡大基調で、スキンケアが最大カテゴリー。", ["出典付きの調査データから作成（デモでは省略）"]],
+        ["market_asia", "市場動向（インドネシア・アジア）", "インドネシアの化粧品市場は成長が続き、EC比率が上昇。", ["出典付きの調査データから作成（デモでは省略）"]],
+        ["competitors", "競合分析", "ドラッグストアの保湿化粧水は大手と新興ブランドが競合。", ["価格帯1,500〜2,500円に競合が集中", "差別化軸：成分の見える化と国内製造"]],
+        ["concept", "製品コンセプトとターゲット", "とろみがあるのにさっぱり、毎日のバリアケア。", ["ターゲット：30〜40代・乾燥とハリ不足", "無香料・パラベンフリー・エタノールフリー"]],
+        ["formula", "処方と訴求成分", "セラミドNPとナイアシンアミドを訴求成分とする。", ["全成分は別表", "配合量は社外秘のため別紙"]],
+        ["evidence", "エビデンス", "原料メーカーのデータと第三者試験で訴求を裏付ける。", ["パッチテスト（デモ・実在しないデータ）"]],
+        ["business", "価格・販売チャネル・収益計画", "販売価格1,980円、完成品コスト240円。", ["チャネル：ドラッグストア・EC", "初年度販売目標：【要確認】"]],
+        ["roadmap", "スケジュール・リスク・次のアクション", "10月末試作→評価→2027年春発売。", ["リスク：原料供給・為替・品質（COAで管理）", "次のアクション：試作評価とフィードバック"]]]
+        .map(([key, title, lead, bullets]) => ({ key, title, lead, bullets, sources: [] })) } }],
+    market: [], mail_log: [], admin_emails: [{ email: "demo-admin@example.com" }],
     settings: [{ key: "dev_email", value: "rd@instinct-bro.com" }, { key: "app_url", value: location.origin }],
     terms: [["nda", "Confidentiality Agreement (NDA)", "Perjanjian Kerahasiaan (NDA)", "秘密保持契約（NDA）"], ["purchase", "Declaration of Purchase by Artisans Production", "Pernyataan Pembelian oleh Artisans Production", "原料購入に関する当社宣言書"], ["ip", "Ownership of Adopted Formulas", "Kepemilikan Formula yang Diadopsi", "採用処方の帰属に関する合意"]]
       .map(([doc, en, idt, ja]) => ({ doc, version: "demo", current: true, title_en: en, title_id: idt, title_ja: ja, text_en: "(Demo) The full text is shown on the real registration page.", text_id: "(Demo) Teks lengkap ditampilkan di halaman pendaftaran.", text_ja: "（デモ）本番の登録画面には全文が表示されます。" })),
