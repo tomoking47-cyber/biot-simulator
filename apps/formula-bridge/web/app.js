@@ -73,7 +73,7 @@
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
     document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
   }
-  const libs = { XLSX: "vendor/xlsx.full.min.js", PptxGenJS: "vendor/pptxgen.bundle.js", docx: "vendor/docx.iife.js" };
+  const libs = { jspdf: "vendor/jspdf.umd.min.js", html2canvas: "vendor/html2canvas.min.js", XLSX: "vendor/xlsx.full.min.js", PptxGenJS: "vendor/pptxgen.bundle.js", docx: "vendor/docx.iife.js" };
   function lib(name) {
     if (window[name]) return Promise.resolve(window[name]);
     return new Promise((res, rej) => { const s = document.createElement("script"); s.src = libs[name]; s.onload = () => (window[name] ? res(window[name]) : rej(new Error(name))); s.onerror = rej; document.head.append(s); });
@@ -235,6 +235,57 @@
   };
   const TPL_MARK = "Formula Bridge formula template v1";
   const TPL_HEAD = ["No.", "Phase", "Trade name", "Nama bahan (Indonesian label name)", "INCI name", "Supplier / maker", "Amount", "Function"];
+  /* Formula as our Excel template (re-importable) — empty for the template, filled for exports. */
+  async function formulaXlsx({ project, company, unit, rows }) {
+    const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = Math.max(40, rows.length), extra = rows.length ? ["% w/w", "日本語表示名称 (Japanese label name)", "確認事項（AI）"] : [];
+    const head = TPL_HEAD.map((h) => h + (h === "No." ? "" : " *")).concat(extra);
+    const cell = (v) => (v === "" || v == null ? "" : isNaN(Number(v)) ? String(v) : Number(v));
+    const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English. Do not change the header row (row 7). / Isi SEMUA kolom dalam bahasa Inggris. Jangan ubah baris judul (baris 7)."],
+      ["Project", project || ""], ["Company", company || ""], ["Amount unit (write %, g or mL) *", unit || "%"], [],
+      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", r.jaNote || ""] : [i + 1, "", "", "", "", "", "", ""]; }),
+      ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
+    ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
+    ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
+    XLSX.utils.book_append_sheet(wb, ws, "Formula");
+    const ex = XLSX.utils.aoa_to_sheet([["EXAMPLE — do not fill in this sheet / CONTOH"], [], TPL_HEAD,
+      [1, "A", "Purified water", "Air", "Water", "—", 83.7, "Solvent"], [2, "A", "Glycerin 99.5%", "Gliserin", "Glycerin", "Wilmar", 4, "Humectant"],
+      [3, "B", "Ceramide NP-3", "Seramida NP", "Ceramide NP", "Evonik", 0.05, "Skin conditioning"], [4, "C", "Euxyl PE 9010", "Fenoksietanol, Etilheksilgliserin", "Phenoxyethanol, Ethylhexylglycerin", "Schülke", 0.5, "Preservative"]]);
+    ex["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, ex, "Example");
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["How to fill in / Cara mengisi"], [],
+      ["1", "One row per raw material, in the order you add them. / Satu baris per bahan baku."], ["2", "Phase: A, B, C … (the manufacturing phase). / Fase pembuatan."],
+      ["3", "Trade name: the product name of the raw material. / Nama dagang bahan baku."], ["4", "Nama bahan: the Indonesian label name. / Nama bahan sesuai label Indonesia."],
+      ["5", "INCI name: the international name. For a blend, list all INCI names separated by commas. / Untuk campuran, tulis semua nama INCI."],
+      ["6", "Supplier / maker: who makes the raw material. / Produsen bahan baku."], ["7", "Amount: numbers only, in the unit written in cell B5 (%, g or mL). If %, the total must be 100. / Hanya angka. Jika %, total harus 100."],
+      ["8", "Function: e.g. Humectant, Emulsifier, Preservative. / Fungsi bahan."], ["9", "Save the file and drop it into Formula Bridge (section B). / Simpan lalu unggah ke Formula Bridge (bagian B)."]]), "How to fill");
+    return new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  }
+  const fileBase = (name, kind) => `FormulaBridge_${kind}_` + String(name || "request").replace(/[\\/:*?"<>|\s]+/g, "_");
+  /* Formula as an A4 landscape PDF (rendered from HTML so Japanese names print correctly). */
+  async function formulaPdf({ project, company, logo, unit, rows, requester }) {
+    const [{ jsPDF }, h2c] = await Promise.all([lib("jspdf"), lib("html2canvas")]);
+    let logoData = "";
+    if (logo) try { const b = await (await fetch(logo)).blob(); logoData = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(b); }); } catch { /* print without the logo */ }
+    const per = 14, pages = Math.max(1, Math.ceil(rows.length / per)), tot = rows.reduce((a, r) => a + num(unit === "%" ? r.pct : r.amt), 0);
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const host = document.createElement("div"); host.style.cssText = "position:fixed;left:-99999px;top:0"; document.body.append(host);
+    try {
+      for (let pg = 0; pg < pages; pg++) {
+        const part = rows.slice(pg * per, pg * per + per);
+        host.innerHTML = `<div class="pdf-page"><div class="pdf-head">${logoData ? `<img src="${logoData}" alt="">` : ""}<div><div class="pdf-t">Formula / 処方表</div><div class="pdf-m">Project: <b>${esc(project || "")}</b>　Company: <b>${esc(company || "")}</b>${requester ? `　Requested by: ${esc(requester)}` : ""}</div>
+          <div class="pdf-m">Unit: ${unit === "%" ? "% w/w" : esc(unit) + " per batch (% calculated)"}　Date: ${new Date().toISOString().slice(0, 10)}　Page ${pg + 1}/${pages}</div></div><div class="pdf-brand">Formula Bridge<br><span>Artisans Production Co., Ltd.</span></div></div>
+          <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>日本語表示名称</th></tr></thead><tbody>
+          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}</td></tr>`).join("")}
+          ${pg === pages - 1 ? `<tr class="tot"><td colspan="6" style="text-align:right">Total</td>${unit === "%" ? "" : `<td class="n">${fmt(tot)}</td>`}<td class="n">${fmt(rows.reduce((a, r) => a + num(r.pct), 0))}</td><td colspan="2"></td></tr>` : ""}</tbody></table>
+          <div class="pdf-foot">Confidential — Formula Bridge / Artisans Production Co., Ltd.</div></div>`;
+        const cv = await h2c(host.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
+        if (pg) pdf.addPage();
+        pdf.addImage(cv.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 297, 210);
+      }
+    } finally { host.remove(); }
+    return pdf.output("blob");
+  }
+
   /* An editable table bound to an array; onChange is called after every edit. */
   function editTable(el, cols, rows, onChange, { totalCheck = false, readOnly = false } = {}) {
     const render = () => {
@@ -319,7 +370,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
   /* ================= SUPPLIER (Indonesia) ================= */
   async function supplierHome() {
     const { data: rows, error } = await sb.from("assignments").select("id, status, request_snapshot, requested_at, submitted_at, shipped_at, feedback_at, updated_at").order("requested_at", { ascending: false });
-    app.innerHTML = `<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these.</small></div>
+    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG). <a href="#/company">Company profile →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these.</small></div>
       <div class="card en"><h2>Requests / Permintaan</h2>
       ${error ? `<p class="status err">${esc(error.message)}</p>` : (rows || []).length ? `<div class="tbl-wrap"><table class="view master"><thead><tr><th>Project</th><th>Received</th><th>Status</th><th>Submitted</th><th>Sample shipped</th><th>Feedback from Japan</th><th></th></tr></thead><tbody>
       ${rows.map((a) => `<tr><td>${esc(a.request_snapshot?.name || "(project)")}</td><td>${d(a.requested_at)}</td><td>${chip(a.status, true)}</td><td>${d(a.submitted_at)}</td><td>${a.shipped_at ? '<span class="chip done">Shipped ✓</span>' : "—"}</td><td>${a.feedback_at ? '<span class="chip done">Received ✓</span>' : "—"}</td><td><a href="#/a/${a.id}">Open / Buka →</a></td></tr>`).join("")}
@@ -337,12 +388,13 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     if (error || !a) { app.innerHTML = `<div class="card"><p>This request was not found, or it is not addressed to your company.</p><a href="#/">← Back</a></div>`; return; }
     const sp = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, a.supplier || {});
     const snap = a.request_snapshot || {}, rq = snap.request || {};
+    await loadLogos([S.company]);
     app.innerHTML = `<div class="who id ${a.status === "submitted" ? "is-done" : ""}">${FLAG_ID}Your company fills in this page · Diisi oleh tim Indonesia<small>Please write in English</small><span class="state">${a.status === "submitted" ? "Done ✓" : "In progress"}</span></div>
     <div class="stack en">
       ${a.feedback_at ? `<div class="card" style="border-color:var(--ok)"><h2>${FLAG_JP}Feedback from Japan / Umpan balik dari Jepang</h2>
         <p class="sub">${dt(a.feedback_at)} · <b>${esc(a.feedback?.decision_en || "")}</b></p>
         <div class="brief-out">${esc(a.feedback?.en || "")}</div><div class="brief-out" style="margin-top:8px">${esc(a.feedback?.id || "")}</div></div>` : ""}
-      <div class="card"><div class="head"><h2>${FLAG_JP}Request from Japan: ${esc(snap.name || "")}</h2>
+      <div class="card"><div class="head"><div><h2>${FLAG_JP}Request from Japan: ${esc(snap.name || "")}</h2>${rq.requester ? `<p class="sub" style="margin:0">Requested by / Diminta oleh: <b>${esc(rq.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}</div>
         <div class="seg"><button type="button" data-rq="en" aria-pressed="true">English</button><button type="button" data-rq="id" aria-pressed="false">Bahasa Indonesia</button></div></div>
         <div class="brief-out" id="dev-brief"></div></div>
       <div class="card"><h2>${FLAG_ID}A. Product overview</h2><p class="sub">Changes are saved automatically. <span class="saved" id="saved"></span></p>
@@ -362,7 +414,10 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated)</option><option value="mL">mL per batch (% is calculated)</option></select></div>
         <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
         <div class="status err" id="st-miss" role="status"></div>
-        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button></div><div class="status" id="st-toja"></div></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button><span class="spacer"></span>
+          <span class="muted" style="font-size:12.5px">Save the formula as / Simpan sebagai:</span><button type="button" class="btn ghost" id="f-xlsx">⬇ Excel</button><button type="button" class="btn ghost" id="f-pdf">⬇ PDF</button></div>
+        <p class="sub" style="margin:6px 0 0">When you submit, the formula is also sent to Japan as Excel and PDF automatically. / Saat dikirim, formula juga dikirim ke Jepang dalam Excel dan PDF.</p>
+        <div class="status" id="st-toja"></div></div>
       <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E.</p>
         <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row</button></div></div>
       <div class="card"><h2>${FLAG_ID}D. Third-party test data</h2><p class="sub">Tests by independent laboratories (patch test, efficacy, stability, microbiology…). Attach reports in section E.</p>
@@ -454,27 +509,26 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     // Import a formula sheet (PDF, Excel, CSV or photo): AI reads it, the supplier checks the preview, then it is applied.
     const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
     const drop = $("f-drop"), dropSt = $("st-drop");
+    const fMeta = () => ({ project: snap.name, company: S.company?.name, logo: logoUrls[S.company?.logo_path], unit: sp.formulaUnit, rows: sp.formula.filter((r) => r.trade || r.idName || r.inci), requester: rq.requester });
+    $("f-xlsx").onclick = async () => download(fileBase(snap.name, "formula") + ".xlsx", await formulaXlsx(fMeta()));
+    $("f-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the PDF… / Membuat PDF…", async () => {
+      if (!fMeta().rows.length) throw { userMsg: "The formula is empty. / Formula masih kosong." };
+      download(fileBase(snap.name, "formula") + ".pdf", await formulaPdf(fMeta())); $("st-toja").textContent = "✓ PDF saved / PDF tersimpan";
+    });
+    // On submit: the formula goes to Japan as Excel + PDF too (stored with the attachments, attached to the email).
+    const attachFormulaFiles = async () => {
+      const m = fMeta(), stamp = new Date().toISOString().slice(0, 16).replace(/[-:T]/g, ""), made = [];
+      for (const [ext, blob, type] of [["xlsx", await formulaXlsx(m), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"], ["pdf", await formulaPdf(m), "application/pdf"]]) {
+        const name = `${fileBase(snap.name, "formula")}_${stamp}.${ext}`, path = `${a.company_id}/${aid}/${Date.now()}_formula.${ext}`;
+        const { error } = await sb.storage.from("attachments").upload(path, blob, { contentType: type });
+        if (error) throw error;
+        made.push({ path, name, cat: "Formula (auto)", desc: ext === "pdf" ? "Formula as PDF (made on submit)" : "Formula as Excel (made on submit)", type, size: blob.size, auto: true });
+      }
+      const old = sp.files.filter((f) => f.auto); sp.files = sp.files.filter((f) => !f.auto).concat(made); renderFiles();
+      if (old.length) sb.storage.from("attachments").remove(old.map((f) => f.path));
+    };
     $("tpl-dl").onclick = async () => {
-      const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new();
-      const head = TPL_HEAD.map((h) => h + (h === "No." ? "" : " *"));
-      const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English. Do not change the header row (row 7). / Isi SEMUA kolom dalam bahasa Inggris. Jangan ubah baris judul (baris 7)."],
-        ["Project", snap.name || ""], ["Company", S.company?.name || ""], ["Amount unit (write %, g or mL) *", "%"], [],
-        head, ...Array.from({ length: 40 }, (_, i) => [i + 1, "", "", "", "", "", "", ""]), ["", "", "", "", "", "Total", { f: "SUM(G8:G47)" }, ""]]);
-      ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
-      ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
-      XLSX.utils.book_append_sheet(wb, ws, "Formula");
-      const ex = XLSX.utils.aoa_to_sheet([["EXAMPLE — do not fill in this sheet / CONTOH"], [], TPL_HEAD,
-        [1, "A", "Purified water", "Air", "Water", "—", 83.7, "Solvent"], [2, "A", "Glycerin 99.5%", "Gliserin", "Glycerin", "Wilmar", 4, "Humectant"],
-        [3, "B", "Ceramide NP-3", "Seramida NP", "Ceramide NP", "Evonik", 0.05, "Skin conditioning"], [4, "C", "Euxyl PE 9010", "Fenoksietanol, Etilheksilgliserin", "Phenoxyethanol, Ethylhexylglycerin", "Schülke", 0.5, "Preservative"]]);
-      ex["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
-      XLSX.utils.book_append_sheet(wb, ex, "Example");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["How to fill in / Cara mengisi"], [],
-        ["1", "One row per raw material, in the order you add them. / Satu baris per bahan baku."], ["2", "Phase: A, B, C … (the manufacturing phase). / Fase pembuatan."],
-        ["3", "Trade name: the product name of the raw material. / Nama dagang bahan baku."], ["4", "Nama bahan: the Indonesian label name. / Nama bahan sesuai label Indonesia."],
-        ["5", "INCI name: the international name. For a blend, list all INCI names separated by commas. / Untuk campuran, tulis semua nama INCI."],
-        ["6", "Supplier / maker: who makes the raw material. / Produsen bahan baku."], ["7", "Amount: numbers only, in the unit written in cell B5 (%, g or mL). If %, the total must be 100. / Hanya angka. Jika %, total harus 100."],
-        ["8", "Function: e.g. Humectant, Emulsifier, Preservative. / Fungsi bahan."], ["9", "Save the file and drop it into Formula Bridge (section B). / Simpan lalu unggah ke Formula Bridge (bagian B)."]]), "How to fill");
-      download("FormulaBridge_formula_template_" + (snap.name || "request").replace(/[\\/:*?"<>|\s]+/g, "_") + ".xlsx", new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })]));
+      download(fileBase(snap.name, "formula_template") + ".xlsx", await formulaXlsx({ project: snap.name, company: S.company?.name, unit: "%", rows: [] }));
       toast("Template downloaded ✓", "Fill in every cell, save, then drop the file in the orange box.", "info");
     };
     // Our own template is read directly (exact, instant); anything else goes to the AI.
@@ -607,12 +661,16 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const b = blanks(); if (b.length) miss.push("Empty cells in the formula — " + b.slice(0, 5).map((x) => `row ${x.i + 1}: ${x.m.join(", ")}`).join("; ") + (b.length > 5 ? " …" : ""));
       if (miss.length) throw { userMsg: "Please check: " + miss.join(", ") };
       if (needsJa()) { $("st-submit").textContent = "Converting to Japanese names first… / 日本語表示名称に変換しています…"; await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); }
+      $("st-submit").textContent = "Making the formula Excel + PDF… / Membuat Excel + PDF…";
+      let fileNote = "";
+      try { await attachFormulaFiles(); } catch (err) { console.error(err); fileNote = " (The Excel/PDF copy could not be attached; Japan can still see the formula.)"; }
+      $("st-submit").textContent = "Submitting…";
       await save.now();
       const { error } = await sb.from("assignments").update({ supplier: sp, status: "submitted" }).eq("id", aid);
       if (error) throw { userMsg: "Could not submit: " + error.message };
       status = "submitted";
       const { data: r } = await sb.functions.invoke("notify", { body: { event: "submit", assignment_id: aid } });
-      $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan." + (r?.sent ? " Japan has been emailed." : "");
+      $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan." + (r?.sent ? " Japan has been emailed (with the formula Excel + PDF)." : "") + fileNote;
       shipState(); $("ship-card").scrollIntoView({ behavior: "smooth", block: "center" });
       toast("Done: submitted to Japan ✓", r?.sent ? "Japan's development team has been notified by email." : "Japan will see it on the master screen. Terima kasih!");
       document.querySelector(".who").classList.add("is-done"); document.querySelector(".who .state").textContent = "Done ✓";
@@ -621,11 +679,16 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   }
 
   async function supplierCompany() {
-    const c = S.company || {};
+    const c = S.company || {}; await loadLogos([c]);
     const F = [["name", "Company name"], ["contact_name", "Contact person"], ["contact_email", "Contact email"], ["phone", "Phone"], ["whatsapp", "WhatsApp"], ["address", "Address"], ["website", "Website"], ["nib", "Business ID (NIB)"], ["halal", "Halal certification"], ["materials", "Main raw materials"]];
     app.innerHTML = `<div class="who id">${FLAG_ID}Company profile / Profil perusahaan</div><form class="card en" id="f-co">
       ${F.map(([k, l]) => `<div class="field"><label for="c-${k}">${l}</label><input id="c-${k}" value="${esc(c[k] || "")}"></div>`).join("")}
+      <div class="field"><label for="c-logo">Company logo (JPG) * / Logo perusahaan</label><div class="logo-in">${logoImg(c, 72)}<input id="c-logo" type="file" accept="image/jpeg,image/png"><span id="c-logo-prev"></span></div><div class="status" id="st-logo"></div></div>
       <p class="sub">NDA agreed: ${dt(c.nda_agreed_at)}</p><button class="btn" type="submit">Save</button><div class="status" id="st-co"></div></form>`;
+    $("c-logo").onchange = async (e) => {
+      const f = e.target.files?.[0]; if (!f) return; const st = $("st-logo"); st.className = "status"; st.textContent = "Uploading… / Mengunggah…";
+      try { await uploadLogo(S.company, f); st.textContent = "✓ Logo saved / Logo tersimpan"; supplierCompany(); } catch (err) { st.className = "status err"; st.textContent = err?.userMsg || "Upload failed"; }
+    };
     $("f-co").onsubmit = async (e) => {
       e.preventDefault(); const patch = {}; F.forEach(([k]) => (patch[k] = $("c-" + k).value.trim()));
       const { error } = await sb.from("companies").update(patch).eq("id", c.id);
@@ -633,10 +696,51 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     };
   }
 
+  /* ---------------- Company logos (JPG, private bucket, shown through signed URLs) ---------------- */
+  const logoUrls = {};
+  async function loadLogos(list) {
+    const need = [...new Set(list.map((c) => c?.logo_path).filter((x) => x && !logoUrls[x]))];
+    if (!need.length) return;
+    try {
+      const { data } = await sb.storage.from("attachments").createSignedUrls(need, 60 * 60 * 6);
+      (data || []).forEach((x, i) => { if (x?.signedUrl) logoUrls[need[i]] = x.signedUrl; });
+    } catch { /* logos are optional to display */ }
+  }
+  function logoImg(c, size = 40) {
+    const u = c?.logo_path && logoUrls[c.logo_path];
+    if (u) return `<img class="co-logo" src="${esc(u)}" alt="${esc(c.name)}" style="width:${size}px;height:${size}px">`;
+    const ini = String(c?.name || "?").replace(/^(PT|CV)\.?\s+/i, "").split(/\s+/).map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+    return `<span class="co-logo none" style="width:${size}px;height:${size}px;font-size:${Math.max(10, Math.round(size / 2.8))}px" title="ロゴ未登録 / No logo">${esc(ini)}</span>`;
+  }
+  // Resize to at most 480px and save as JPG, so every logo looks alike and stays small.
+  async function toJpeg(file) {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw { userMsg: "JPG（または PNG）の画像を選んでください。 / Please choose a JPG image." };
+    if (file.size > 8 * 1024 * 1024) throw { userMsg: "画像が大きすぎます（8MBまで）。 / The image is larger than 8 MB." };
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      const k = Math.min(1, 480 / Math.max(img.width, img.height)), cv = document.createElement("canvas");
+      cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+      const g = cv.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height); g.drawImage(img, 0, 0, cv.width, cv.height);
+      return await new Promise((res) => cv.toBlob(res, "image/jpeg", 0.9));
+    } finally { URL.revokeObjectURL(url); }
+  }
+  async function uploadLogo(company, file) {
+    const blob = await toJpeg(file), path = `${company.id}/logo/logo-${Date.now()}.jpg`;
+    const { error } = await sb.storage.from("attachments").upload(path, blob, { contentType: "image/jpeg" });
+    if (error) throw { userMsg: "ロゴをアップロードできませんでした / Upload failed: " + error.message };
+    const { error: e2 } = await sb.from("companies").update({ logo_path: path }).eq("id", company.id);
+    if (e2) throw { userMsg: "ロゴを保存できませんでした / Could not save: " + e2.message };
+    if (company.logo_path) sb.storage.from("attachments").remove([company.logo_path]);
+    company.logo_path = path; await loadLogos([company]); return path;
+  }
+  const logoPreview = (input, box) => { input.onchange = () => { const f = input.files?.[0]; box.innerHTML = f ? `<img class="co-logo" style="width:72px;height:72px" alt="" src="${URL.createObjectURL(f)}">` : ""; }; };
+
   /* ================= ADMIN (Japan) ================= */
   async function loadCompanies() {
     const [{ data }, { data: people }] = await Promise.all([sb.from("companies").select("*").order("created_at"), sb.from("profiles").select("full_name, email, company_id, role")]);
-    S.companies = data || []; S.people = (people || []).filter((x) => x.company_id && x.role !== "admin"); return S.companies;
+    S.companies = data || []; S.people = (people || []).filter((x) => x.company_id && x.role !== "admin");
+    await loadLogos(S.companies); return S.companies;
   }
   // Full company details, so the right manufacturer is chosen.
   function coCard(c, a) {
@@ -644,7 +748,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     const must = (label, v) => `<div><span class="k">${label}</span>${v ? esc(v) : '<span class="unset">未登録</span>'}</div>`;
     const line = (label, v) => (v ? `<div><span class="k">${label}</span>${esc(v)}</div>` : "");
     const users = (S.people || []).filter((x) => x.company_id === c.id).map((x) => x.full_name ? `${x.full_name}（${x.email}）` : x.email).join("、");
-    return `<div class="co-card"><div class="co-head">${FLAG_ID}<span class="co-lbl">会社名</span></div><div class="co-name">${esc(c.name)}</div>${a ? `<div class="co-st">${chip(a.status)}</div>` : ""}
+    return `<div class="co-card"><div class="co-head">${logoImg(c, 52)}<div>${FLAG_ID}<span class="co-lbl">会社名</span><div class="co-name">${esc(c.name)}</div></div></div>${a ? `<div class="co-st">${chip(a.status)}</div>` : ""}
       <div class="co-grid">${must("担当者名", c.contact_name)}${must("ログイン者", users)}${must("メール", c.contact_email)}${must("電話", c.phone || c.whatsapp)}
         ${line("所在地", c.address)}${line("取扱原料", c.materials)}${line("NIB", c.nib)}${line("ハラール", c.halal)}</div></div>`;
   }
@@ -653,8 +757,23 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
 
   async function adminHome() {
     await loadCompanies();
-    const { data: projects } = await sb.from("projects").select("id, name, request, created_at, updated_at, assignments(id, company_id, status, requested_at, submitted_at, shipped_at, feedback_at, updated_at), finals(finalized_at), plans(created_at)").order("updated_at", { ascending: false });
+    const { data: projects } = await sb.from("projects").select("id, name, request, created_at, updated_at, assignments(id, company_id, status, requested_at, submitted_at, shipped_at, feedback, feedback_at, updated_at), finals(finalized_at, adopted_assignment), plans(created_at)").order("updated_at", { ascending: false });
     const P = projects || [];
+    // Outcome per company: adopted (final formula based on it, or feedback "採用（…）") / not adopted (feedback "不採用", or another company's formula was adopted).
+    const outcome = (p, a) => {
+      const f = one(p.finals), dec = String(a.feedback?.decision || "");
+      if ((f?.finalized_at && f.adopted_assignment === a.id) || dec.startsWith("採用（")) return { k: "yes", at: f?.adopted_assignment === a.id && f?.finalized_at ? f.finalized_at : a.feedback_at, why: f?.adopted_assignment === a.id && f?.finalized_at ? "完成処方に採用" : "フィードバックで採用" };
+      if (dec === "不採用") return { k: "no", at: a.feedback_at, why: a.feedback?.ja || "不採用" };
+      if (f?.finalized_at && f.adopted_assignment && f.adopted_assignment !== a.id) return { k: "no", at: f.finalized_at, why: "他社の処方を採用" };
+      return null;
+    };
+    const decided = P.flatMap((p) => (p.assignments || []).filter((a) => a.status !== "draft").map((a) => ({ p, a, o: outcome(p, a) })).filter((x) => x.o));
+    const openAs = (p) => (p.assignments || []).filter((a) => a.status !== "draft" && !outcome(p, a));
+    const listP = P.filter((p) => !(p.assignments || []).some((a) => a.status !== "draft") || openAs(p).length);
+    const coOf = (id) => S.companies.find((c) => c.id === id);
+    const decTable = (k) => { const rows = decided.filter((x) => x.o.k === k).sort((x, y) => String(y.o.at || "").localeCompare(String(x.o.at || "")));
+      return `<div class="tbl-wrap"><table class="view master"><thead><tr><th>会社</th><th>案件</th><th>理由・経緯</th><th>決定日</th></tr></thead><tbody>
+      ${rows.map(({ p, a, o }) => `<tr><td><div style="display:flex;gap:8px;align-items:center">${logoImg(coOf(a.company_id), 36)}<b>${esc(coName(a.company_id))}</b></div></td><td><a href="#/p/${p.id}/dev">${esc(p.name)}</a></td><td style="max-width:320px;font-size:12.5px">${esc(String(o.why).slice(0, 120))}</td><td>${d(o.at)}</td></tr>`).join("") || `<tr><td colspan="4" class="empty">まだありません</td></tr>`}</tbody></table></div>`; };
     const stats = S.companies.map((c) => {
       const as = P.flatMap((p) => p.assignments || []).filter((a) => a.company_id === c.id);
       return { c, req: as.filter((a) => a.status !== "draft").length, dev: as.filter((a) => a.status === "requested" || a.status === "developing").length, sub: as.filter((a) => a.status === "submitted").length, fb: as.filter(needsFeedback).length };
@@ -663,15 +782,19 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     app.innerHTML = `<div class="who jp">${FLAG_JP}マスター画面<small>依頼している全社の状況・依頼内容・進捗</small></div>
       ${owed.length ? `<div class="notice off"><b>フィードバック未実施 ${owed.length}件</b>　サンプルが届いた会社には必ずフィードバックを送ってください：${owed.map(({ p, a }) => `<a href="#/p/${p.id}/dev">${esc(coName(a.company_id))}（${esc(p.name)}）</a>`).join("、")}</div>` : ""}
       <div class="head"><h2 style="margin:0">登録企業 ${S.companies.length}社</h2><button class="btn" id="new-proj">＋ 新規案件</button></div>
-      <div class="kpis">${stats.map(({ c, req, dev, sub, fb }) => `<div class="kpi"><div class="co">${FLAG_ID}${esc(c.name)}</div>
+      <div class="kpis">${stats.map(({ c, req, dev, sub, fb }) => `<div class="kpi"><div class="co">${logoImg(c, 40)}<span>${esc(c.name)}</span></div>
         <div class="nums"><div><b>${req}</b>依頼</div><div><b>${dev}</b>開発中</div><div><b>${sub}</b>提出済み</div><div><b style="${fb ? "color:var(--warn)" : ""}">${fb}</b>FB待ち</div></div>
         <div class="muted" style="font-size:12px">${esc(c.contact_name || "")}　${esc(c.contact_email || "")}</div></div>`).join("") || `<div class="kpi"><div class="muted">まだ登録企業がありません。インドネシア各社にこのページのURLを送り、「Register company」から登録してもらってください。</div></div>`}</div>
       <div class="card"><h2>${FLAG_JP}案件一覧</h2><div class="tbl-wrap" style="margin-top:10px"><table class="view master"><thead><tr><th>案件</th><th>依頼先と進捗</th><th>完成処方</th><th>企画書</th><th>更新</th></tr></thead><tbody>
-      ${P.map((p) => { const as = (p.assignments || []).filter((a) => a.status !== "draft"), f = one(p.finals), pl = one(p.plans);
+      ${listP.map((p) => { const as = openAs(p), nd = (p.assignments || []).filter((a) => a.status !== "draft").length - as.length, f = one(p.finals), pl = one(p.plans);
         return `<tr><td><a href="#/p/${p.id}">${esc(p.name)}</a><div class="muted" style="font-size:12px">${esc(p.request?.cat || "")}</div></td>
-        <td>${as.length ? as.map((a) => `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0">${FLAG_ID}<span>${esc(coName(a.company_id))}</span>${chip(a.status)}${a.shipped_at ? '<span class="chip done">発送済み</span>' : ""}${a.feedback_at ? '<span class="chip done">FB済み</span>' : needsFeedback(a) ? '<span class="chip" style="border-color:var(--warn);color:var(--warn)">FB未実施</span>' : ""}<span class="muted" style="font-size:11px">${a.submitted_at ? "提出 " + d(a.submitted_at) : "依頼 " + d(a.requested_at)}</span></div>`).join("") : '<span class="chip draft">未依頼</span>'}</td>
-        <td>${f?.finalized_at ? '<span class="chip done">確定 ✓</span>' : "—"}</td><td>${pl ? '<span class="chip done">完成 ✓</span>' : "—"}</td><td>${d(p.updated_at)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">案件はまだありません。「＋ 新規案件」から始めてください。</td></tr>`}
-      </tbody></table></div></div>`;
+        <td>${as.length ? as.map((a) => `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:3px 0">${logoImg(S.companies.find((c) => c.id === a.company_id), 30)}<span>${esc(coName(a.company_id))}</span>${chip(a.status)}${a.shipped_at ? '<span class="chip done">発送済み</span>' : ""}${a.feedback_at ? '<span class="chip done">FB済み</span>' : needsFeedback(a) ? '<span class="chip" style="border-color:var(--warn);color:var(--warn)">FB未実施</span>' : ""}<span class="muted" style="font-size:11px">${a.submitted_at ? "提出 " + d(a.submitted_at) : "依頼 " + d(a.requested_at)}</span></div>`).join("") : '<span class="chip draft">未依頼</span>'}${nd ? `<div class="muted" style="font-size:11.5px;margin-top:2px">採用・不採用が決まった ${nd}社は下の欄に移動しました ↓</div>` : ""}</td>
+        <td>${f?.finalized_at ? '<span class="chip done">確定 ✓</span>' : "—"}</td><td>${pl ? '<span class="chip done">完成 ✓</span>' : "—"}</td><td>${d(p.updated_at)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">${P.length ? "進行中の案件はありません。" : "案件はまだありません。「＋ 新規案件」から始めてください。"}</td></tr>`}
+      </tbody></table></div></div>
+      <div class="dec-cols">
+        <div class="card dec yes"><h2>採用 <span class="muted" style="font-size:13px;font-weight:400">${decided.filter((x) => x.o.k === "yes").length}件</span></h2><p class="sub">完成処方に採用した会社、またはフィードバックで「採用」とした会社</p>${decTable("yes")}</div>
+        <div class="card dec no"><h2>不採用 <span class="muted" style="font-size:13px;font-weight:400">${decided.filter((x) => x.o.k === "no").length}件</span></h2><p class="sub">フィードバックで「不採用」とした会社、または他社の処方を採用した案件</p>${decTable("no")}</div>
+      </div>`;
     $("new-proj").onclick = async () => {
       const { data, error } = await sb.from("projects").insert({ name: "新規案件", created_by: S.user.id, request: { markets: ["jp"] } }).select("id").single();
       if (error) { toast("案件を作れませんでした", error.message, "info"); return; }
@@ -699,27 +822,43 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
           <div class="field"><label for="s-halal">ハラール認証</label><input id="s-halal"></div>
         </div>
         <div class="field"><label for="s-materials">主な取扱原料</label><input id="s-materials"></div>
+        <div class="field"><label for="s-logo">会社ロゴ（JPG）*　<small>依頼先の取り違えを防ぐため必須です</small></label><div class="logo-in"><input id="s-logo" type="file" accept="image/jpeg,image/png" required><span id="s-logo-prev"></span></div></div>
         <button class="btn saff" type="submit">登録してログイン情報を発行</button><div class="status" id="st-sup"></div>
         <div id="sup-result"></div></form>
-      <div class="card"><div class="tbl-wrap"><table class="view master"><thead><tr><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
-      ${S.companies.map((c) => `<tr><td>${FLAG_ID}<b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(c.address || "")}${c.website ? `<br>${esc(c.website)}` : ""}</div></td><td>${esc(c.contact_name || "")}</td>
+      <div class="card" id="co-list"><div class="tbl-wrap"><table class="view master"><thead><tr><th>ロゴ</th><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
+      ${S.companies.map((c) => `<tr><td>${logoImg(c, 56)}<label class="linkbtn" style="display:block;font-size:12px;margin-top:4px;position:relative">${c.logo_path ? "ロゴを変更" : "ロゴを登録"}<input type="file" accept="image/jpeg,image/png" data-logo="${c.id}" style="position:absolute;width:1px;height:1px;opacity:0"></label>${c.logo_path ? "" : '<span class="unset" style="font-size:12px">未登録</span>'}</td><td>${FLAG_ID}<b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(c.address || "")}${c.website ? `<br>${esc(c.website)}` : ""}</div></td><td>${esc(c.contact_name || "")}</td>
         <td>${esc(c.contact_email || "")}<div class="muted" style="font-size:12px">${esc(c.phone || "")}${c.whatsapp ? " / WA " + esc(c.whatsapp) : ""}</div></td><td>${esc(c.nib || "—")}<div class="muted" style="font-size:12px">${esc(c.halal || "")}</div></td>
-        <td style="max-width:240px">${esc(c.materials || "")}</td><td>${DOC_ORDER.map((k) => { const l = agreed(c.id, k); return `<div>${l ? `<span class="chip done">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} ✓</span> <span class="muted" style="font-size:11px">${dt(l.accepted_at)}</span>` : `<span class="chip draft">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} 未</span>`}</div>`; }).join("")}</td><td>${d(c.created_at)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">まだ登録がありません。</td></tr>`}
+        <td style="max-width:240px">${esc(c.materials || "")}</td><td>${DOC_ORDER.map((k) => { const l = agreed(c.id, k); return `<div>${l ? `<span class="chip done">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} ✓</span> <span class="muted" style="font-size:11px">${dt(l.accepted_at)}</span>` : `<span class="chip draft">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} 未</span>`}</div>`; }).join("")}</td><td>${d(c.created_at)}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">まだ登録がありません。</td></tr>`}
       </tbody></table></div></div>
       <div class="card" style="margin-top:14px"><h2>${FLAG_JP}合意文（日本語訳・確認用）</h2><p class="sub">相手は英語とインドネシア語の版に同意します。本番運用の前に、必ず弁護士の確認を受けてください。</p>
         ${terms.map((t) => `<h3>${esc(t.title_ja)}（版 ${esc(t.version)}）</h3><div class="brief-out ja">${esc(t.text_ja)}</div>`).join("")}</div>`;
+    logoPreview($("s-logo"), $("s-logo-prev"));
+    $("co-list").onchange = async (e) => {
+      const inp = e.target.closest("[data-logo]"); if (!inp) return; const f = inp.files?.[0]; if (!f) return;
+      const c = S.companies.find((x) => x.id === inp.dataset.logo);
+      try { await uploadLogo(c, f); toast("完了：ロゴを登録しました", c.name); adminCompanies(); } catch (err) { toast("ロゴを登録できませんでした", err?.userMsg || String(err), "info"); }
+    };
     const SF = ["company_name", "full_name", "email", "title", "phone", "whatsapp", "address", "website", "nib", "halal", "materials"];
     $("f-sup").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-sup").querySelector("button"), $("st-sup"), "登録しています…", async () => {
       const body = Object.fromEntries(SF.map((k) => [k, $("s-" + k).value.trim()]));
+      const logo = $("s-logo").files?.[0];
+      if (!logo) throw { userMsg: "会社ロゴ（JPG）を選んでください。" };
+      await toJpeg(logo); // check the image before creating the account
       const { data, error } = await sb.functions.invoke("create-supplier", { body });
       let err = null; if (error) { try { err = await error.context.json(); } catch { err = { error: "network" }; } }
       if (err || !data?.ok) {
         const code = err?.error || data?.error;
         throw { userMsg: code === "already_registered" ? "このメールアドレスは既に登録されています。" : code === "is_admin_email" ? "管理者のアドレスは仕入先に使えません。" : code === "demo" ? "デモ画面では登録できません。" : "登録できませんでした：" + (err?.message || code || "") };
       }
+      let logoMsg = "";
+      try {
+        const { data: prof } = await sb.from("profiles").select("company_id").eq("email", data.email).maybeSingle();
+        if (!prof?.company_id) throw { userMsg: "会社が見つかりません" };
+        await uploadLogo({ id: prof.company_id, name: body.company_name }, logo);
+      } catch (e) { logoMsg = "（ロゴは保存できませんでした。一覧の「ロゴを登録」から入れ直してください）"; }
       const url = location.origin + location.pathname;
       const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, purchase declaration, ownership of adopted formulas).\n3. Change your password from the "Password" menu.\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
-      $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
+      $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました" + logoMsg + "。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
       $("sup-result").innerHTML = `<div class="brief-out" style="margin-top:10px" id="sup-msg"></div><div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="copy-sup">案内文をコピー（英語・インドネシア語）</button><button type="button" class="btn ghost" id="done-sup">一覧を更新</button></div>`;
       $("sup-msg").textContent = msg;
       $("copy-sup").onclick = (ev) => copy(msg, ev.currentTarget);
@@ -815,6 +954,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     pv.innerHTML = `<div class="who jp ${done.req ? "is-done" : ""}">${FLAG_JP}日本側が入力する画面<small>依頼先の各社は、自社あての依頼だけを見られます</small><span class="state">${done.req ? "完了 ✓" : "入力中"}</span></div>
     <div class="cols"><form class="card" id="f-req" autocomplete="off"><h2>${FLAG_JP}開発依頼の内容</h2><p class="sub">入力は自動で保存されます。<span class="saved" id="saved"></span></p>
       <div class="field"><label for="r-name">案件名</label><input id="r-name" value="${esc(p.name)}"></div>
+      <div class="field"><label for="r-requester">依頼者（当社の担当者名）*</label><input id="r-requester" value="${esc(r.requester ?? S.profile?.full_name ?? "")}" placeholder="例：長野 智樹"></div>
       ${REQ_LABELS.map(([k, l]) => `<div class="field"><label for="r-${k}">${l}${k === "date" ? " <small>（カレンダーから選択）</small>" : ""}</label>${["feel", "claim", "avoid", "note"].includes(k) ? `<textarea id="r-${k}">${esc(r[k] || "")}</textarea>`
         : k === "date" ? `<input id="r-date" type="date" min="${today()}" value="${/^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? esc(r.date) : ""}">${r.date && !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? `<span class="hint">以前の入力：${esc(r.date)}（カレンダーで選び直してください）</span>` : ""}`
         : `<input id="r-${k}" value="${esc(r[k] || "")}">`}</div>`).join("")}
@@ -830,6 +970,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     </div></div>`;
     const save = saver(async () => { const { error } = await sb.from("projects").update({ name: p.name, request: r, brief }).eq("id", p.id); if (error) throw error; }, $("saved"));
     $("r-name").oninput = (e) => { p.name = e.target.value; save.soon(); };
+    if (r.requester == null) { r.requester = $("r-requester").value; save.soon(); }
+    $("r-requester").oninput = (e) => { r.requester = e.target.value; save.soon(); };
     REQ_LABELS.forEach(([k]) => ($("r-" + k)[k === "date" ? "onchange" : "oninput"] = (e) => { r[k] = e.target.value; save.soon(); }));
     $("r-markets").onchange = () => { r.markets = [...$("r-markets").querySelectorAll("input:checked")].map((i) => i.value); save.soon(); };
     let bl = "en";
@@ -838,7 +980,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     renderBrief();
     $("copy-brief").onclick = (e) => copy(brief[bl] || "", e.currentTarget);
     $("go-brief").onclick = (e) => busy(e.currentTarget, $("st-brief"), "依頼書を作成しています…（20〜60秒）", async () => {
-      const body = REQ_LABELS.filter(([k]) => r[k]).map(([k, l]) => `${l}: ${r[k]}`).concat((r.markets || []).length ? ["販売予定の市場: " + r.markets.map((m) => MK[m]).join("、")] : []).join("\n");
+      const body = (r.requester ? [`依頼者: ${r.requester}（株式会社Artisans Production）`] : []).concat(REQ_LABELS.filter(([k]) => r[k]).map(([k, l]) => `${l}: ${r[k]}`)).concat((r.markets || []).length ? ["販売予定の市場: " + r.markets.map((m) => MK[m]).join("、")] : []).join("\n");
       if (!body) throw { userMsg: "少なくとも1項目は記入してください。" };
       const res = await ai(`あなたは日本の化粧品メーカーの開発担当者です。インドネシアの化粧品原料メーカーの処方開発担当者に送る「処方開発依頼書」を作ります。
 下の日本語メモをもとに、見出し付きの簡潔な依頼書を作成してください。
@@ -860,11 +1002,12 @@ ${body}`, { effort: "medium" });
     $("send").onclick = () => {
       const ids = [...$("pick").querySelectorAll("input:checked")].map((i) => i.value), st = $("st-send");
       st.className = "status err";
+      if (!String(r.requester || "").trim()) { st.textContent = "左の「依頼者（当社の担当者名）」を入力してください。"; $("r-requester").focus(); return; }
       if (!brief.en) { st.textContent = "先に「依頼書を作成」を押してください。"; return; }
       if (!ids.length) { st.textContent = "依頼先を1社以上選んでください。"; return; }
       st.textContent = "";
       const list = ids.map((id) => S.companies.find((c) => c.id === id)).filter(Boolean);
-      $("send-confirm").innerHTML = `<div class="confirm-box"><b>次の${list.length}社に、案件「${esc(p.name)}」の依頼を送ります。会社名と担当者に間違いがないか確認してください。</b>
+      $("send-confirm").innerHTML = `<div class="confirm-box"><b>依頼者：${esc(r.requester)}　／　次の${list.length}社に、案件「${esc(p.name)}」の依頼を送ります。会社名と担当者に間違いがないか確認してください。</b>
         ${list.map((c) => `<div class="co-card-wrap">${coCard(c)}</div>`).join("")}
         <div class="row" style="margin-top:10px"><button class="btn saff big" id="send-go">この${list.length}社に依頼を送る</button><button class="btn ghost" id="send-back">選び直す</button></div></div>`;
       $("send-back").onclick = () => { $("send-confirm").innerHTML = ""; };
@@ -874,7 +1017,7 @@ ${body}`, { effort: "medium" });
     const doSend = (btn, ids) => busy(btn, $("st-send"), "送信しています…", async () => {
       $("send-confirm").innerHTML = "";
       await save.now();
-      const snapshot = { name: p.name, brief: { en: brief.en, id: brief.id }, request: { costRaw: r.costRaw || "", costFin: r.costFin || "", price: r.price || "", vol: r.vol || "", date: r.date || "" } };
+      const snapshot = { name: p.name, brief: { en: brief.en, id: brief.id }, request: { requester: String(r.requester || "").trim(), requesterEmail: S.profile?.email || "", costRaw: r.costRaw || "", costFin: r.costFin || "", price: r.price || "", vol: r.vol || "", date: r.date || "" } };
       const results = [];
       for (const cid of ids) {
         const existing = P.as.find((a) => a.company_id === cid);
@@ -901,7 +1044,8 @@ ${body}`, { effort: "medium" });
         <div class="cotabs">${sent.map((a) => `<button type="button" data-a="${a.id}" aria-pressed="${a.id === cur.id}">${FLAG_ID}${esc(coName(a.company_id))} ${chip(a.status)}</button>`).join("")}</div>
         <div class="stack en">
           <div class="card"><h2>${FLAG_ID}A. Product overview</h2><dl class="kv">${PRODUCT_FIELDS.map(([k, l]) => `<dt>${esc(l)}</dt><dd>${esc(sp.product[k] || "—")}</dd>`).join("")}</dl></div>
-          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><div class="tbl-wrap"><table class="view" id="t-f"></table></div><div class="status" id="st-toja"></div></div>
+          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><div class="tbl-wrap"><table class="view" id="t-f"></table></div>
+            <div class="row" style="margin-top:8px"><span class="spacer"></span><span class="muted" style="font-size:12.5px">処方表を保存：</span><button type="button" class="btn ghost" id="a-xlsx">⬇ Excel</button><button type="button" class="btn ghost" id="a-pdf">⬇ PDF</button></div><div class="status" id="st-toja"></div></div>
           <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><div class="tbl-wrap"><table class="view" id="t-m"></table></div></div>
           <div class="card"><h2>${FLAG_ID}D. Third-party tests</h2><div class="tbl-wrap"><table class="view" id="t-t"></table></div></div>
           <div class="card"><h2>${FLAG_ID}E. Attachments</h2><div class="files">${sp.files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span><div><button class="linkbtn" data-open="${i}">${esc(f.name)}</button>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div><span></span></div>`).join("") || '<div class="hint">なし</div>'}</div></div>
@@ -937,6 +1081,9 @@ ${ja}`, { effort: "low" });
         toast("完了：フィードバックを送りました", `${coName(cur.company_id)} に英語・インドネシア語で届きます。`);
       });
       editTable($("t-f"), COLS.formula, sp.formula, () => {}, { totalCheck: true, readOnly: true });
+      const co = S.companies.find((c) => c.id === cur.company_id), am = () => ({ project: P.p.name, company: co?.name, logo: logoUrls[co?.logo_path], unit: sp.formulaUnit || "%", rows: sp.formula, requester: cur.request_snapshot?.request?.requester });
+      $("a-xlsx").onclick = async () => download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".xlsx", await formulaXlsx(am()));
+      $("a-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "PDFを作成しています…", async () => { if (!sp.formula.length) throw { userMsg: "処方がまだありません。" }; download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".pdf", await formulaPdf(am())); $("st-toja").textContent = "✓ PDFを保存しました"; });
       editTable($("t-m"), COLS.materials, sp.materials, () => {}, { readOnly: true });
       editTable($("t-t"), COLS.tests, sp.tests, () => {}, { readOnly: true });
       $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "変換しています…", async () => {
