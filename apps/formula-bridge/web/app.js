@@ -756,18 +756,42 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   const needsFeedback = (a) => (a.status === "submitted" || a.shipped_at) && !a.feedback_at;
   const coName = (id) => S.companies.find((c) => c.id === id)?.name || "(company)";
 
+  // Outcome per company: adopted (final formula based on it, or feedback "採用（…）") / not adopted (feedback "不採用", or another company's formula was adopted).
+  function outcomeOf(p, a) {
+    const f = one(p.finals), dec = String(a.feedback?.decision || "");
+    if ((f?.finalized_at && f.adopted_assignment === a.id) || dec.startsWith("採用（")) return { k: "yes", at: f?.adopted_assignment === a.id && f?.finalized_at ? f.finalized_at : a.feedback_at, why: f?.adopted_assignment === a.id && f?.finalized_at ? "完成処方に採用" : "フィードバックで採用" };
+    if (dec === "不採用") return { k: "no", at: a.feedback_at, why: a.feedback?.ja || "不採用" };
+    if (f?.finalized_at && f.adopted_assignment && f.adopted_assignment !== a.id) return { k: "no", at: f.finalized_at, why: "他社の処方を採用" };
+    return null;
+  }
+
+  /* One company: its details and every project it was asked for. */
+  async function adminCompanyDetail(cid) {
+    await loadCompanies();
+    const c = S.companies.find((x) => x.id === cid);
+    if (!c) { app.innerHTML = `<div class="card empty">この企業は見つかりません。<a href="#/">← マスター画面</a></div>`; return; }
+    const { data: rows } = await sb.from("assignments").select("id, project_id, status, requested_at, submitted_at, shipped_at, feedback, feedback_at, updated_at, request_snapshot").eq("company_id", cid).order("requested_at", { ascending: false });
+    const { data: projects } = await sb.from("projects").select("id, name, request, finals(finalized_at, adopted_assignment)");
+    const pj = (id) => (projects || []).find((p) => p.id === id) || { id, name: "(案件)" };
+    const list = (rows || []).filter((a) => a.status !== "draft").map((a) => ({ a, p: pj(a.project_id), o: outcomeOf(pj(a.project_id), a) }));
+    const cnt = (f) => list.filter(f).length;
+    const res = (o) => (o ? (o.k === "yes" ? '<span class="chip done">採用</span>' : '<span class="chip draft">不採用</span>') : '<span class="muted">—</span>');
+    app.innerHTML = `<div class="head" style="margin-bottom:12px"><a href="#/">← マスター画面</a></div>
+      <div class="card co-detail"><div class="co-head" style="display:flex;gap:14px;align-items:center">${logoImg(c, 72)}<div><div class="co-lbl">${FLAG_ID}会社名</div><div class="co-name" style="margin:0">${esc(c.name)}</div></div></div>
+        <div class="co-grid" style="margin-top:10px">${[["担当者名", c.contact_name], ["メール", c.contact_email], ["電話", c.phone], ["WhatsApp", c.whatsapp], ["所在地", c.address], ["取扱原料", c.materials], ["NIB", c.nib], ["ハラール", c.halal]].map(([k, v]) => `<div><span class="k">${k}</span>${v ? esc(v) : '<span class="unset">未登録</span>'}</div>`).join("")}</div>
+        <div class="kpi" style="border:0;padding:10px 0 0"><div class="nums"><div><b>${list.length}</b>依頼</div><div><b>${cnt((x) => ["requested", "developing"].includes(x.a.status))}</b>開発中</div><div><b>${cnt((x) => x.a.status === "submitted")}</b>提出済み</div><div><b style="${cnt((x) => needsFeedback(x.a)) ? "color:var(--warn)" : ""}">${cnt((x) => needsFeedback(x.a))}</b>FB待ち</div><div><b style="color:var(--ok)">${cnt((x) => x.o?.k === "yes")}</b>採用</div><div><b>${cnt((x) => x.o?.k === "no")}</b>不採用</div></div></div></div>
+      <div class="card" style="margin-top:14px"><h2>${FLAG_JP}${esc(c.name)} の案件一覧</h2><div class="tbl-wrap" style="margin-top:10px"><table class="view master"><thead><tr><th>案件</th><th>依頼者</th><th>進捗</th><th>依頼日</th><th>提出日</th><th>サンプル</th><th>フィードバック</th><th>採否</th></tr></thead><tbody>
+      ${list.map(({ a, p, o }) => `<tr><td><a href="#/p/${p.id}/dev">${esc(p.name)}</a><div class="muted" style="font-size:12px">${esc(p.request?.cat || "")}</div></td><td>${esc(a.request_snapshot?.request?.requester || "—")}</td><td>${chip(a.status)}</td><td>${d(a.requested_at)}</td><td>${d(a.submitted_at)}</td>
+        <td>${a.shipped_at ? '<span class="chip done">発送済み</span>' : "—"}</td><td>${a.feedback_at ? `<span class="chip done">FB済み</span><div class="muted" style="font-size:11.5px">${esc(a.feedback?.decision || "")}</div>` : needsFeedback(a) ? '<span class="chip" style="border-color:var(--warn);color:var(--warn)">FB未実施</span>' : "—"}</td><td>${res(o)}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">この企業への依頼はまだありません。</td></tr>`}
+      </tbody></table></div></div>`;
+  }
+
   async function adminHome() {
     await loadCompanies();
     const { data: projects } = await sb.from("projects").select("id, name, request, created_at, updated_at, assignments(id, company_id, status, requested_at, submitted_at, shipped_at, feedback, feedback_at, updated_at), finals(finalized_at, adopted_assignment), plans(created_at)").order("updated_at", { ascending: false });
     const P = projects || [];
     // Outcome per company: adopted (final formula based on it, or feedback "採用（…）") / not adopted (feedback "不採用", or another company's formula was adopted).
-    const outcome = (p, a) => {
-      const f = one(p.finals), dec = String(a.feedback?.decision || "");
-      if ((f?.finalized_at && f.adopted_assignment === a.id) || dec.startsWith("採用（")) return { k: "yes", at: f?.adopted_assignment === a.id && f?.finalized_at ? f.finalized_at : a.feedback_at, why: f?.adopted_assignment === a.id && f?.finalized_at ? "完成処方に採用" : "フィードバックで採用" };
-      if (dec === "不採用") return { k: "no", at: a.feedback_at, why: a.feedback?.ja || "不採用" };
-      if (f?.finalized_at && f.adopted_assignment && f.adopted_assignment !== a.id) return { k: "no", at: f.finalized_at, why: "他社の処方を採用" };
-      return null;
-    };
+    const outcome = outcomeOf;
     const decided = P.flatMap((p) => (p.assignments || []).filter((a) => a.status !== "draft").map((a) => ({ p, a, o: outcome(p, a) })).filter((x) => x.o));
     const openAs = (p) => (p.assignments || []).filter((a) => a.status !== "draft" && !outcome(p, a));
     const listP = P.filter((p) => !(p.assignments || []).some((a) => a.status !== "draft") || openAs(p).length);
@@ -783,9 +807,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     app.innerHTML = `<div class="who jp">${FLAG_JP}マスター画面<small>依頼している全社の状況・依頼内容・進捗</small></div>
       ${owed.length ? `<div class="notice off"><b>フィードバック未実施 ${owed.length}件</b>　サンプルが届いた会社には必ずフィードバックを送ってください：${owed.map(({ p, a }) => `<a href="#/p/${p.id}/dev">${esc(coName(a.company_id))}（${esc(p.name)}）</a>`).join("、")}</div>` : ""}
       <div class="head"><h2 style="margin:0">登録企業 ${S.companies.length}社</h2><button class="btn" id="new-proj">＋ 新規案件</button></div>
-      <div class="kpis">${stats.map(({ c, req, dev, sub, fb }) => `<div class="kpi"><div class="co">${logoImg(c, 40)}<span>${esc(c.name)}</span></div>
+      <div class="kpis">${stats.map(({ c, req, dev, sub, fb }) => `<a class="kpi kpi-link" href="#/co/${c.id}" title="${esc(c.name)} の案件一覧を見る"><div class="co">${logoImg(c, 40)}<span>${esc(c.name)}</span><span class="kpi-go">案件一覧 ›</span></div>
         <div class="nums"><div><b>${req}</b>依頼</div><div><b>${dev}</b>開発中</div><div><b>${sub}</b>提出済み</div><div><b style="${fb ? "color:var(--warn)" : ""}">${fb}</b>FB待ち</div></div>
-        <div class="muted" style="font-size:12px">${esc(c.contact_name || "")}　${esc(c.contact_email || "")}</div></div>`).join("") || `<div class="kpi"><div class="muted">まだ登録企業がありません。インドネシア各社にこのページのURLを送り、「Register company」から登録してもらってください。</div></div>`}</div>
+        <div class="muted" style="font-size:12px">${esc(c.contact_name || "")}　${esc(c.contact_email || "")}</div></a>`).join("") || `<div class="kpi"><div class="muted">まだ登録企業がありません。インドネシア各社にこのページのURLを送り、「Register company」から登録してもらってください。</div></div>`}</div>
       <div class="card"><h2>${FLAG_JP}案件一覧</h2><div class="tbl-wrap" style="margin-top:10px"><table class="view master"><thead><tr><th>案件</th><th>依頼先と進捗</th><th>完成処方</th><th>企画書</th><th>更新</th></tr></thead><tbody>
       ${listP.map((p) => { const as = openAs(p), nd = (p.assignments || []).filter((a) => a.status !== "draft").length - as.length, f = one(p.finals), pl = one(p.plans);
         return `<tr><td><a href="#/p/${p.id}">${esc(p.name)}</a><div class="muted" style="font-size:12px">${esc(p.request?.cat || "")}</div></td>
@@ -827,7 +851,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         <button class="btn saff" type="submit">登録してログイン情報を発行</button><div class="status" id="st-sup"></div>
         <div id="sup-result"></div></form>
       <div class="card" id="co-list"><div class="tbl-wrap"><table class="view master"><thead><tr><th>ロゴ</th><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
-      ${S.companies.map((c) => `<tr><td>${logoImg(c, 56)}<label class="linkbtn" style="display:block;font-size:12px;margin-top:4px;position:relative">${c.logo_path ? "ロゴを変更" : "ロゴを登録"}<input type="file" accept="image/jpeg,image/png" data-logo="${c.id}" style="position:absolute;width:1px;height:1px;opacity:0"></label>${c.logo_path ? "" : '<span class="unset" style="font-size:12px">未登録</span>'}</td><td>${FLAG_ID}<b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(c.address || "")}${c.website ? `<br>${esc(c.website)}` : ""}</div></td><td>${esc(c.contact_name || "")}</td>
+      ${S.companies.map((c) => `<tr><td>${logoImg(c, 56)}<label class="linkbtn" style="display:block;font-size:12px;margin-top:4px;position:relative">${c.logo_path ? "ロゴを変更" : "ロゴを登録"}<input type="file" accept="image/jpeg,image/png" data-logo="${c.id}" style="position:absolute;width:1px;height:1px;opacity:0"></label>${c.logo_path ? "" : '<span class="unset" style="font-size:12px">未登録</span>'}</td><td>${FLAG_ID}<a href="#/co/${c.id}"><b>${esc(c.name)}</b></a><div class="muted" style="font-size:12px">${esc(c.address || "")}${c.website ? `<br>${esc(c.website)}` : ""}</div></td><td>${esc(c.contact_name || "")}</td>
         <td>${esc(c.contact_email || "")}<div class="muted" style="font-size:12px">${esc(c.phone || "")}${c.whatsapp ? " / WA " + esc(c.whatsapp) : ""}</div></td><td>${esc(c.nib || "—")}<div class="muted" style="font-size:12px">${esc(c.halal || "")}</div></td>
         <td style="max-width:240px">${esc(c.materials || "")}</td><td>${DOC_ORDER.map((k) => { const l = agreed(c.id, k); return `<div>${l ? `<span class="chip done">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} ✓</span> <span class="muted" style="font-size:11px">${dt(l.accepted_at)}</span>` : `<span class="chip draft">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} 未</span>`}</div>`; }).join("")}</td><td>${d(c.created_at)}</td></tr>`).join("") || `<tr><td colspan="8" class="empty">まだ登録がありません。</td></tr>`}
       </tbody></table></div></div>
@@ -1336,6 +1360,7 @@ ${src}`, { effort: "low" });
       if (parts[0] === "password") return viewUpdatePassword(true);
       if (parts[0] === "p" && parts[1]) return adminProject(parts[1], parts[2]);
       if (parts[0] === "companies") return adminCompanies();
+      if (parts[0] === "co" && parts[1]) return adminCompanyDetail(parts[1]);
       if (parts[0] === "settings") return adminSettings();
       if (parts[0] === "translate") return viewTranslate();
       return adminHome();
