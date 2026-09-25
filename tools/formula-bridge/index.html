@@ -4,20 +4,11 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
 :root{
-  --ground:#F3F5F2;
-  --paper:#FFFFFF;
-  --ink:#1B2420;
-  --ink-2:#4B5752;
-  --ink-3:#7C8883;
-  --line:#D9DFDA;
-  --line-2:#E8ECE9;
-  --accent:#23507A;       /* 藍 — Japanese side */
-  --accent-soft:#E3ECF4;
-  --saffron:#B36A12;      /* kunyit — Indonesian side */
-  --saffron-soft:#F8ECDC;
-  --warn:#A2461F;
-  --warn-soft:#F8E4DA;
-  --ok:#2E6B45;
+  --ground:#F3F5F2;--paper:#FFFFFF;--ink:#1B2420;--ink-2:#4B5752;--ink-3:#7C8883;
+  --line:#D9DFDA;--line-2:#E8ECE9;
+  --accent:#23507A;--accent-soft:#E3ECF4;
+  --saffron:#B36A12;--saffron-soft:#F8ECDC;
+  --warn:#A2461F;--warn-soft:#F8E4DA;--ok:#2E6B45;--ok-soft:#E1F0E6;
   --radius:10px;
   --jp:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif;
   --id:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;
@@ -28,31 +19,145 @@
     color-scheme:dark;
     --ground:#131816;--paper:#1B211F;--ink:#E7ECE9;--ink-2:#B3BDB8;--ink-3:#85918C;
     --line:#2F3834;--line-2:#252D2A;--accent:#8DB6DD;--accent-soft:#1F2F3E;
-    --saffron:#E3A457;--saffron-soft:#35291A;--warn:#E49270;--warn-soft:#3A2419;--ok:#7CC49A;
+    --saffron:#E3A457;--saffron-soft:#35291A;--warn:#E49270;--warn-soft:#3A2419;--ok:#7CC49A;--ok-soft:#1C3325;
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
   --ground:#131816;--paper:#1B211F;--ink:#E7ECE9;--ink-2:#B3BDB8;--ink-3:#85918C;
   --line:#2F3834;--line-2:#252D2A;--accent:#8DB6DD;--accent-soft:#1F2F3E;
-  --saffron:#E3A457;--saffron-soft:#35291A;--warn:#E49270;--warn-soft:#3A2419;--ok:#7CC49A;
+  --saffron:#E3A457;--saffron-soft:#35291A;--warn:#E49270;--warn-soft:#3A2419;--ok:#7CC49A;--ok-soft:#1C3325;
 }
 *{box-sizing:border-box}
 body{background:var(--ground);color:var(--ink);font-family:var(--jp);font-size:15px;line-height:1.65}
-.wrap{max-width:1180px;margin:0 auto;padding-inline:16px;padding-block:20px 48px}
-header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:18px}
-.brand h1{font-size:26px;font-weight:700;letter-spacing:.02em;margin:0;text-wrap:balance}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:16px;padding-block:18px 56px}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;margin-bottom:14px}
+.brand h1{font-size:26px;font-weight:700;letter-spacing:.02em;margin:0}
 .brand p{margin:2px 0 0;color:var(--ink-2);font-size:13px}
-.brand .pair{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.06em}
-nav.tabs{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:4px;flex-wrap:wrap}
-nav.tabs button{font:inherit;font-size:14px;border:0;background:transparent;color:var(--ink-2);padding:7px 16px;border-radius:999px;cursor:pointer}
-nav.tabs button[aria-selected="true"]{background:var(--ink);color:var(--ground);font-weight:500}
-nav.tabs button:focus-visible,button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.pair{font-family:var(--mono);font-size:12px;color:var(--ink-3);letter-spacing:.06em}
 
-.notice{font-size:13px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:16px}
+.projbar{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;margin-bottom:12px}
+.projbar label{font-size:12px;color:var(--ink-3);letter-spacing:.06em}
+.projbar select{font:inherit;font-size:15px;font-weight:500;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);padding:6px 10px;max-width:100%;min-width:0}
+.pill{font-size:12px;border-radius:999px;padding:2px 10px;border:1px solid currentColor;white-space:nowrap}
+.pill.s-draft{color:var(--ink-3)}.pill.s-requested{color:var(--saffron)}.pill.s-developing{color:var(--saffron)}
+.pill.s-submitted{color:var(--accent)}.pill.s-finalizing{color:var(--accent)}.pill.s-done{color:var(--ok)}
+.spacer{flex:1}
+
+/* Step navigation: a real sequence, so numbered */
+nav.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:16px}
+nav.steps button{font:inherit;text-align:left;border:1px solid var(--line);background:var(--paper);color:var(--ink-2);border-radius:var(--radius);padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;gap:0;min-width:0}
+nav.steps button .n{font-family:var(--mono);font-size:11px;color:var(--ink-3);letter-spacing:.06em}
+nav.steps button .t{font-weight:500;font-size:14px;color:var(--ink)}
+nav.steps button .w{font-size:11px;color:var(--ink-3)}
+nav.steps button[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
+nav.steps button.id-side .w{color:var(--saffron)}
+nav.steps button.done .n::after{content:" ✓";color:var(--ok)}
+
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.notice{font-size:13px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px}
 .notice.off{border-color:var(--warn);color:var(--warn);background:var(--warn-soft)}
+.notice.info{border-color:var(--saffron);background:var(--saffron-soft);color:var(--ink)}
 
-/* Translator panes: left = Indonesian, right = Japanese */
+.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:16px;min-width:0}
+.card h2{font-size:16px;margin:0 0 2px;font-weight:700}
+.card h3{font-size:14px;margin:14px 0 6px;font-weight:700}
+.card .sub{font-size:12.5px;color:var(--ink-3);margin:0 0 12px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.cols{display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);gap:14px;align-items:start}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;min-width:0}
+.field label{font-size:12px;color:var(--ink-2);font-weight:500}
+.field label small{color:var(--ink-3);font-weight:400}
+.field input,.field textarea,.field select{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);padding:8px 10px;width:100%}
+.field textarea{min-height:66px;resize:vertical}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:0 12px}
+.en{font-family:var(--id)}
+.en .field label{font-family:var(--id)}
+.checks{display:flex;gap:14px;flex-wrap:wrap;font-size:14px}
+.checks label{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:inherit;font-size:14px;font-weight:500;border:1px solid transparent;border-radius:8px;padding:9px 16px;cursor:pointer;background:var(--accent);color:#fff}
+:root[data-theme="dark"] .btn{color:#0F1A24}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn{color:#0F1A24}}
+.btn.big{font-size:16px;padding:12px 22px}
+.btn.saff{background:var(--saffron)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--line);font-weight:400;padding:6px 12px;font-size:13px}
+.btn.ghost:hover{color:var(--ink);border-color:var(--ink-3)}
+.btn.stop{background:transparent;color:var(--warn);border-color:var(--warn)}
+.x{font:inherit;border:0;background:transparent;color:var(--ink-3);cursor:pointer;font-size:16px;line-height:1;padding:4px 6px}
+.x:hover{color:var(--warn)}
+.status{font-size:13px;color:var(--ink-2);min-height:1.4em;margin-top:6px}
+.status.err{color:var(--warn)}
+.saved{font-size:12px;color:var(--ink-3)}
+.tag-ex{font-size:11px;font-family:var(--mono);color:var(--saffron);border:1px solid var(--saffron);border-radius:4px;padding:0 5px;letter-spacing:.04em}
+
+/* Editable tables */
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+table.edit{min-width:980px}
+table.view{min-width:640px}
+thead th{background:var(--paper);text-align:left;font-weight:500;font-size:11px;letter-spacing:.06em;color:var(--ink-3);padding:8px;border-bottom:1px solid var(--line);white-space:nowrap}
+thead th.ja-col{color:var(--accent)}
+tbody td{padding:4px 6px;border-bottom:1px solid var(--line-2);vertical-align:top}
+table.view tbody td{padding:8px}
+tbody tr:last-child td{border-bottom:0}
+td input{font:inherit;font-size:13.5px;width:100%;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--ink);padding:5px 6px}
+td input:hover{border-color:var(--line)}
+td input:focus{background:var(--ground);border-color:var(--line)}
+td.num input,td.num{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+td.no{font-family:var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums;width:34px;padding-top:9px}
+td.ja{color:var(--accent);padding-top:9px;font-size:13px}
+td.ja .nt{display:block;color:var(--warn);font-size:11.5px}
+td.inci,.mono{font-family:var(--mono);font-size:12.5px}
+tfoot td{padding:8px;font-weight:500;border-top:1px solid var(--line)}
+.total-ok{color:var(--ok)}.total-bad{color:var(--warn)}
+tr.add td{color:var(--ink-3)}
+.badge{font-size:11px;border-radius:4px;padding:0 6px;white-space:nowrap}
+.badge.base{background:var(--saffron-soft);color:var(--saffron)}
+.badge.add{background:var(--accent-soft);color:var(--accent)}
+
+.fulllist{font-size:14px;line-height:1.9;background:var(--ground);border-radius:8px;padding:12px 14px}
+.files{display:flex;flex-direction:column;gap:6px}
+.file{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;border:1px solid var(--line-2);border-radius:8px;padding:8px 10px;font-family:var(--id);font-size:13px}
+.file .cat{font-size:11px;background:var(--saffron-soft);color:var(--saffron);border-radius:4px;padding:1px 6px;white-space:nowrap}
+.file a{color:var(--accent);word-break:break-all}
+.file .d{color:var(--ink-3);font-size:12px}
+.upl{display:grid;grid-template-columns:180px minmax(0,1fr) auto;gap:8px;align-items:end;margin-top:10px}
+
+.brief-out{white-space:pre-wrap;font-family:var(--id);font-size:14px;line-height:1.7;min-height:120px;background:var(--ground);border-radius:8px;padding:12px 14px}
+.brief-out.ja{font-family:var(--jp)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
+.seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--ink-2);padding:6px 12px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:500}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+
+/* Checklist + slides */
+.checklist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;font-size:14px}
+.checklist li{display:flex;gap:10px;align-items:baseline}
+.checklist .mk{font-family:var(--mono);font-size:12px;width:44px;flex:none}
+.checklist .ok{color:var(--ok)}.checklist .ng{color:var(--warn)}
+.slides{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.slide{border:1px solid var(--line);border-radius:8px;background:var(--paper);padding:14px 16px;aspect-ratio:16/9;overflow:auto;max-width:100%;display:flex;flex-direction:column;gap:4px}
+.slide .sn{font-family:var(--mono);font-size:11px;color:var(--saffron)}
+.slide h4{margin:0;font-size:14px;color:var(--accent)}
+.slide p{margin:0;font-size:12px;color:var(--ink-2)}
+.slide ul{margin:2px 0 0;padding-left:16px;font-size:12px}
+.slide .att{font-size:11px;color:var(--ink-3);margin-top:auto}
+.slide.cover{background:var(--accent);color:#fff;border-color:var(--accent)}
+.slide.cover h4,.slide.cover p,.slide.cover .sn{color:#fff}
+:root[data-theme="dark"] .slide.cover{color:#0F1A24}
+:root[data-theme="dark"] .slide.cover h4,:root[data-theme="dark"] .slide.cover p,:root[data-theme="dark"] .slide.cover .sn{color:#0F1A24}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .slide.cover,:root:not([data-theme="light"]) .slide.cover h4,
+  :root:not([data-theme="light"]) .slide.cover p,:root:not([data-theme="light"]) .slide.cover .sn{color:#0F1A24}
+}
+.src{font-size:12px;color:var(--ink-3)}
+.src a{color:var(--accent)}
+
+/* Translator (kept from v1) */
 .panes{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .pane{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0}
 .pane-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line-2)}
@@ -61,73 +166,32 @@ nav.tabs button:focus-visible,button:focus-visible,textarea:focus-visible,input:
 .pane.id .code{background:var(--saffron-soft);color:var(--saffron)}
 .pane.ja .code{background:var(--accent-soft);color:var(--accent)}
 .role{font-size:11px;color:var(--ink-3);letter-spacing:.08em}
-.pane textarea{border:0;background:transparent;color:var(--ink);resize:vertical;min-height:230px;padding:14px;font-size:17px;line-height:1.7;width:100%}
+.pane textarea{border:0;background:transparent;color:var(--ink);resize:vertical;min-height:220px;padding:14px;font-size:17px;line-height:1.7;width:100%}
 .pane.id textarea{font-family:var(--id)}
-.pane.ja textarea{font-family:var(--jp)}
-.pane textarea[readonly]{cursor:default}
 .pane-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px 10px 14px;border-top:1px solid var(--line-2);flex-wrap:wrap}
 .back{font-size:13px;color:var(--ink-2);padding:0 14px 12px}
 .back b{font-weight:500;color:var(--ink-3);font-size:11px;letter-spacing:.08em;display:block}
 .hint{font-size:12px;color:var(--ink-3)}
-
-.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0}
-.dir{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--paper)}
-.dir button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--ink-2);padding:7px 12px;cursor:pointer}
-.dir button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent);font-weight:500}
-.btn{font:inherit;font-size:14px;font-weight:500;border:1px solid transparent;border-radius:8px;padding:9px 18px;cursor:pointer;background:var(--accent);color:#fff}
-:root[data-theme="dark"] .btn{color:#0F1A24}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .btn{color:#0F1A24}}
-.btn:disabled{opacity:.5;cursor:progress}
-.btn.ghost{background:transparent;color:var(--ink-2);border-color:var(--line);font-weight:400;padding:6px 12px;font-size:13px}
-.btn.ghost:hover{color:var(--ink);border-color:var(--ink-3)}
-.btn.stop{background:transparent;color:var(--warn);border-color:var(--warn)}
+.bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:0 0 12px}
 .check{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);cursor:pointer}
-.status{font-size:13px;color:var(--ink-2);min-height:1.4em}
-.status.err{color:var(--warn)}
-.tag-ex{font-size:11px;font-family:var(--mono);color:var(--saffron);border:1px solid var(--saffron);border-radius:4px;padding:0 5px;letter-spacing:.04em}
-
-/* Ingredient table */
 .ing-grid{display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);gap:14px;align-items:start}
-.card{background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
-.card h2{font-size:15px;margin:0 0 4px;font-weight:700}
-.card .sub{font-size:12px;color:var(--ink-3);margin:0 0 10px}
-.card textarea{width:100%;min-height:220px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);padding:10px;font:inherit;font-size:14px;line-height:1.7;resize:vertical}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
-.file-label{font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px}
-.file-label input{position:absolute;width:1px;height:1px;opacity:0}
-.tbl-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--paper)}
-table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
-thead th{position:sticky;top:0;background:var(--paper);text-align:left;font-weight:500;font-size:11px;letter-spacing:.08em;color:var(--ink-3);padding:10px 10px;border-bottom:1px solid var(--line)}
-thead th.id-col{color:var(--saffron)}
-tbody td{padding:9px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}
-tbody tr:last-child td{border-bottom:0}
-td.no{font-family:var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums;width:36px}
-td.inci{font-family:var(--mono);font-size:12.5px}
+.card textarea.big{width:100%;min-height:200px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);padding:10px;font:inherit;font-size:14px;line-height:1.7;resize:vertical}
 td.idn{font-family:var(--id)}
 td.idn .fn{display:block;color:var(--ink-3);font-size:12px}
-td.note{font-size:12px;color:var(--warn);max-width:220px}
-.tbl-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
-.tbl-head h2{margin:0;font-size:15px}
-.legend{font-size:12px;color:var(--ink-3)}
+td.note{font-size:12px;color:var(--warn)}
+.file-label{font-size:13px;color:var(--accent);cursor:pointer;text-decoration:underline;text-underline-offset:3px;position:relative}
+.file-label input{position:absolute;width:1px;height:1px;opacity:0}
 
-/* Brief */
-.brief-grid{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:14px;align-items:start}
-.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-.field label{font-size:12px;color:var(--ink-2);font-weight:500}
-.field input,.field textarea,.field select{font:inherit;font-size:14px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink);padding:8px 10px;width:100%}
-.field textarea{min-height:64px;resize:vertical}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.brief-out{white-space:pre-wrap;font-family:var(--id);font-size:14px;line-height:1.7;min-height:200px}
-.brief-out.ja{font-family:var(--jp)}
-.out-tabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-width:80ch}
 
-footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-width:70ch}
-
-@media (max-width:820px){
-  .panes,.ing-grid,.brief-grid{grid-template-columns:1fr}
-  /* Phone: put the Japanese input first so typing comes before reading */
+@media (max-width:900px){
+  nav.steps{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .cols,.panes,.ing-grid{grid-template-columns:1fr}
   .pane.ja{order:-1}
-  .two{grid-template-columns:1fr}
+}
+@media (max-width:560px){
+  nav.steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid2,.grid3,.upl{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
@@ -136,473 +200,1075 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   <header class="top">
     <div class="brand">
       <h1>処方ブリッジ</h1>
-      <p>インドネシア原料メーカーとの処方開発用　翻訳ツール</p>
-      <div class="pair">JA ⇄ ID · INCI</div>
+      <p>依頼 → インドネシアで開発 → 当社で完成 → 企画書</p>
+      <div class="pair">JA ⇄ ID / EN · INCI</div>
     </div>
-    <nav class="tabs" role="tablist" aria-label="機能">
-      <button role="tab" id="tab-text" aria-selected="true" data-tab="text">文章翻訳</button>
-      <button role="tab" id="tab-ing" aria-selected="false" data-tab="ing">成分表翻訳</button>
-      <button role="tab" id="tab-brief" aria-selected="false" data-tab="brief">開発依頼書</button>
-    </nav>
   </header>
 
-  <div class="notice" id="avail">翻訳機能を準備しています…</div>
+  <div class="notice" id="avail">準備しています…</div>
 
-  <!-- ============ 文章翻訳 ============ -->
-  <section id="view-text" role="tabpanel" aria-labelledby="tab-text">
-    <div class="bar">
-      <div class="dir" role="group" aria-label="翻訳の向き">
-        <button id="dir-ja" aria-pressed="true">日本語 → インドネシア語</button>
-        <button id="dir-id" aria-pressed="false">インドネシア語 → 日本語</button>
-      </div>
-      <label class="check"><input type="checkbox" id="hq"> 高精度モード（少し遅い）</label>
-    </div>
+  <div class="projbar" id="projbar">
+    <label for="proj-sel">案件 / Project</label>
+    <select id="proj-sel" aria-label="案件を選ぶ"></select>
+    <span class="pill s-draft" id="proj-status">—</span>
+    <span class="spacer"></span>
+    <span class="saved" id="saved"></span>
+    <button class="btn ghost" id="proj-new">＋ 新規案件</button>
+  </div>
 
-    <div class="panes">
-      <div class="pane id">
-        <div class="pane-head">
-          <span class="lang"><span class="code">ID</span>Bahasa Indonesia</span>
-          <span class="role" id="role-id">翻訳結果</span>
-        </div>
-        <textarea id="txt-id" readonly aria-label="インドネシア語">Terima kasih atas waktu Anda hari ini. Kami akan mengirimkan daftar komposisi dan sampel fisik produk acuan (benchmark) dari Jepang. Mohon kembangkan formula dengan sensasi pemakaian yang setara, namun dengan biaya yang lebih efisien.</textarea>
-        <div class="back" id="back-wrap"><b>逆翻訳（意味が通じているかの確認用）</b><span id="back-txt">本日はお時間をいただきありがとうございました。日本からベンチマーク品の成分表と現物サンプルをお送りします。同等の使用感で、よりコストを抑えた処方を開発してください。</span></div>
-        <div class="pane-foot">
-          <span class="hint" id="id-hint"><span class="tag-ex">例</span> 入力例の翻訳です</span>
-          <button class="btn ghost" data-copy="txt-id">コピー</button>
-        </div>
-      </div>
+  <nav class="steps" role="tablist" aria-label="工程">
+    <button role="tab" data-step="req"><span class="n">STEP 1</span><span class="t">依頼</span><span class="w">当社が記入</span></button>
+    <button role="tab" data-step="dev" class="id-side"><span class="n">STEP 2</span><span class="t">Development</span><span class="w">Indonesia team · English</span></button>
+    <button role="tab" data-step="fin"><span class="n">STEP 3</span><span class="t">完成処方</span><span class="w">当社で原料を追記</span></button>
+    <button role="tab" data-step="plan"><span class="n">STEP 4</span><span class="t">企画書</span><span class="w">出来上がり → PPT / Word</span></button>
+    <button role="tab" data-step="tr"><span class="n">TOOL</span><span class="t">翻訳ツール</span><span class="w">文章・成分表</span></button>
+  </nav>
 
-      <div class="pane ja">
-        <div class="pane-head">
-          <span class="lang"><span class="code">JA</span>日本語</span>
-          <span class="role" id="role-ja">ここに入力</span>
+  <!-- ================= STEP 1 依頼 ================= -->
+  <section id="view-req" role="tabpanel" hidden>
+    <div class="cols">
+      <form class="card" id="req-form" autocomplete="off">
+        <h2>開発依頼の内容</h2>
+        <p class="sub">日本語で記入してください。入力内容は自動で保存されます。</p>
+        <div class="field"><label for="r-name">案件名</label><input id="r-name" data-doc="project" data-path="name"></div>
+        <div class="grid2">
+          <div class="field"><label for="r-cat">製品カテゴリ</label><input id="r-cat" data-doc="project" data-path="request.cat"></div>
+          <div class="field"><label for="r-vol">容量</label><input id="r-vol" data-doc="project" data-path="request.vol"></div>
         </div>
-        <textarea id="txt-ja" aria-label="日本語">本日はありがとうございました。当社が希望するベンチマーク品の成分表と現物サンプルを日本から送ります。同等の使用感で、価格を抑えた処方の開発をお願いします。</textarea>
-        <div class="pane-foot">
-          <span class="hint">Ctrl / ⌘ + Enter でも翻訳できます</span>
-          <div class="row" style="margin:0">
-            <button class="btn ghost" id="clear-text">クリア</button>
-            <button class="btn" id="go-text">翻訳する</button>
+        <div class="field"><label for="r-bench">ベンチマーク品（ブランド・商品名）</label><input id="r-bench" data-doc="project" data-path="request.bench"></div>
+        <div class="field"><label for="r-feel">目標とする使用感</label><textarea id="r-feel" data-doc="project" data-path="request.feel"></textarea></div>
+        <div class="field"><label for="r-claim">訴求したい成分・効果</label><textarea id="r-claim" data-doc="project" data-path="request.claim"></textarea></div>
+        <div class="field"><label for="r-avoid">使いたくない成分</label><textarea id="r-avoid" data-doc="project" data-path="request.avoid"></textarea></div>
+        <div class="grid2">
+          <div class="field"><label for="r-cost">目標原価（1本あたり）</label><input id="r-cost" data-doc="project" data-path="request.cost"></div>
+          <div class="field"><label for="r-date">試作サンプル希望日</label><input id="r-date" data-doc="project" data-path="request.date"></div>
+        </div>
+        <div class="field"><label>販売予定の市場</label>
+          <div class="checks" id="r-markets">
+            <label><input type="checkbox" value="jp"> 日本国内</label>
+            <label><input type="checkbox" value="id"> インドネシア</label>
+            <label><input type="checkbox" value="asia"> その他アジア</label>
           </div>
         </div>
-      </div>
-    </div>
-    <div class="status" id="st-text" role="status" aria-live="polite"></div>
-  </section>
-
-  <!-- ============ 成分表翻訳 ============ -->
-  <section id="view-ing" role="tabpanel" aria-labelledby="tab-ing" hidden>
-    <div class="ing-grid">
-      <div class="card">
-        <h2>日本語の全成分</h2>
-        <p class="sub">パッケージ裏の全成分をそのまま貼り付けてください。「、」区切り・改行区切りのどちらでも読み取ります。配合順はそのまま保ちます。</p>
-        <textarea id="ing-in" aria-label="日本語の全成分">水、BG、グリセリン、ペンチレングリコール、ヒアルロン酸Na、セラミドNP、ナイアシンアミド、カルボマー、水酸化K、フェノキシエタノール</textarea>
-        <div class="row">
-          <button class="btn" id="go-ing">インドネシア語に翻訳</button>
-          <label class="file-label" id="photo-wrap" hidden>写真から読み取る<input type="file" id="ing-photo" accept="image/*"></label>
-        </div>
-        <div class="status" id="st-ing" role="status" aria-live="polite"></div>
-      </div>
-
-      <div>
-        <div class="tbl-head">
-          <h2>成分対照表 <span class="tag-ex" id="ing-ex">例</span></h2>
-          <div class="row" style="margin:0">
-            <button class="btn ghost" id="copy-ing-id">インドネシア語版をコピー</button>
-            <button class="btn ghost" id="copy-ing-tsv">Excel用にコピー</button>
-            <button class="btn ghost" id="dl-ing" hidden>CSVで保存</button>
-          </div>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th>No.</th><th>日本語表示名</th><th>INCI名（国際共通名）</th>
-              <th class="id-col">Bahasa Indonesia ／ Fungsi</th><th>配合目的</th><th>確認事項</th>
-            </tr></thead>
-            <tbody id="ing-body"></tbody>
-          </table>
-        </div>
-        <p class="legend">INCI名は世界共通の成分名で、インドネシアの化粧品当局（BPOM）もこの名前で審査します。研究員との会話はINCI名を基準にすると誤解が起きません。</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ============ 開発依頼書 ============ -->
-  <section id="view-brief" role="tabpanel" aria-labelledby="tab-brief" hidden>
-    <div class="brief-grid">
-      <form class="card" id="brief-form">
-        <h2>開発依頼の内容（日本語で記入）</h2>
-        <p class="sub">ベンチマーク品と一緒に送る依頼書を作ります。わかる項目だけで構いません。</p>
-        <div class="two">
-          <div class="field"><label for="b-cat">製品カテゴリ</label><input id="b-cat" value="化粧水（ローション）"></div>
-          <div class="field"><label for="b-vol">容量</label><input id="b-vol" value="150mL"></div>
-        </div>
-        <div class="field"><label for="b-bench">ベンチマーク品（ブランド・商品名）</label><input id="b-bench" value="（例）国内ドラッグストアで販売中の保湿化粧水"></div>
-        <div class="field"><label for="b-feel">目標とする使用感</label><textarea id="b-feel">とろみがあるが、肌になじむとベタつかずにさっぱりする。香りは無香料。</textarea></div>
-        <div class="field"><label for="b-claim">訴求したい成分・効果</label><textarea id="b-claim">セラミド、ナイアシンアミドによる保湿とハリ感</textarea></div>
-        <div class="field"><label for="b-avoid">使いたくない成分</label><textarea id="b-avoid">日本の化粧品基準で配合できない成分、パラベン、鉱物油、アルコール（エタノール）</textarea></div>
-        <div class="two">
-          <div class="field"><label for="b-cost">目標原価（1本あたり）</label><input id="b-cost" value="原料費 100円以内"></div>
-          <div class="field"><label for="b-date">試作サンプル希望日</label><input id="b-date" value="2026年10月末"></div>
-        </div>
-        <div class="field"><label for="b-note">その他</label><textarea id="b-note">製造は日本の自社工場（静岡県掛川市）で行う。原料の規格書・SDS・COAの提出をお願いしたい。</textarea></div>
-        <div class="row"><button class="btn" type="submit" id="go-brief">依頼書を作成</button></div>
-        <div class="status" id="st-brief" role="status" aria-live="polite"></div>
+        <div class="field"><label for="r-note">その他</label><textarea id="r-note" data-doc="project" data-path="request.note"></textarea></div>
       </form>
 
-      <div class="card">
-        <div class="tbl-head">
-          <div class="out-tabs dir" role="group" aria-label="表示する言語">
-            <button type="button" data-out="id" aria-pressed="true">インドネシア語</button>
-            <button type="button" data-out="en" aria-pressed="false">英語</button>
-            <button type="button" data-out="ja" aria-pressed="false">日本語（確認用）</button>
+      <div class="stack">
+        <div class="card">
+          <div class="head">
+            <h2>依頼書（インドネシア側が読む版）</h2>
+            <div class="seg" role="group" aria-label="言語">
+              <button type="button" data-bout="en" aria-pressed="true">English</button>
+              <button type="button" data-bout="id" aria-pressed="false">Indonesia</button>
+              <button type="button" data-bout="ja" aria-pressed="false">日本語（確認用）</button>
+            </div>
           </div>
-          <button class="btn ghost" id="copy-brief">表示中の版をコピー</button>
+          <div class="brief-out" id="brief-out"></div>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="go-brief">依頼書を作成（英語・インドネシア語）</button>
+            <button class="btn ghost" id="copy-brief">表示中の版をコピー</button>
+          </div>
+          <div class="status" id="st-brief" role="status" aria-live="polite"></div>
         </div>
-        <div class="brief-out" id="brief-out"></div>
+        <div class="card">
+          <h2>インドネシアへ依頼を送る</h2>
+          <p class="sub">押すと状態が「依頼済み」になり、インドネシア側の STEP 2 画面の上部にこの依頼書が表示されます。</p>
+          <div class="row"><button class="btn saff" id="send-req">依頼を送る</button></div>
+          <div class="status" id="st-send"></div>
+          <h3>インドネシア側への共有方法</h3>
+          <ol class="sub" style="padding-left:18px;margin:0">
+            <li>このページ右上の「共有」から、相手のメールアドレスを <b>編集者</b> として招待します（相手はClaudeのアカウントが必要です）。</li>
+            <li>リンクの末尾に <span class="mono">#dev</span> を付けて送ると、英語の開発画面が最初に開きます。</li>
+            <li>招待がうまくいかない場合は STEP 2 の「Excel template」を送り、返送されたファイルを取り込んでください。</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STEP 2 Development (English) ================= -->
+  <section id="view-dev" role="tabpanel" class="en" hidden>
+    <div class="stack">
+      <div class="card">
+        <div class="head">
+          <h2>Request from Japan</h2>
+          <div class="seg" role="group" aria-label="Language">
+            <button type="button" data-rq="en" aria-pressed="true">English</button>
+            <button type="button" data-rq="id" aria-pressed="false">Bahasa Indonesia</button>
+          </div>
+        </div>
+        <div class="brief-out" id="dev-brief"></div>
+      </div>
+
+      <div class="card">
+        <h2>A. Product overview</h2>
+        <p class="sub">Please write everything in English. Changes are saved automatically.</p>
+        <div class="grid2">
+          <div class="field"><label for="d-pname">Product name (working title)</label><input id="d-pname" data-doc="supplier" data-path="product.name"></div>
+          <div class="field"><label for="d-appear">Appearance / texture</label><input id="d-appear" data-doc="supplier" data-path="product.appearance"></div>
+        </div>
+        <div class="field"><label for="d-concept">Concept</label><textarea id="d-concept" data-doc="supplier" data-path="product.concept"></textarea></div>
+        <div class="field"><label for="d-features">Key features <small>(one per line)</small></label><textarea id="d-features" data-doc="supplier" data-path="product.features" style="min-height:110px"></textarea></div>
+        <div class="field"><label for="d-claims">Possible marketing claims <small>(with supporting data)</small></label><textarea id="d-claims" data-doc="supplier" data-path="product.claims"></textarea></div>
+        <div class="grid3">
+          <div class="field"><label for="d-ph">pH</label><input id="d-ph" data-doc="supplier" data-path="product.ph"></div>
+          <div class="field"><label for="d-visc">Viscosity</label><input id="d-visc" data-doc="supplier" data-path="product.viscosity"></div>
+          <div class="field"><label for="d-shelf">Shelf life</label><input id="d-shelf" data-doc="supplier" data-path="product.shelfLife"></div>
+        </div>
+        <div class="field"><label for="d-stab">Stability test summary</label><textarea id="d-stab" data-doc="supplier" data-path="product.stability"></textarea></div>
+        <div class="grid3">
+          <div class="field"><label for="d-cost">Raw material cost per unit</label><input id="d-cost" data-doc="supplier" data-path="product.cost"></div>
+          <div class="field"><label for="d-moq">MOQ (raw materials)</label><input id="d-moq" data-doc="supplier" data-path="product.moq"></div>
+          <div class="field"><label for="d-lead">Lead time</label><input id="d-lead" data-doc="supplier" data-path="product.leadTime"></div>
+        </div>
+        <div class="field"><label for="d-process">Manufacturing process (brief)</label><textarea id="d-process" data-doc="supplier" data-path="product.process"></textarea></div>
+      </div>
+
+      <div class="card">
+        <div class="head">
+          <div><h2>B. Base formula (% w/w)</h2><p class="sub" style="margin:0">Enter the Indonesian label name (Nama bahan) and %. The Japanese label name (日本語表示名称) is filled in by the button below.</p></div>
+          <div class="row">
+            <button class="btn ghost" id="to-ja">日本語表示名称に変換 / Convert to Japanese names</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" data-addrow="formula">＋ Add row</button></div>
+        <div class="status" id="st-toja" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>C. Raw material highlights</h2>
+        <p class="sub">Features of key raw materials and the supplier's data (efficacy, mechanism, recommended dosage). Attach graphs and documents in section E.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" data-addrow="materials">＋ Add row</button></div>
+      </div>
+
+      <div class="card">
+        <h2>D. Third-party test data</h2>
+        <p class="sub">Tests performed by independent laboratories (e.g. patch test, SPF, efficacy, stability, microbiology). Attach the report in section E.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" data-addrow="tests">＋ Add row</button></div>
+      </div>
+
+      <div class="card">
+        <h2>E. Attachments</h2>
+        <p class="sub">Data sheets, graphs, specifications, sales materials, third-party reports, SDS, COA. PDF, images, videos and text files up to 20 MB each.</p>
+        <div class="files" id="files"></div>
+        <div class="upl" id="upl">
+          <div class="field" style="margin:0"><label for="f-cat">Category</label>
+            <select id="f-cat">
+              <option>Raw material data</option><option>Graph / chart</option><option>Specification</option>
+              <option>Sales material</option><option>Third-party report</option><option>SDS</option><option>COA</option><option>Other</option>
+            </select></div>
+          <div class="field" style="margin:0"><label for="f-desc">Description</label><input id="f-desc" placeholder="e.g. Hydration graph, 4 weeks, n=20"></div>
+          <label class="btn saff" style="position:relative">Upload file<input type="file" id="f-file" style="position:absolute;width:1px;height:1px;opacity:0" multiple></label>
+        </div>
+        <div class="status" id="st-upl" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>Submit to Japan</h2>
+        <p class="sub">When the sample is ready and sections A–E are complete, press Submit. Japan will be notified on this page.</p>
+        <div class="row">
+          <button class="btn saff big" id="submit-dev">Submit to Japan</button>
+          <span class="spacer"></span>
+          <button class="btn ghost" id="xl-out">Excel template (download)</button>
+          <label class="btn ghost" style="position:relative">Import from Excel<input type="file" id="xl-in" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></label>
+        </div>
+        <div class="status" id="st-submit" role="status" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STEP 3 完成処方 ================= -->
+  <section id="view-fin" role="tabpanel" hidden>
+    <div class="stack">
+      <div class="card">
+        <div class="head">
+          <div><h2>インドネシア側の提出内容（日本語訳）</h2><p class="sub" style="margin:0">英語で入力された製品特徴・原料データ・第三者試験を日本語に訳して表示します。</p></div>
+          <button class="btn ghost" id="tr-sup">日本語に翻訳</button>
+        </div>
+        <div class="brief-out ja" id="sup-ja"></div>
+        <div class="status" id="st-trsup" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="card">
+        <h2>当社で追記する原料</h2>
+        <p class="sub">ベース処方に当社が加える原料です。「水で100%に調整」を押すと、ベース処方の水の量を自動で合わせます。</p>
+        <div class="tbl-wrap"><table class="edit" id="t-add"></table></div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn ghost" data-addrow="additions">＋ 原料を追加</button>
+          <button class="btn ghost" id="qs-water">水で100%に調整</button>
+        </div>
+        <div class="status" id="st-qs"></div>
+      </div>
+
+      <div class="card">
+        <div class="head"><h2>完成処方</h2><span id="fin-total"></span></div>
+        <div class="tbl-wrap"><table class="view" id="t-final"></table></div>
+        <h3>全成分表示（自動作成・配合量の多い順）</h3>
+        <div class="fulllist" id="fulllist"></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" id="copy-full">全成分をコピー</button></div>
+        <p class="sub" style="margin-top:8px">1%以下の成分は順不同で表示できます（日本の表示ルール）。複数成分を含む原料は成分ごとの配合量が不明なため、並び順は要確認です。</p>
+      </div>
+
+      <div class="card">
+        <h2>商品計画</h2>
+        <p class="sub">企画書の「価格・販売チャネル・収益」の根拠になります。わかる範囲で記入してください。</p>
+        <div class="grid2">
+          <div class="field"><label for="p-name">商品名</label><input id="p-name" data-doc="final" data-path="plan.productName"></div>
+          <div class="field"><label for="p-brand">ブランド名</label><input id="p-brand" data-doc="final" data-path="plan.brand"></div>
+          <div class="field"><label for="p-target">ターゲット顧客</label><input id="p-target" data-doc="final" data-path="plan.target"></div>
+          <div class="field"><label for="p-price">販売価格（税込）</label><input id="p-price" data-doc="final" data-path="plan.price"></div>
+          <div class="field"><label for="p-cost">製造原価（1本）</label><input id="p-cost" data-doc="final" data-path="plan.cost"></div>
+          <div class="field"><label for="p-channel">販売チャネル</label><input id="p-channel" data-doc="final" data-path="plan.channel"></div>
+          <div class="field"><label for="p-launch">発売時期</label><input id="p-launch" data-doc="final" data-path="plan.launch"></div>
+          <div class="field"><label for="p-goal">初年度の販売目標</label><input id="p-goal" data-doc="final" data-path="plan.goal"></div>
+        </div>
+        <div class="field"><label for="p-usp">当社としての強み・差別化ポイント</label><textarea id="p-usp" data-doc="final" data-path="plan.usp"></textarea></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= STEP 4 企画書 ================= -->
+  <section id="view-plan" role="tabpanel" hidden>
+    <div class="stack">
+      <div class="cols">
+        <div class="card">
+          <h2>出来上がり前のチェック</h2>
+          <p class="sub">不足があっても作成できますが、その部分は企画書に【要確認】と表示されます。</p>
+          <ul class="checklist" id="checklist"></ul>
+        </div>
+        <div class="card">
+          <h2>企画書を作る</h2>
+          <p class="sub">市場動向・競合情報は、出典を確認した調査データだけを使います。数字は作りません。完成処方の配合%は社外秘として企画書には載せません。</p>
+          <div class="row">
+            <button class="btn big" id="go-plan">出来上がり（企画書を作成）</button>
+          </div>
+          <div class="status" id="st-plan" role="status" aria-live="polite"></div>
+          <h3>ダウンロード（10ページ）</h3>
+          <div class="row">
+            <button class="btn saff" id="dl-pptx" disabled>PowerPoint</button>
+            <button class="btn saff" id="dl-docx" disabled>Word</button>
+          </div>
+          <div class="status" id="st-dl" role="status" aria-live="polite"></div>
+          <h3>市場データ</h3>
+          <div class="src" id="market-meta"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="head"><h2 id="plan-title">企画書プレビュー</h2><span class="saved" id="plan-date"></span></div>
+        <div class="slides" id="slides"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= TOOL 翻訳 ================= -->
+  <section id="view-tr" role="tabpanel" hidden>
+    <div class="bar">
+      <div class="seg" role="group" aria-label="ツール">
+        <button type="button" id="sub-text" aria-pressed="true">文章翻訳</button>
+        <button type="button" id="sub-ing" aria-pressed="false">成分表翻訳</button>
+      </div>
+    </div>
+    <div id="tr-text">
+      <div class="bar">
+        <div class="seg" role="group" aria-label="翻訳の向き">
+          <button type="button" id="dir-ja" aria-pressed="true">日本語 → インドネシア語</button>
+          <button type="button" id="dir-id" aria-pressed="false">インドネシア語 → 日本語</button>
+        </div>
+        <label class="check"><input type="checkbox" id="hq"> 高精度モード（少し遅い）</label>
+      </div>
+      <div class="panes">
+        <div class="pane id">
+          <div class="pane-head"><span class="lang"><span class="code">ID</span>Bahasa Indonesia</span><span class="role" id="role-id">翻訳結果</span></div>
+          <textarea id="txt-id" readonly aria-label="インドネシア語">Terima kasih atas waktu Anda hari ini. Kami akan mengirimkan daftar komposisi dan sampel fisik produk acuan (benchmark) dari Jepang. Mohon kembangkan formula dengan sensasi pemakaian yang setara, namun dengan biaya yang lebih efisien.</textarea>
+          <div class="back" id="back-wrap"><b>逆翻訳（意味の確認用）</b><span id="back-txt">本日はお時間をいただきありがとうございました。日本からベンチマーク品の成分表と現物サンプルをお送りします。同等の使用感で、よりコストを抑えた処方を開発してください。</span></div>
+          <div class="pane-foot"><span class="hint" id="id-hint"><span class="tag-ex">例</span> 入力例の翻訳です</span><button class="btn ghost" data-copy="txt-id">コピー</button></div>
+        </div>
+        <div class="pane ja">
+          <div class="pane-head"><span class="lang"><span class="code">JA</span>日本語</span><span class="role" id="role-ja">ここに入力</span></div>
+          <textarea id="txt-ja" aria-label="日本語">本日はありがとうございました。当社が希望するベンチマーク品の成分表と現物サンプルを日本から送ります。同等の使用感で、価格を抑えた処方の開発をお願いします。</textarea>
+          <div class="pane-foot"><span class="hint">Ctrl / ⌘ + Enter でも翻訳できます</span>
+            <div class="row"><button class="btn ghost" id="clear-text">クリア</button><button class="btn" id="go-text">翻訳する</button></div></div>
+        </div>
+      </div>
+      <div class="status" id="st-text" role="status" aria-live="polite"></div>
+    </div>
+    <div id="tr-ing" hidden>
+      <div class="ing-grid">
+        <div class="card">
+          <h2>日本語の全成分</h2>
+          <p class="sub">パッケージ裏の全成分を貼り付けてください。配合順はそのまま保ちます。</p>
+          <textarea class="big" id="ing-in" aria-label="日本語の全成分">水、BG、グリセリン、ペンチレングリコール、ヒアルロン酸Na、セラミドNP、ナイアシンアミド、カルボマー、水酸化K、フェノキシエタノール</textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="btn" id="go-ing">インドネシア語に翻訳</button>
+            <label class="file-label" id="photo-wrap" hidden>写真から読み取る<input type="file" id="ing-photo" accept="image/*"></label>
+          </div>
+          <div class="status" id="st-ing" role="status" aria-live="polite"></div>
+        </div>
+        <div>
+          <div class="head">
+            <h2 style="margin:0;font-size:15px">成分対照表 <span class="tag-ex" id="ing-ex">例</span></h2>
+            <div class="row"><button class="btn ghost" id="copy-ing-id">インドネシア語版をコピー</button><button class="btn ghost" id="copy-ing-tsv">Excel用にコピー</button></div>
+          </div>
+          <div class="tbl-wrap"><table class="view"><thead><tr><th>No.</th><th>日本語表示名</th><th>INCI</th><th>Bahasa Indonesia ／ Fungsi</th><th>配合目的</th><th>確認事項</th></tr></thead><tbody id="ing-body"></tbody></table></div>
+        </div>
       </div>
     </div>
   </section>
 
   <footer>
-    機械翻訳です。契約・価格・納期など重要な数字は、逆翻訳や相手の復唱で必ず確認してください。INCI名は日本化粧品工業会（JCIA）の表示名称リストで最終確認を。翻訳は閲覧者ご自身のClaude利用枠で実行されます。
+    機械翻訳・AI作成の内容を含みます。価格・数量・納期などの数字は逆翻訳や相手の復唱で確認してください。日本語表示名称は日本化粧品工業会（JCIA）の表示名称リストで最終確認を。翻訳・企画書作成は、閲覧者ご自身のClaude利用枠で実行されます。
   </footer>
 </div>
 
+<script src="export.js"></script>
 <script>
 (() => {
   const $ = (id) => document.getElementById(id);
-  const store = {
-    get(k){ try { return JSON.parse(localStorage.getItem("fb:"+k)); } catch { return null; } },
-    set(k,v){ try { localStorage.setItem("fb:"+k, JSON.stringify(v)); } catch {} }
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const ls = {
+    get(k) { try { return JSON.parse(localStorage.getItem("fb2:" + k)); } catch { return null; } },
+    set(k, v) { try { localStorage.setItem("fb2:" + k, JSON.stringify(v)); } catch {} },
   };
+  const getPath = (o, p) => p.split(".").reduce((a, k) => (a == null ? undefined : a[k]), o);
+  const setPath = (o, p, v) => { const ks = p.split("."); let a = o; ks.slice(0, -1).forEach((k) => { if (typeof a[k] !== "object" || a[k] == null) a[k] = {}; a = a[k]; }); a[ks[ks.length - 1]] = v; };
+  const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
+  const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
+  const today = () => new Date().toISOString().slice(0, 10);
 
-  /* ---------- Glossary shared by every prompt ---------- */
+  let sample = null, db = null, assets = null, downloads = null;
+
+  /* ---------------- Shared vocabulary for every prompt ---------------- */
   const GLOSSARY = `化粧品開発の用語は次の訳語で統一すること:
-処方=formula / formulasi, 処方設計=desain formula, 試作=sampel uji coba (trial sample), 使用感=sensasi pemakaian, テクスチャー=tekstur,
-ベンチマーク品=produk acuan (benchmark), 全成分=daftar bahan lengkap (INCI), 成分表=daftar komposisi, 配合量=kadar / persentase,
-原料=bahan baku, 規格書=spesifikasi bahan baku, 安全データシート=SDS, 品質証明書=COA, 防腐剤=pengawet, 増粘剤=pengental,
-保湿剤=humektan / pelembap, 乳化剤=pengemulsi, 安定性試験=uji stabilitas, 防腐効力試験=uji efektivitas pengawet (challenge test),
-原価=biaya bahan (HPP), 最低発注量=MOQ, 納期=waktu pengiriman (lead time), 化粧品基準=standar kosmetik Jepang, 医薬部外品=quasi-drug (Jepang),
-ハラール=halal, BPOM=BPOM.`;
+処方=formula / formulasi, 試作=trial sample / sampel uji coba, 使用感=sensory profile / sensasi pemakaian, ベンチマーク品=benchmark product / produk acuan,
+全成分=full ingredient list (INCI) / daftar bahan lengkap, 原料=raw material / bahan baku, 規格書=specification / spesifikasi, SDS, COA,
+防腐剤=preservative / pengawet, 増粘剤=thickener / pengental, 保湿剤=humectant / humektan, 乳化剤=emulsifier / pengemulsi,
+安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期=lead time,
+化粧品基準=Japanese Standards for Cosmetics, 医薬部外品=quasi-drug, ハラール=halal, BPOM.`;
 
   const ERR = {
-    not_granted: "翻訳の利用が許可されていません。ページを開き直して「許可」を選んでください。",
-    sampling_disabled: "このアカウントでは翻訳機能が使えません。",
+    not_granted: "AI機能の利用が許可されていません。ページを開き直して「許可」を選んでください。",
+    sampling_disabled: "このアカウントではAI機能が使えません。",
     rate_limited: "短時間に使いすぎました。1分ほど待ってからもう一度押してください。",
     session_expired: "ログインが切れました。claude.ai にサインインし直してください。",
-    prompt_too_large: "文章が長すぎます。2〜3回に分けて翻訳してください。",
+    prompt_too_large: "入力が長すぎます。内容を減らすか、分けて実行してください。",
     image_rejected: "この写真は読み取れません。明るく、文字が大きく写った写真で試してください。",
-    refused: "この内容は翻訳できませんでした。表現を変えてお試しください。",
+    refused: "この内容は処理できませんでした。表現を変えてお試しください。",
     invalid_json: "結果の形式が崩れました。もう一度押してください。",
     empty_completion: "結果が空でした。もう一度押してください。",
   };
   const errText = (e) => ERR[e?.code] || "通信が途切れました。もう一度押してください。";
 
-  let sample = null, downloads = null;
-  const HIDE = new Set(["not_granted","sampling_disabled","not_declared","capability_disabled","capability_removed"]);
-  function disableAll(msg){
-    const a = $("avail"); a.textContent = msg; a.classList.add("off"); a.hidden = false;
-    ["go-text","go-ing","go-brief"].forEach(id => $(id).disabled = true);
+  /* Run one AI call behind a button with a Stop affordance. */
+  const running = new Map();
+  async function aiRun(btn, stEl, busyMsg, fn) {
+    if (running.has(btn)) { running.get(btn).abort(); return; }
+    if (!sample) { stEl.className = "status err"; stEl.textContent = "AI機能はclaude.aiにサインインした状態で使えます。"; return; }
+    const ctl = new AbortController(); running.set(btn, ctl);
+    const label = btn.textContent; btn.textContent = "止める"; btn.classList.add("stop");
+    stEl.className = "status"; stEl.textContent = busyMsg;
+    try { await fn(ctl.signal); }
+    catch (e) {
+      if (e?.code === "cancelled") stEl.textContent = "止めました。";
+      else { stEl.className = "status err"; stEl.textContent = e?.userMsg || errText(e); }
+    } finally { running.delete(btn); btn.textContent = label; btn.classList.remove("stop"); }
   }
 
-  /* ---------- Tabs ---------- */
-  const tabs = document.querySelectorAll("nav.tabs button");
-  function showTab(name){
-    tabs.forEach(b => b.setAttribute("aria-selected", String(b.dataset.tab === name)));
-    ["text","ing","brief"].forEach(v => $("view-"+v).hidden = v !== name);
-    store.set("tab", name);
-  }
-  tabs.forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
-  const h = location.hash.replace("#","");
-  showTab(["text","ing","brief"].includes(h) ? h : (store.get("tab") || "text"));
-
-  /* ---------- Copy helper ---------- */
-  async function copy(text, btn){
+  async function copy(text, btn) {
     const old = btn.textContent;
     try { await navigator.clipboard.writeText(text); btn.textContent = "コピーしました"; }
-    catch {
-      const ta = document.createElement("textarea"); ta.value = text; document.body.append(ta); ta.select();
-      btn.textContent = "選択しました（長押しでコピー）";
-      setTimeout(() => ta.remove(), 8000);
+    catch { const ta = document.createElement("textarea"); ta.value = text; ta.style.cssText = "position:fixed;left:-9999px"; document.body.append(ta); ta.select(); btn.textContent = "選択しました（長押しでコピー）"; setTimeout(() => ta.remove(), 8000); }
+    setTimeout(() => (btn.textContent = old), 1800);
+  }
+
+  /* ================= Steps ================= */
+  const steps = document.querySelectorAll("nav.steps button");
+  function showStep(name) {
+    steps.forEach((b) => b.setAttribute("aria-selected", String(b.dataset.step === name)));
+    ["req", "dev", "fin", "plan", "tr"].forEach((v) => ($("view-" + v).hidden = v !== name));
+    $("projbar").hidden = name === "tr";
+    ls.set("step", name);
+    if (name === "plan") renderChecklist();
+  }
+  steps.forEach((b) => b.addEventListener("click", () => showStep(b.dataset.step)));
+  const hash = location.hash.replace("#", "");
+  showStep(["req", "dev", "fin", "plan", "tr"].includes(hash) ? hash : ls.get("step") || "req");
+
+  /* ================= Project state + sync ================= */
+  const STATUS = { draft: "下書き", requested: "依頼済み / Requested", developing: "開発中 / In development", submitted: "提出済み / Submitted", finalizing: "完成処方を作成中", done: "企画書完成" };
+  const COLS = { project: "projects", supplier: "supplier", final: "final", plans: "plans" };
+  const S = { pid: null, list: [], docs: { project: {}, supplier: {}, final: {}, plans: {} }, dirty: {}, unsub: [], market: null };
+
+  const blankProject = () => ({
+    name: "新規案件", status: "draft", createdAt: Date.now(), updatedAt: Date.now(),
+    request: { cat: "", vol: "", bench: "", feel: "", claim: "", avoid: "", cost: "", date: "", note: "", markets: ["jp"] },
+    brief: { en: "", id: "", ja: "" },
+  });
+  const blankSupplier = () => ({ product: {}, formula: [], materials: [], tests: [], files: [] });
+  const blankFinal = () => ({ additions: [], plan: {}, supJa: "" });
+
+  /* Writes: one at a time per document, coalesced. */
+  const timers = {}, chains = {};
+  function markDirty(doc, delay = 1200) {
+    S.dirty[doc] = true; $("saved").textContent = "保存待ち…";
+    clearTimeout(timers[doc]);
+    timers[doc] = setTimeout(() => flush(doc), delay);
+  }
+  function flush(doc) {
+    clearTimeout(timers[doc]);
+    if (!db || !S.pid || !S.dirty[doc]) return Promise.resolve();
+    const data = JSON.parse(JSON.stringify(S.docs[doc]));
+    if (doc === "project") data.updatedAt = Date.now();
+    S.dirty[doc] = false;
+    chains[doc] = (chains[doc] || Promise.resolve()).then(() => db.doc(COLS[doc] + "/" + S.pid).set(data))
+      .then(() => { $("saved").textContent = "保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
+        (e) => { S.dirty[doc] = true; $("saved").textContent = "保存できませんでした（" + (e?.code === "invalid_argument" ? "編集権限がありません" : "通信エラー") + "）"; });
+    return chains[doc];
+  }
+  const flushAll = () => Promise.all(Object.keys(COLS).map(flush));
+  async function touchProject(patch) {
+    Object.assign(S.docs.project, patch); S.dirty.project = true; await flush("project");
+  }
+
+  function subscribeProject(pid) {
+    S.unsub.forEach((u) => { try { u(); } catch {} }); S.unsub = [];
+    S.pid = pid; ls.set("pid", pid);
+    S.docs = { project: blankProject(), supplier: blankSupplier(), final: blankFinal(), plans: {} };
+    S.dirty = {};
+    renderAll();
+    if (!db || !pid) return;
+    Object.entries(COLS).forEach(([doc, col]) => {
+      S.unsub.push(db.doc(col + "/" + pid).onSnapshot((snap) => {
+        if (S.pid !== pid || S.dirty[doc]) return;
+        const base = doc === "project" ? blankProject() : doc === "supplier" ? blankSupplier() : doc === "final" ? blankFinal() : {};
+        S.docs[doc] = Object.assign(base, snap.exists ? snap.data() : {});
+        renderDoc(doc);
+      }, () => {}));
+    });
+  }
+
+  function renderProjectSelect() {
+    const sel = $("proj-sel");
+    const items = S.list.length ? S.list : [];
+    sel.innerHTML = items.map((p) => `<option value="${esc(p.id)}">${esc(p.name || "(無題)")}</option>`).join("") || `<option value="">案件がありません</option>`;
+    if (S.pid) sel.value = S.pid;
+  }
+  $("proj-sel").addEventListener("change", async (e) => { await flushAll(); subscribeProject(e.target.value); });
+  $("proj-new").addEventListener("click", async () => {
+    if (!db) return;
+    await flushAll();
+    const pid = "p" + Date.now().toString(36);
+    const p = blankProject();
+    try { await db.doc("projects/" + pid).set(p); } catch (e) { $("saved").textContent = "案件を作れませんでした（編集権限を確認してください）"; return; }
+    subscribeProject(pid); showStep("req"); $("r-name").focus(); $("r-name").select();
+  });
+
+  /* ---------------- Bound form fields ---------------- */
+  document.querySelectorAll("[data-doc]").forEach((el) => {
+    el.addEventListener("input", () => {
+      let v = el.value;
+      if (el.dataset.path === "product.features") v = v; // kept as text, split when used
+      setPath(S.docs[el.dataset.doc], el.dataset.path, v);
+      markDirty(el.dataset.doc);
+      if (el.dataset.path === "name") renderProjectLabel();
+    });
+  });
+  function fillForms(doc) {
+    document.querySelectorAll(`[data-doc="${doc}"]`).forEach((el) => {
+      if (el === document.activeElement) return;
+      const v = getPath(S.docs[doc], el.dataset.path);
+      el.value = v == null ? "" : String(v);
+    });
+  }
+  $("r-markets").addEventListener("change", () => {
+    S.docs.project.request = S.docs.project.request || {};
+    S.docs.project.request.markets = [...$("r-markets").querySelectorAll("input:checked")].map((i) => i.value);
+    markDirty("project", 300);
+  });
+
+  function renderProjectLabel() {
+    const opt = $("proj-sel").querySelector(`option[value="${CSS.escape(S.pid || "")}"]`);
+    if (opt) opt.textContent = S.docs.project.name || "(無題)";
+  }
+
+  /* ---------------- Editable tables ---------------- */
+  const TABLES = {
+    formula: { doc: "supplier", el: "t-formula", cols: [
+      { k: "phase", l: "Phase", w: 60 }, { k: "trade", l: "Trade name", w: 150 }, { k: "idName", l: "Nama bahan (Indonesian label name)", w: 190 },
+      { k: "inci", l: "INCI name", w: 190 }, { k: "maker", l: "Supplier / maker", w: 130 }, { k: "pct", l: "% w/w", w: 80, num: true },
+      { k: "fn", l: "Function", w: 120 }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 } ] },
+    materials: { doc: "supplier", el: "t-materials", cols: [
+      { k: "material", l: "Raw material", w: 180 }, { k: "feature", l: "Key feature", w: 280 }, { k: "data", l: "Supporting data (supplier / literature)", w: 360 } ] },
+    tests: { doc: "supplier", el: "t-tests", cols: [
+      { k: "lab", l: "Laboratory", w: 160 }, { k: "item", l: "Test item", w: 170 }, { k: "method", l: "Method / n", w: 170 },
+      { k: "result", l: "Result", w: 260 }, { k: "date", l: "Date", w: 100 } ] },
+    additions: { doc: "final", el: "t-add", cols: [
+      { k: "ja", l: "日本語表示名称", w: 200 }, { k: "inci", l: "INCI", w: 200 }, { k: "pct", l: "配合量 %", w: 90, num: true },
+      { k: "purpose", l: "配合目的", w: 160 }, { k: "note", l: "備考（仕入先など）", w: 200 } ] },
+  };
+  const rowsOf = (name) => { const t = TABLES[name]; const d = S.docs[t.doc]; if (!Array.isArray(d[name])) d[name] = []; return d[name]; };
+
+  function renderTable(name) {
+    const t = TABLES[name], tbl = $(t.el);
+    if (tbl.contains(document.activeElement)) return;
+    const rows = rowsOf(name);
+    const head = `<thead><tr><th>No.</th>${t.cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}<th></th></tr></thead>`;
+    const body = rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${t.cols.map((c) => c.ja
+      ? `<td class="ja">${esc(r.ja || "")}${r.jaNote ? `<span class="nt">${esc(r.jaNote)}</span>` : ""}</td>`
+      : `<td class="${c.num ? "num" : ""}"><input data-t="${name}" data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" aria-label="${esc(c.l)} ${i + 1}" ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
+      <td><button class="x" data-del="${name}" data-i="${i}" aria-label="行を削除">×</button></td></tr>`).join("");
+    let foot = "";
+    if (name === "formula" || name === "additions") {
+      const tot = rows.reduce((a, r) => a + num(r.pct), 0);
+      const idx = t.cols.findIndex((c) => c.k === "pct");
+      foot = `<tfoot><tr><td colspan="${idx + 1}" style="text-align:right">Total</td><td class="num ${name === "formula" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${t.cols.length - idx}"></td></tr></tfoot>`;
     }
-    setTimeout(() => btn.textContent = old, 1800);
+    tbl.innerHTML = head + `<tbody>${body || `<tr><td colspan="${t.cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>` + foot;
   }
-  document.querySelectorAll("[data-copy]").forEach(b =>
-    b.addEventListener("click", () => copy($(b.dataset.copy).value, b)));
-
-  /* ================= 文章翻訳 ================= */
-  let dir = "ja2id";
-  const txtJa = $("txt-ja"), txtId = $("txt-id");
-  function setDir(d){
-    dir = d;
-    $("dir-ja").setAttribute("aria-pressed", String(d === "ja2id"));
-    $("dir-id").setAttribute("aria-pressed", String(d === "id2ja"));
-    txtJa.readOnly = d !== "ja2id";
-    txtId.readOnly = d === "ja2id";
-    $("role-ja").textContent = d === "ja2id" ? "ここに入力" : "翻訳結果";
-    $("role-id").textContent = d === "ja2id" ? "翻訳結果" : "ここに入力";
-    $("back-wrap").hidden = d !== "ja2id";
-    (d === "ja2id" ? txtJa : txtId).focus();
+  document.addEventListener("input", (e) => {
+    const el = e.target; if (!el.dataset || !el.dataset.t) return;
+    const name = el.dataset.t, rows = rowsOf(name), r = rows[+el.dataset.i]; if (!r) return;
+    r[el.dataset.k] = el.value;
+    if (name === "formula" && ["idName", "inci", "trade"].includes(el.dataset.k)) { r.ja = ""; r.jaNote = ""; }
+    markDirty(TABLES[name].doc);
+    if (el.dataset.k === "pct") updateTotals(name);
+    if (name === "additions" || name === "formula") renderFinal();
+  });
+  document.addEventListener("focusout", (e) => {
+    const el = e.target; if (!el.dataset || !el.dataset.t) return;
+    setTimeout(() => { if (!$(TABLES[el.dataset.t].el).contains(document.activeElement)) renderTable(el.dataset.t); }, 0);
+  });
+  function updateTotals(name) {
+    const tbl = $(TABLES[name].el), cell = tbl.querySelector("tfoot td.num"); if (!cell) return;
+    const tot = rowsOf(name).reduce((a, r) => a + num(r.pct), 0); cell.textContent = fmt(tot);
+    if (name === "formula") cell.className = "num " + (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad");
   }
-  $("dir-ja").onclick = () => setDir("ja2id");
-  $("dir-id").onclick = () => setDir("id2ja");
+  document.addEventListener("click", (e) => {
+    const add = e.target.closest("[data-addrow]"), del = e.target.closest("[data-del]");
+    if (add) { const n = add.dataset.addrow; rowsOf(n).push({}); markDirty(TABLES[n].doc, 400); renderTable(n); const ins = $(TABLES[n].el).querySelectorAll("tbody tr:last-child input"); ins[0]?.focus(); }
+    if (del) { const n = del.dataset.del; rowsOf(n).splice(+del.dataset.i, 1); markDirty(TABLES[n].doc, 400); renderTable(n); renderFinal(); }
+  });
 
-  const draft = store.get("draft");
-  if (draft && draft.ja) { txtJa.value = draft.ja; txtId.value = draft.id || ""; $("back-txt").textContent = draft.back || ""; $("id-hint").textContent = ""; }
+  /* ================= STEP 1 依頼 ================= */
+  let bout = "en";
+  function renderBrief() {
+    const b = S.docs.project.brief || {};
+    $("brief-out").textContent = b[bout] || "まだ作成していません。左の内容を記入して「依頼書を作成」を押してください。";
+    $("brief-out").classList.toggle("ja", bout === "ja" || !b[bout]);
+    document.querySelectorAll("[data-bout]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.bout === bout)));
+  }
+  document.querySelectorAll("[data-bout]").forEach((x) => x.addEventListener("click", () => { bout = x.dataset.bout; renderBrief(); }));
+  $("copy-brief").addEventListener("click", (e) => copy((S.docs.project.brief || {})[bout] || "", e.currentTarget));
 
-  let ctlText = null;
-  async function translateText(){
-    const src = (dir === "ja2id" ? txtJa : txtId).value.trim();
-    const st = $("st-text"), btn = $("go-text");
-    if (!src) { st.textContent = "翻訳する文章を入力してください。"; return; }
-    if (!sample) return;
-    if (ctlText) { ctlText.abort(); return; }
-    ctlText = new AbortController();
-    btn.textContent = "止める"; btn.classList.add("stop");
-    st.className = "status"; st.textContent = "翻訳しています…";
-    const target = dir === "ja2id" ? "インドネシア語" : "日本語";
-    const prompt = `あなたは日本の化粧品メーカーとインドネシアの化粧品原料メーカーの間に立つ、化粧品処方開発に詳しいプロの通訳です。
-次の${dir === "ja2id" ? "日本語" : "インドネシア語"}を、ビジネスで失礼のない丁寧な${target}に翻訳してください。
-- 意味を足したり省いたりしない。数字・単位・日付・商品名・ブランド名・INCI名はそのまま正確に残す。
-- 日本語特有の曖昧な表現は、相手が誤解しない明確な表現にする。
-${dir === "ja2id" ? "- さらに、訳文を日本語に訳し戻した逆翻訳も作る（意味確認用）。" : ""}
+  const REQ_LABELS = [["cat", "製品カテゴリ"], ["vol", "容量"], ["bench", "ベンチマーク品"], ["feel", "目標とする使用感"], ["claim", "訴求成分・効果"], ["avoid", "使いたくない成分"], ["cost", "目標原価"], ["date", "試作サンプル希望日"], ["note", "その他"]];
+  const MK = { jp: "日本国内", id: "インドネシア", asia: "その他アジア" };
+  function requestText() {
+    const r = S.docs.project.request || {};
+    const lines = REQ_LABELS.filter(([k]) => r[k]).map(([k, l]) => `${l}: ${r[k]}`);
+    if ((r.markets || []).length) lines.push("販売予定の市場: " + r.markets.map((m) => MK[m]).join("、"));
+    return lines.join("\n");
+  }
+  $("go-brief").addEventListener("click", (e) => aiRun(e.currentTarget, $("st-brief"), "依頼書を作成しています…（20〜60秒）", async (signal) => {
+    const body = requestText();
+    if (!body) throw { userMsg: "少なくとも1項目は記入してください。" };
+    const r = await sample.json(`あなたは日本の化粧品メーカーの開発担当者です。インドネシアの化粧品原料メーカーの処方開発担当者に送る「処方開発依頼書」を作ります。
+下の日本語メモをもとに、見出し付きの簡潔な依頼書を作成してください。
+- 内容を創作しない。メモにない数値や条件は書かない。記入のない項目は省く。
+- 金額は円なら「JPY」表記。日付は誤解のない形で。
+- 相手は処方技術者なので、使用感は技術用語（粘度感、伸び、仕上がり等）で明確に。
+- 最後に「開発後に提出してほしいもの」として次を必ず列挙: 製品の特徴、処方（% w/w・INCI名・インドネシアの原料表示名称）、主要原料の特徴とメーカーデータ・グラフ、規格書・SDS・COA、営業資料、第三者機関の試験データ。すべて英語で。
+- 出力は3言語: en=英語, id=インドネシア語（丁寧なビジネス文）, ja=日本語（内容確認用の訳）。
 ${GLOSSARY}
 
+JSONのみで返答: {"en": string, "id": string, "ja": string}
+
+日本語メモ:
+${body}`, { signal });
+    if (!r?.en) throw { code: "invalid_json" };
+    S.docs.project.brief = { en: String(r.en), id: String(r.id ?? ""), ja: String(r.ja ?? "") };
+    S.dirty.project = true; await flush("project");
+    bout = "en"; renderBrief(); renderDevBrief();
+    $("st-brief").textContent = "作成しました。「日本語（確認用）」で内容を確認してください。";
+  }));
+  $("send-req").addEventListener("click", async () => {
+    const st = $("st-send");
+    if (!(S.docs.project.brief || {}).en) { st.className = "status err"; st.textContent = "先に「依頼書を作成」を押してください。"; return; }
+    await touchProject({ status: "requested", requestedAt: Date.now() });
+    st.className = "status"; st.textContent = "依頼済みにしました。インドネシア側の STEP 2 に依頼書が表示されます。";
+    renderStatus();
+  });
+
+  /* ================= STEP 2 Development ================= */
+  let rq = "en";
+  function renderDevBrief() {
+    const b = S.docs.project.brief || {};
+    $("dev-brief").textContent = b[rq] || "No request has been sent from Japan yet.";
+    document.querySelectorAll("[data-rq]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.rq === rq)));
+  }
+  document.querySelectorAll("[data-rq]").forEach((x) => x.addEventListener("click", () => { rq = x.dataset.rq; renderDevBrief(); }));
+
+  // Indonesian label name → Japanese label name (日本語表示名称)
+  $("to-ja").addEventListener("click", (e) => aiRun(e.currentTarget, $("st-toja"), "Converting… / 変換しています…（10〜60秒）", async (signal) => {
+    const rows = rowsOf("formula");
+    const list = rows.map((r, i) => ({ i, trade: r.trade || "", idName: r.idName || "", inci: r.inci || "" })).filter((r) => r.trade || r.idName || r.inci);
+    if (!list.length) throw { userMsg: "Enter at least one ingredient. / 原料を1行以上入力してください。" };
+    const res = await sample.json(`あなたは日本とインドネシア（BPOM）の化粧品規制に詳しい処方技術者です。
+次はインドネシアの原料メーカーが入力した処方の原料リストです（trade=商品名, idName=インドネシアでの原料表示名称, inci=INCI名。空欄あり）。
+各行について、日本の化粧品の全成分表示で使う「日本語表示名称」（日本化粧品工業会の表示名称リストに準拠）を答えてください。
+- 1つの原料（商品名）が複数成分の混合物なら、含まれる成分の日本語表示名称を「、」で区切って並べ、mix=true。
+- 確信が持てない場合は推測で断定せず、note に「要確認: 理由」を日本語で書く。日本の化粧品基準で配合制限・禁止がある成分も note に書く。
+- inci が空なら、推定したINCI名を inci に入れる（推定なら note に明記）。
+JSONのみで返答: {"items":[{"i":0,"ja":"","inci":"","mix":false,"note":""}]}
+
+${JSON.stringify(list)}`, { signal });
+    const items = Array.isArray(res?.items) ? res.items : null;
+    if (!items) throw { code: "invalid_json" };
+    let n = 0;
+    items.forEach((x) => { const r = rows[+x.i]; if (!r) return; r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); if (!r.inci && x.inci) r.inci = String(x.inci); n++; });
+    S.dirty.supplier = true; await flush("supplier");
+    renderTable("formula"); renderFinal();
+    const flagged = rows.filter((r) => r.jaNote).length;
+    $("st-toja").textContent = `${n} rows converted / ${n}行を変換しました。` + (flagged ? ` 要確認 ${flagged}件` : "");
+  }));
+
+  // Attachments
+  function renderFiles() {
+    const files = S.docs.supplier.files || [];
+    $("files").innerHTML = files.length ? files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span>
+      <div><a href="/_blob/${esc(f.id)}" target="_blank" rel="noopener">${esc(f.name)}</a>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div>
+      <button class="x" data-delfile="${i}" aria-label="Remove">×</button></div>`).join("")
+      : `<div class="hint">No files yet. / まだ添付がありません。</div>`;
+  }
+  $("files").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-delfile]"); if (!b) return;
+    (S.docs.supplier.files || []).splice(+b.dataset.delfile, 1); markDirty("supplier", 300); renderFiles();
+  });
+  $("f-file").addEventListener("change", async (e) => {
+    const files = [...(e.target.files || [])]; e.target.value = "";
+    const st = $("st-upl");
+    if (!assets) { st.className = "status err"; st.textContent = "Uploading needs editor access. Ask Japan to invite you as an Editor, or send files by email. / アップロードには編集者権限が必要です。"; return; }
+    for (const f of files) {
+      st.className = "status"; st.textContent = `Uploading ${f.name}…`;
+      try {
+        const r = await assets.upload(f);
+        S.docs.supplier.files = S.docs.supplier.files || [];
+        S.docs.supplier.files.push({ id: r.id, name: f.name, cat: $("f-cat").value, desc: $("f-desc").value.trim(), type: r.contentType || f.type, size: f.size });
+        S.dirty.supplier = true; await flush("supplier"); renderFiles();
+        st.textContent = `Uploaded: ${f.name}`;
+      } catch (err) {
+        st.className = "status err";
+        st.textContent = err?.code === "unsupported_type" ? `${f.name}: this file type is not accepted. Please upload PDF, image, video or text.` :
+          err?.code === "quota_exceeded" ? "Storage is full. / 容量がいっぱいです。" : `${f.name}: upload failed. Please try again.`;
+      }
+    }
+    $("f-desc").value = "";
+  });
+
+  $("submit-dev").addEventListener("click", async () => {
+    const st = $("st-submit"), sp = S.docs.supplier;
+    const missing = [];
+    if (!sp.product?.name) missing.push("Product name");
+    if (!(sp.formula || []).length) missing.push("Formula");
+    const tot = (sp.formula || []).reduce((a, r) => a + num(r.pct), 0);
+    if ((sp.formula || []).length && Math.abs(tot - 100) > 0.001) missing.push(`Formula total is ${fmt(tot)}% (should be 100%)`);
+    if (missing.length) { st.className = "status err"; st.textContent = "Please check: " + missing.join(", "); return; }
+    await flush("supplier");
+    await touchProject({ status: "submitted", submittedAt: Date.now() });
+    st.className = "status"; st.textContent = "Submitted. Thank you! / 提出しました。"; renderStatus();
+  });
+
+  /* Excel template round-trip (for teams that cannot open this page) */
+  const LIBS = {
+    XLSX: "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js",
+    PptxGenJS: "https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js",
+    docx: "https://cdn.jsdelivr.net/npm/docx@9.5.1/dist/index.iife.js",
+  };
+  function lib(name) {
+    if (window[name]) return Promise.resolve(window[name]);
+    return new Promise((res, rej) => { const s = document.createElement("script"); s.src = LIBS[name]; s.onload = () => (window[name] ? res(window[name]) : rej(new Error(name))); s.onerror = () => rej(new Error(name)); document.head.append(s); });
+  }
+  const PRODUCT_FIELDS = [["name", "Product name"], ["concept", "Concept"], ["features", "Key features (one per line)"], ["claims", "Possible marketing claims"], ["appearance", "Appearance / texture"], ["ph", "pH"], ["viscosity", "Viscosity"], ["shelfLife", "Shelf life"], ["stability", "Stability test summary"], ["cost", "Raw material cost per unit"], ["moq", "MOQ"], ["leadTime", "Lead time"], ["process", "Manufacturing process"]];
+  const SHEETS = { Formula: "formula", Materials: "materials", ThirdParty: "tests" };
+  async function saveFile(filename, data, st) {
+    if (!downloads) { st.className = "status err"; st.textContent = "このページではファイル保存が使えません。"; return; }
+    try { await downloads.save({ filename, data }); st.className = "status"; st.textContent = "保存しました / Saved: " + filename; }
+    catch (e) { if (e?.code !== "declined") { st.className = "status err"; st.textContent = "保存できませんでした / Could not save (" + (e?.code || "error") + ")"; } }
+  }
+  $("xl-out").addEventListener("click", async () => {
+    const st = $("st-submit");
+    try {
+      const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), sp = S.docs.supplier;
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([
+        ["Formula Bridge — Development sheet"], ["Please fill in every sheet in English and send this file back to Japan."],
+        ["Sheets: Product, Formula (% w/w, total 100%), Materials, ThirdParty. Send graphs, specifications, SDS, COA, sales materials and third-party reports as separate files."],
+        [], ["Request from Japan:"], ...String(S.docs.project.brief?.en || "").split("\n").map((l) => [l])]), "Guide");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Field", "Value"], ...PRODUCT_FIELDS.map(([k, l]) => [l, sp.product?.[k] || ""])]), "Product");
+      Object.entries(SHEETS).forEach(([sheet, name]) => {
+        const cols = TABLES[name].cols.filter((c) => !c.ja);
+        XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols.map((c) => c.l), ...rowsOf(name).map((r) => cols.map((c) => r[c.k] ?? ""))]), sheet);
+      });
+      const buf = XLSX.write(wb, { type: "array", bookType: "xlsx" });
+      await saveFile(`FormulaBridge_${(S.docs.project.name || "project").replace(/[^\w\-一-龠ぁ-んァ-ヶ]+/g, "_")}.xlsx`, new Uint8Array(buf), st);
+    } catch { st.className = "status err"; st.textContent = "Excelを作れませんでした（通信を確認してください）。"; }
+  });
+  $("xl-in").addEventListener("change", async (e) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const st = $("st-submit");
+    try {
+      const XLSX = await lib("XLSX");
+      const wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
+      const sp = S.docs.supplier; let n = 0;
+      const prod = wb.Sheets.Product;
+      if (prod) {
+        sp.product = sp.product || {};
+        XLSX.utils.sheet_to_json(prod, { header: 1 }).slice(1).forEach(([label, val]) => {
+          const hit = PRODUCT_FIELDS.find(([, l]) => l === String(label || "").trim()); if (hit && val != null) { sp.product[hit[0]] = String(val); n++; }
+        });
+      }
+      Object.entries(SHEETS).forEach(([sheet, name]) => {
+        const ws = wb.Sheets[sheet]; if (!ws) return;
+        const cols = TABLES[name].cols.filter((c) => !c.ja);
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+        const header = (rows[0] || []).map((h) => String(h || "").trim());
+        const out = rows.slice(1).filter((r) => r.some((c) => String(c ?? "").trim())).map((r) => {
+          const o = {}; cols.forEach((c) => { const j = header.indexOf(c.l); if (j >= 0 && r[j] != null) o[c.k] = String(r[j]); }); return o;
+        });
+        if (out.length) { sp[name] = out; n += out.length; }
+      });
+      S.dirty.supplier = true; await flush("supplier");
+      fillForms("supplier"); ["formula", "materials", "tests"].forEach(renderTable); renderFinal();
+      st.className = "status"; st.textContent = `Imported ${n} items from ${f.name}. / 取り込みました。`;
+    } catch { st.className = "status err"; st.textContent = "This file could not be read. Please use the template. / 読み取れませんでした。"; }
+  });
+
+  /* ================= STEP 3 完成処方 ================= */
+  const isWater = (r) => /^(water|aqua)\b/i.test(String(r.inci || "").trim()) || /^(水|精製水)$/.test(String(r.ja || "").trim()) || /^air$/i.test(String(r.idName || "").trim());
+  function finalRows() {
+    const base = rowsOf("formula").map((r) => ({ src: "base", ja: r.ja || "", jaNote: r.jaNote || "", mix: !!r.mix, inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));
+    const add = rowsOf("additions").map((r) => ({ src: "add", ja: r.ja || "", inci: r.inci || "", label: r.ja || r.inci || "", pct: num(r.pct), fn: r.purpose || "" }));
+    return [...base, ...add].filter((r) => r.label || r.pct);
+  }
+  function fullIngredientList(rows) {
+    const map = new Map();
+    rows.forEach((r, order) => {
+      const names = (r.ja || r.label).split(/[、,，]/).map((s) => s.trim()).filter(Boolean);
+      names.forEach((n) => { const m = map.get(n) || { n, pct: 0, order, mix: false }; m.pct += r.pct; m.mix = m.mix || names.length > 1; map.set(n, m); });
+    });
+    const all = [...map.values()];
+    const over = all.filter((x) => x.pct > 1).sort((a, b) => b.pct - a.pct);
+    const under = all.filter((x) => x.pct <= 1).sort((a, b) => a.order - b.order);
+    return [...over, ...under];
+  }
+  function renderFinal() {
+    const rows = finalRows(), tot = rows.reduce((a, r) => a + r.pct, 0);
+    $("fin-total").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
+    $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>` +
+      (rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td>
+        <td>${esc(r.ja || "")}${!r.ja ? `<span class="hint">（未変換: ${esc(r.label)}）</span>` : ""}${r.jaNote ? `<div class="hint" style="color:var(--warn)">${esc(r.jaNote)}</div>` : ""}</td>
+        <td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") ||
+        `<tr><td colspan="6" class="hint" style="padding:12px">インドネシア側の処方が提出されると、ここに表示されます。</td></tr>`) + "</tbody>";
+    const list = fullIngredientList(rows);
+    $("fulllist").textContent = list.length ? list.map((x) => x.n + (x.mix ? "※" : "")).join("、") : "—";
+    if (list.some((x) => x.mix)) $("fulllist").append(Object.assign(document.createElement("div"), { className: "hint", textContent: "※ 混合原料由来。並び順は要確認。" }));
+  }
+  $("copy-full").addEventListener("click", (e) => copy(fullIngredientList(finalRows()).map((x) => x.n).join("、"), e.currentTarget));
+  $("qs-water").addEventListener("click", () => {
+    const st = $("st-qs"), base = rowsOf("formula"), w = base.find(isWater);
+    if (!w) { st.className = "status err"; st.textContent = "ベース処方に水（Water / Aqua）の行が見つかりません。"; return; }
+    const others = finalRows().reduce((a, r) => a + r.pct, 0) - num(w.pct);
+    const nw = Math.round((100 - others) * 1000) / 1000;
+    if (nw < 0) { st.className = "status err"; st.textContent = "追記分が多すぎて、水を減らしても100%を超えます。"; return; }
+    w.pct = String(nw); markDirty("supplier", 300); renderTable("formula"); renderFinal();
+    st.className = "status"; st.textContent = `水を ${fmt(nw)}% に調整し、合計を100%にしました（ベース処方の水の行を更新）。`;
+  });
+
+  function supplierEnglish() {
+    const sp = S.docs.supplier, p = sp.product || {};
+    const lines = PRODUCT_FIELDS.filter(([k]) => p[k]).map(([k, l]) => `${l}: ${p[k]}`);
+    if ((sp.materials || []).length) lines.push("Raw material highlights:\n" + sp.materials.map((m) => `- ${m.material}: ${m.feature} / Data: ${m.data || "-"}`).join("\n"));
+    if ((sp.tests || []).length) lines.push("Third-party tests:\n" + sp.tests.map((t) => `- ${t.lab} | ${t.item} | ${t.method || "-"} | ${t.result} | ${t.date || "-"}`).join("\n"));
+    if ((sp.files || []).length) lines.push("Attachments:\n" + sp.files.map((f) => `- [${f.cat}] ${f.name}${f.desc ? " — " + f.desc : ""}`).join("\n"));
+    return lines.join("\n");
+  }
+  $("tr-sup").addEventListener("click", (e) => aiRun(e.currentTarget, $("st-trsup"), "翻訳しています…（10〜40秒）", async (signal) => {
+    const src = supplierEnglish();
+    if (!src) throw { userMsg: "インドネシア側の入力がまだありません。" };
+    const r = await sample.json(`次は化粧品原料メーカー（インドネシア）の開発担当者が英語で書いた、試作品の説明です。日本の化粧品メーカーの経営者が読む日本語に正確に翻訳してください。見出しと箇条書きの構成は保ち、数値・単位・INCI名・試験機関名はそのまま残すこと。意味を足さないこと。
+${GLOSSARY}
+JSONのみで返答: {"ja": string}
+
+${src}`, { signal });
+    if (!r?.ja) throw { code: "invalid_json" };
+    S.docs.final.supJa = String(r.ja); S.dirty.final = true; await flush("final");
+    $("sup-ja").textContent = S.docs.final.supJa; $("st-trsup").textContent = "";
+  }));
+
+  /* ================= STEP 4 企画書 ================= */
+  function checks() {
+    const p = S.docs.project, sp = S.docs.supplier, fr = finalRows(), tot = fr.reduce((a, r) => a + r.pct, 0);
+    const m = S.market;
+    return [
+      [!!(p.brief || {}).en, "依頼書を作成し、依頼を送った"],
+      [["submitted", "finalizing", "done"].includes(p.status), "インドネシア側が開発内容を提出した"],
+      [(sp.formula || []).length > 0 && (sp.formula || []).every((r) => r.ja), "処方の日本語表示名称を変換した"],
+      [fr.length > 0 && Math.abs(tot - 100) < 0.001, `完成処方の合計が100%（現在 ${fmt(tot)}%）`],
+      [(sp.tests || []).length > 0, "第三者試験データがある"],
+      [!!(S.docs.final.plan || {}).price, "商品計画（価格など）を記入した"],
+      [!!(m && m.markets), m && m.asOf ? `市場データ（${m.asOf} 時点）が登録されている` : "市場データが登録されている"],
+    ];
+  }
+  function renderChecklist() {
+    $("checklist").innerHTML = checks().map(([ok, t]) => `<li><span class="mk ${ok ? "ok" : "ng"}">${ok ? "OK" : "未完了"}</span><span>${esc(t)}</span></li>`).join("");
+    const m = S.market;
+    $("market-meta").innerHTML = m && m.markets ? `調査時点: ${esc(m.asOf || "—")}　／　市場: ${Object.values(m.markets).map((x) => esc(x.title)).join("、")}<br>出典つきのデータのみ企画書に使います。${m.verification ? `<br><span style="color:var(--warn)">${esc(m.verification)}</span><br>` : ""}更新が必要なときは、Claudeのチャットで「市場データを更新して」と依頼してください。`
+      : "市場データはまだ登録されていません。Claudeのチャットで「市場データを調査して登録して」と依頼してください。";
+  }
+
+  const SLIDE_KEYS = [
+    ["cover", "表紙"], ["summary", "エグゼクティブサマリー"], ["market_jp", "市場動向（日本）"], ["market_asia", "市場動向（インドネシア・アジア）"],
+    ["competitors", "競合分析"], ["concept", "製品コンセプトとターゲット"], ["formula", "処方と訴求成分"], ["evidence", "エビデンス（原料データ・第三者試験）"],
+    ["business", "価格・販売チャネル・収益計画"], ["roadmap", "スケジュール・リスク・次のアクション"],
+  ];
+  const seriesOf = (mk) => {
+    const stats = (S.market?.markets?.[mk]?.stats || []);
+    const groups = {};
+    stats.forEach((s) => { const v = num(s.value); if (!s.year || !v) return; const k = s.label + "|" + (s.unit || ""); (groups[k] = groups[k] || []).push(s); });
+    const best = Object.values(groups).filter((g) => g.length >= 2).sort((a, b) => b.length - a.length)[0];
+    if (!best) return null;
+    best.sort((a, b) => String(a.year).localeCompare(String(b.year)));
+    return { title: best[0].label, unit: best[0].unit || "", labels: best.map((s) => String(s.year)), values: best.map((s) => num(s.value)), source: [...new Set(best.map((s) => s.source))].join(" / ") };
+  };
+  const marketCompact = () => {
+    const m = S.market; if (!m) return null;
+    const mk = (S.docs.project.request?.markets || ["jp"]);
+    const pick = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => mk.includes(k) || (k === "asia" && mk.includes("asia"))));
+    return { asOf: m.asOf, markets: pick(m.markets), competitors: pick(m.competitors), regulatory: m.regulatory || [] };
+  };
+
+  $("go-plan").addEventListener("click", (e) => aiRun(e.currentTarget, $("st-plan"), "企画書を作成しています…（1〜3分。画面はそのままでお待ちください）", async (signal) => {
+    await flushAll();
+    const p = S.docs.project, sp = S.docs.supplier, fin = S.docs.final;
+    const fr = finalRows();
+    const input = {
+      project: p.name, request: p.request,
+      supplier_en: supplierEnglish().slice(0, 12000),
+      supplier_ja: (fin.supJa || "").slice(0, 8000),
+      final_formula_names: fr.map((r) => ({ name: r.ja || r.label, inci: r.inci, purpose: r.fn, origin: r.src === "base" ? "インドネシア側ベース" : "当社追記" })),
+      product_plan: fin.plan || {},
+      market: marketCompact(),
+    };
+    const plan = await sample.json(`あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
+次のJSONデータだけを根拠に書くこと。厳守事項:
+- 数字（市場規模、成長率、価格、原価、販売目標、試験結果など）は、データにあるものだけを使う。データにない数字は絶対に作らず「【要確認】」と書く。
+- 市場・競合・規制の記述には、データ内の source と url を sources に必ず付ける。データにない市場情報は書かない。
+- 配合量（%）は社外秘なので書かない。
+- 各ページ: title（20字以内）、lead（そのページの結論を1文、60字以内）、bullets（3〜6項目、各60字以内、具体的に）、sources（[{label,url}]、無ければ空配列）。
+- ページ構成は次の key の順で必ず10ページ: ${SLIDE_KEYS.map(([k, t]) => `${k}=${t}`).join(", ")}。
+- cover の bullets には、案件名・カテゴリ・販売市場・作成日(${today()})などの表紙情報を入れる。
+- summary は意思決定者向けに、何を・なぜ今・いくらで・いつまでに、を書く。
+- roadmap にはリスク（規制・原料調達・為替・品質）と対策、次のアクションを入れる。
+JSONのみで返答: {"title": string, "subtitle": string, "slides":[{"key":"cover","title":"","lead":"","bullets":[],"sources":[]}]}
+
+データ:
+${JSON.stringify(input)}`, { signal, modelTier: "complex" });
+    if (!Array.isArray(plan?.slides) || plan.slides.length < 5) throw { code: "invalid_json" };
+
+    // Attach deterministic charts / tables built from real data (never AI-generated numbers).
+    const byKey = Object.fromEntries(plan.slides.map((s) => [s.key, s]));
+    const slides = SLIDE_KEYS.map(([k, t]) => {
+      const s = byKey[k] || { key: k, title: t, lead: "【要確認】", bullets: [], sources: [] };
+      return { key: k, title: String(s.title || t), lead: String(s.lead || ""), bullets: (s.bullets || []).map(String).slice(0, 7), sources: (s.sources || []).filter((x) => x && (x.label || x.url)).map((x) => ({ label: String(x.label || ""), url: String(x.url || "") })) };
+    });
+    const sl = (k) => slides.find((s) => s.key === k);
+    const cj = seriesOf("jp"); if (cj) sl("market_jp").chart = cj;
+    const ci = seriesOf("id") || seriesOf("asia"); if (ci) sl("market_asia").chart = ci;
+    const comp = marketCompact()?.competitors || {};
+    const compRows = Object.entries(comp).flatMap(([mk, arr]) => (arr || []).slice(0, 4).map((c) => [MK[mk] || mk, c.name, c.note]));
+    if (compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要"], rows: compRows, caption: "出典は各行の調査データに記載" };
+    if (fr.length) sl("formula").table = { headers: ["No.", "日本語表示名称", "配合目的", "区分"], rows: fullIngredientList(fr).map((x, i) => {
+      const r = fr.find((y) => (y.ja || y.label).split(/[、,，]/).map((z) => z.trim()).includes(x.n)) || {};
+      return [String(i + 1), x.n, r.fn || "", r.src === "add" ? "当社追記" : "ベース"]; }), caption: "配合量は社外秘のため別紙" };
+    const tests = sp.tests || [];
+    const img = (sp.files || []).find((f) => /^image\/(png|jpe?g|gif)/.test(f.type || ""));
+    if (tests.length) sl("evidence").table = { headers: ["試験機関", "試験項目", "方法", "結果", "日付"], rows: tests.map((t) => [t.lab, t.item, t.method, t.result, t.date].map((x) => String(x || ""))) };
+    else if (img) sl("evidence").imageId = img.id, sl("evidence").imageCaption = img.desc || img.name;
+
+    S.docs.plans = { title: String(plan.title || p.name || "新商品企画書"), subtitle: String(plan.subtitle || ""), date: today(), slides, createdAt: Date.now() };
+    S.dirty.plans = true; await flush("plans");
+    await touchProject({ status: "done" });
+    renderPlan(); renderStatus();
+    $("st-plan").textContent = "作成しました。下のボタンからPowerPoint・Wordを保存できます。";
+  }));
+
+  function renderPlan() {
+    const pl = S.docs.plans;
+    const has = Array.isArray(pl?.slides) && pl.slides.length;
+    $("dl-pptx").disabled = $("dl-docx").disabled = !has;
+    $("plan-title").textContent = has ? pl.title : "企画書プレビュー";
+    $("plan-date").textContent = has ? "作成日 " + pl.date : "";
+    $("slides").innerHTML = has ? pl.slides.map((s, i) => `<div class="slide ${s.key === "cover" ? "cover" : ""}"><span class="sn">${String(i + 1).padStart(2, "0")}</span>
+      <h4>${esc(s.key === "cover" ? pl.title : s.title)}</h4><p>${esc(s.key === "cover" ? pl.subtitle : s.lead)}</p>
+      <ul>${(s.bullets || []).map((b) => `<li>${esc(b)}</li>`).join("")}</ul>
+      <div class="att">${[s.chart ? "グラフ: " + esc(s.chart.title) : "", s.table ? `表: ${s.table.rows.length}行` : "", s.imageId ? "画像: 添付グラフ" : "", (s.sources || []).length ? `出典 ${s.sources.length}件` : ""].filter(Boolean).join("　")}</div></div>`).join("")
+      : `<div class="hint">「出来上がり」を押すと、ここに10ページの構成が表示されます。</div>`;
+  }
+
+  async function exportPlan(kind) {
+    const st = $("st-dl"), pl = JSON.parse(JSON.stringify(S.docs.plans || {}));
+    if (!pl.slides) return;
+    st.className = "status"; st.textContent = "ファイルを作成しています…";
+    try {
+      pl.footer = S.docs.final.plan?.brand || "";
+      for (const s of pl.slides) {
+        if (!s.imageId) continue;
+        try {
+          const blob = await (await fetch("/_blob/" + s.imageId)).blob();
+          const bmp = await createImageBitmap(blob);
+          const dataUrl = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(blob); });
+          s.image = { data: dataUrl.replace(/^data:/, ""), bytes: new Uint8Array(await blob.arrayBuffer()), type: /png/.test(blob.type) ? "png" : /gif/.test(blob.type) ? "gif" : "jpg", w: bmp.width, h: bmp.height, caption: s.imageCaption || "" };
+        } catch {}
+      }
+      const base = (pl.title || "企画書").replace(/[\\/:*?"<>|\s]+/g, "_").slice(0, 60);
+      if (kind === "pptx") {
+        const P = await lib("PptxGenJS"); const deck = FBExport.buildPptx(pl, P);
+        const blob = await deck.write({ outputType: "blob" });
+        await saveFile(base + ".pptx", blob, st);
+      } else {
+        const D = await lib("docx"); const doc = FBExport.buildDocx(pl, D);
+        const blob = await D.Packer.toBlob(doc);
+        await saveFile(base + ".docx", blob, st);
+      }
+    } catch { st.className = "status err"; st.textContent = "ファイルを作れませんでした。通信を確認して、もう一度押してください。"; }
+  }
+  $("dl-pptx").addEventListener("click", () => exportPlan("pptx"));
+  $("dl-docx").addEventListener("click", () => exportPlan("docx"));
+
+  /* ================= Render ================= */
+  function renderStatus() {
+    const s = S.docs.project.status || "draft";
+    const el = $("proj-status"); el.className = "pill s-" + s; el.textContent = STATUS[s] || s;
+    const order = ["draft", "requested", "developing", "submitted", "finalizing", "done"], k = order.indexOf(s);
+    steps.forEach((b) => b.classList.toggle("done", (b.dataset.step === "req" && k >= 1) || (b.dataset.step === "dev" && k >= 3) || (b.dataset.step === "plan" && k >= 5)));
+  }
+  function renderDoc(doc) {
+    fillForms(doc);
+    if (doc === "project") {
+      const mk = S.docs.project.request?.markets || [];
+      $("r-markets").querySelectorAll("input").forEach((i) => (i.checked = mk.includes(i.value)));
+      renderBrief(); renderDevBrief(); renderStatus(); renderProjectLabel();
+    }
+    if (doc === "supplier") { ["formula", "materials", "tests"].forEach(renderTable); renderFiles(); renderFinal(); }
+    if (doc === "final") { renderTable("additions"); renderFinal(); $("sup-ja").textContent = S.docs.final.supJa || "「日本語に翻訳」を押すと、インドネシア側の英語の入力内容を日本語で表示します。"; }
+    if (doc === "plans") renderPlan();
+    if (!$("view-plan").hidden) renderChecklist();
+  }
+  const renderAll = () => ["project", "supplier", "final", "plans"].forEach(renderDoc);
+  renderAll();
+
+  /* ================= 翻訳ツール (v1) ================= */
+  const subBtns = { text: $("sub-text"), ing: $("sub-ing") };
+  function showSub(n) { Object.entries(subBtns).forEach(([k, b]) => b.setAttribute("aria-pressed", String(k === n))); $("tr-text").hidden = n !== "text"; $("tr-ing").hidden = n !== "ing"; }
+  subBtns.text.onclick = () => showSub("text"); subBtns.ing.onclick = () => showSub("ing");
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", () => copy($(b.dataset.copy).value, b)));
+
+  let dir = "ja2id";
+  const txtJa = $("txt-ja"), txtId = $("txt-id");
+  function setDir(d) {
+    dir = d;
+    $("dir-ja").setAttribute("aria-pressed", String(d === "ja2id")); $("dir-id").setAttribute("aria-pressed", String(d === "id2ja"));
+    txtJa.readOnly = d !== "ja2id"; txtId.readOnly = d === "ja2id";
+    $("role-ja").textContent = d === "ja2id" ? "ここに入力" : "翻訳結果"; $("role-id").textContent = d === "ja2id" ? "翻訳結果" : "ここに入力";
+    $("back-wrap").hidden = d !== "ja2id"; (d === "ja2id" ? txtJa : txtId).focus();
+  }
+  $("dir-ja").onclick = () => setDir("ja2id"); $("dir-id").onclick = () => setDir("id2ja");
+  const draft = ls.get("draft");
+  if (draft && draft.ja) { txtJa.value = draft.ja; txtId.value = draft.id || ""; $("back-txt").textContent = draft.back || ""; $("id-hint").textContent = ""; }
+  const translateText = () => aiRun($("go-text"), $("st-text"), "翻訳しています…", async (signal) => {
+    const src = (dir === "ja2id" ? txtJa : txtId).value.trim();
+    if (!src) throw { userMsg: "翻訳する文章を入力してください。" };
+    const r = await sample.json(`あなたは日本の化粧品メーカーとインドネシアの化粧品原料メーカーの間に立つ、化粧品処方開発に詳しいプロの通訳です。
+次の${dir === "ja2id" ? "日本語" : "インドネシア語"}を、ビジネスで失礼のない丁寧な${dir === "ja2id" ? "インドネシア語" : "日本語"}に翻訳してください。
+- 意味を足したり省いたりしない。数字・単位・日付・商品名・INCI名はそのまま正確に残す。
+${dir === "ja2id" ? "- 訳文を日本語に訳し戻した逆翻訳も作る（意味確認用）。" : ""}
+${GLOSSARY}
 JSONのみで返答: {"translation": string${dir === "ja2id" ? ', "back": string' : ""}}
 
 原文:
-${src}`;
-    try {
-      const r = await sample.json(prompt, { signal: ctlText.signal, modelTier: $("hq").checked ? "default" : "quick" });
-      const out = String(r?.translation ?? "").trim();
-      if (!out) throw { code: "invalid_json" };
-      if (dir === "ja2id") {
-        txtId.value = out; $("back-txt").textContent = String(r.back ?? "");
-        store.set("draft", { ja: txtJa.value, id: out, back: String(r.back ?? "") });
-      } else {
-        txtJa.value = out;
-      }
-      $("id-hint").textContent = "";
-      st.textContent = "";
-    } catch (e) {
-      if (e?.code === "cancelled") st.textContent = "止めました。";
-      else { st.className = "status err"; st.textContent = errText(e); if (HIDE.has(e?.code)) disableAll(errText(e)); }
-    } finally {
-      ctlText = null; btn.textContent = "翻訳する"; btn.classList.remove("stop");
-    }
-  }
+${src}`, { signal, modelTier: $("hq").checked ? "default" : "quick" });
+    const out = String(r?.translation ?? "").trim(); if (!out) throw { code: "invalid_json" };
+    if (dir === "ja2id") { txtId.value = out; $("back-txt").textContent = String(r.back ?? ""); ls.set("draft", { ja: txtJa.value, id: out, back: String(r.back ?? "") }); }
+    else txtJa.value = out;
+    $("id-hint").textContent = ""; $("st-text").textContent = "";
+  });
   $("go-text").onclick = translateText;
-  [txtJa, txtId].forEach(t => t.addEventListener("keydown", e => {
-    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); translateText(); }
-  }));
-  $("clear-text").onclick = () => {
-    txtJa.value = ""; txtId.value = ""; $("back-txt").textContent = ""; $("id-hint").textContent = "";
-    store.set("draft", null); (dir === "ja2id" ? txtJa : txtId).focus();
-  };
+  [txtJa, txtId].forEach((t) => t.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); translateText(); } }));
+  $("clear-text").onclick = () => { txtJa.value = ""; txtId.value = ""; $("back-txt").textContent = ""; $("id-hint").textContent = ""; ls.set("draft", null); };
 
-  /* ================= 成分表翻訳 ================= */
   const EXAMPLE_ING = [
-    {ja:"水",inci:"Water",id:"Air",fungsi:"Pelarut",yoto:"溶剤",note:""},
-    {ja:"BG",inci:"Butylene Glycol",id:"Butilen glikol",fungsi:"Humektan",yoto:"保湿剤",note:""},
-    {ja:"グリセリン",inci:"Glycerin",id:"Gliserin",fungsi:"Humektan",yoto:"保湿剤",note:""},
-    {ja:"ペンチレングリコール",inci:"Pentylene Glycol",id:"Pentilen glikol",fungsi:"Humektan",yoto:"保湿剤",note:""},
-    {ja:"ヒアルロン酸Na",inci:"Sodium Hyaluronate",id:"Natrium hialuronat",fungsi:"Pelembap",yoto:"保湿剤",note:""},
-    {ja:"セラミドNP",inci:"Ceramide NP",id:"Seramida NP",fungsi:"Kondisioner kulit",yoto:"皮膚コンディショニング剤",note:""},
-    {ja:"ナイアシンアミド",inci:"Niacinamide",id:"Niasinamida",fungsi:"Kondisioner kulit",yoto:"皮膚コンディショニング剤",note:""},
-    {ja:"カルボマー",inci:"Carbomer",id:"Karbomer",fungsi:"Pengental",yoto:"増粘剤",note:""},
-    {ja:"水酸化K",inci:"Potassium Hydroxide",id:"Kalium hidroksida",fungsi:"Pengatur pH",yoto:"pH調整剤",note:""},
-    {ja:"フェノキシエタノール",inci:"Phenoxyethanol",id:"Fenoksietanol",fungsi:"Pengawet",yoto:"防腐剤",note:"日本の化粧品基準では配合上限1%"}
+    { ja: "水", inci: "Water", id: "Air", fungsi: "Pelarut", yoto: "溶剤", note: "" },
+    { ja: "BG", inci: "Butylene Glycol", id: "Butilen glikol", fungsi: "Humektan", yoto: "保湿剤", note: "" },
+    { ja: "グリセリン", inci: "Glycerin", id: "Gliserin", fungsi: "Humektan", yoto: "保湿剤", note: "" },
+    { ja: "ペンチレングリコール", inci: "Pentylene Glycol", id: "Pentilen glikol", fungsi: "Humektan", yoto: "保湿剤", note: "" },
+    { ja: "ヒアルロン酸Na", inci: "Sodium Hyaluronate", id: "Natrium hialuronat", fungsi: "Pelembap", yoto: "保湿剤", note: "" },
+    { ja: "セラミドNP", inci: "Ceramide NP", id: "Seramida NP", fungsi: "Kondisioner kulit", yoto: "皮膚コンディショニング剤", note: "" },
+    { ja: "ナイアシンアミド", inci: "Niacinamide", id: "Niasinamida", fungsi: "Kondisioner kulit", yoto: "皮膚コンディショニング剤", note: "" },
+    { ja: "カルボマー", inci: "Carbomer", id: "Karbomer", fungsi: "Pengental", yoto: "増粘剤", note: "" },
+    { ja: "水酸化K", inci: "Potassium Hydroxide", id: "Kalium hidroksida", fungsi: "Pengatur pH", yoto: "pH調整剤", note: "" },
+    { ja: "フェノキシエタノール", inci: "Phenoxyethanol", id: "Fenoksietanol", fungsi: "Pengawet", yoto: "防腐剤", note: "日本の化粧品基準では配合上限1%" },
   ];
-  let ingRows = store.get("ing") || EXAMPLE_ING;
-  let ingIsExample = !store.get("ing");
-  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-  function renderIng(){
-    $("ing-body").innerHTML = ingRows.map((r,i) => `<tr>
-      <td class="no">${i+1}</td><td>${esc(r.ja)}</td><td class="inci">${esc(r.inci)}</td>
-      <td class="idn">${esc(r.id)}<span class="fn">${esc(r.fungsi)}</span></td>
-      <td>${esc(r.yoto)}</td><td class="note">${esc(r.note)}</td></tr>`).join("");
-    $("ing-ex").hidden = !ingIsExample;
+  let ingRows = ls.get("ing") || EXAMPLE_ING, ingEx = !ls.get("ing");
+  function renderIng() {
+    $("ing-body").innerHTML = ingRows.map((r, i) => `<tr><td class="no">${i + 1}</td><td>${esc(r.ja)}</td><td class="inci">${esc(r.inci)}</td><td class="idn">${esc(r.id)}<span class="fn">${esc(r.fungsi)}</span></td><td>${esc(r.yoto)}</td><td class="note">${esc(r.note)}</td></tr>`).join("");
+    $("ing-ex").hidden = !ingEx;
   }
   renderIng();
-  const ingDraft = store.get("ingIn"); if (ingDraft) $("ing-in").value = ingDraft;
-
-  let ctlIng = null;
-  async function translateIng(image){
-    const st = $("st-ing"), btn = $("go-ing");
+  const translateIng = (image) => aiRun($("go-ing"), $("st-ing"), image ? "写真を読み取っています…（30秒ほど）" : "成分を照合しています…（10〜60秒）", async (signal) => {
     const src = $("ing-in").value.trim();
-    if (!image && !src) { st.textContent = "全成分を貼り付けてください。"; return; }
-    if (!sample) return;
-    if (ctlIng) { ctlIng.abort(); return; }
-    ctlIng = new AbortController();
-    btn.textContent = "止める"; btn.classList.add("stop");
-    st.className = "status"; st.textContent = image ? "写真を読み取っています…（30秒ほど）" : "成分を照合しています…（成分数により10〜60秒）";
-    const prompt = `あなたは日本とインドネシア（BPOM）の化粧品規制に詳しい化粧品処方技術者です。
+    if (!image && !src) throw { userMsg: "全成分を貼り付けてください。" };
+    const r = await sample.json(`あなたは日本とインドネシア（BPOM）の化粧品規制に詳しい処方技術者です。
 ${image ? "添付写真は化粧品パッケージの日本語の全成分表示です。写っている成分を配合順にすべて読み取ってください。" : "次は日本の化粧品の全成分表示（日本語の表示名称）です。"}
-各成分について、配合順を変えずに次を出してください。
-- ja: 日本語表示名（原文どおり）
-- inci: INCI名（国際化粧品成分名。日本の表示名称に対応する正式名）
-- id: インドネシア語での成分名（BPOMの書類で通じる表記。INCI名が一般的ならINCI名をインドネシア語綴りに）
-- fungsi: 主な配合目的をインドネシア語で短く（例: Humektan, Pengawet, Pengemulsi）
-- yoto: 同じ配合目的を日本語で短く
-- note: 日本側の担当者が確認すべき点を日本語で短く。例: INCI名が複数候補で要確認／日本の化粧品基準で配合上限あり／医薬部外品の表示名で化粧品と異なる／インドネシアで入手しにくい可能性。問題なければ空文字。推測で断定しない。
-成分の区切りは「、」「,」改行など。1成分を分割したり、2成分を結合したりしないこと。
+各成分について配合順を変えずに: ja=日本語表示名, inci=INCI名, id=インドネシア語の成分名（BPOM書類で通じる表記）, fungsi=配合目的（インドネシア語）, yoto=配合目的（日本語）, note=日本側で確認すべき点（無ければ空文字。推測で断定しない）。
 ${GLOSSARY}
-
 JSONのみで返答: {"items":[{"ja":"","inci":"","id":"","fungsi":"","yoto":"","note":""}]}
-${image ? "" : "\n全成分:\n" + src}`;
-    try {
-      const r = await sample.json(prompt, { signal: ctlIng.signal, images: image || undefined });
-      const items = Array.isArray(r?.items) ? r.items : null;
-      if (!items || !items.length) throw { code: "invalid_json" };
-      ingRows = items.map(x => ({ja:String(x.ja??""),inci:String(x.inci??""),id:String(x.id??""),fungsi:String(x.fungsi??""),yoto:String(x.yoto??""),note:String(x.note??"")}));
-      ingIsExample = false;
-      if (image) $("ing-in").value = ingRows.map(r => r.ja).join("、");
-      store.set("ing", ingRows); store.set("ingIn", $("ing-in").value);
-      renderIng();
-      const flagged = ingRows.filter(r => r.note).length;
-      st.textContent = `${ingRows.length}成分を翻訳しました。` + (flagged ? `確認事項が${flagged}件あります。` : "");
-    } catch (e) {
-      if (e?.code === "cancelled") st.textContent = "止めました。";
-      else { st.className = "status err"; st.textContent = errText(e); if (HIDE.has(e?.code)) disableAll(errText(e)); }
-    } finally {
-      ctlIng = null; btn.textContent = "インドネシア語に翻訳"; btn.classList.remove("stop");
-    }
-  }
+${image ? "" : "\n全成分:\n" + src}`, { signal, images: image || undefined });
+    const items = Array.isArray(r?.items) ? r.items : null; if (!items || !items.length) throw { code: "invalid_json" };
+    ingRows = items.map((x) => ({ ja: String(x.ja ?? ""), inci: String(x.inci ?? ""), id: String(x.id ?? ""), fungsi: String(x.fungsi ?? ""), yoto: String(x.yoto ?? ""), note: String(x.note ?? "") }));
+    ingEx = false; if (image) $("ing-in").value = ingRows.map((r) => r.ja).join("、");
+    ls.set("ing", ingRows); renderIng();
+    $("st-ing").textContent = `${ingRows.length}成分を翻訳しました。`;
+  });
   $("go-ing").onclick = () => translateIng(null);
-  $("ing-photo").addEventListener("change", (e) => {
-    const f = e.target.files?.[0]; e.target.value = "";
-    if (f) translateIng(f);
-  });
-
-  function ingAsIndonesian(){
-    return "Daftar bahan lengkap (urutan sesuai kadar)\nNo. | INCI | Nama (ID) | Fungsi\n" +
-      ingRows.map((r,i) => `${i+1}. ${r.inci} | ${r.id} | ${r.fungsi}`).join("\n");
-  }
+  $("ing-photo").addEventListener("change", (e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) translateIng(f); });
   const cell = (s) => String(s ?? "").replace(/[\t\r\n]+/g, " ");
-  function ingAsTSV(){
-    return ["No.\t日本語表示名\tINCI\tBahasa Indonesia\tFungsi\t配合目的\t確認事項",
-      ...ingRows.map((r,i) => [i+1,r.ja,r.inci,r.id,r.fungsi,r.yoto,r.note].map(cell).join("\t"))].join("\n");
-  }
-  $("copy-ing-id").onclick = (e) => copy(ingAsIndonesian(), e.currentTarget);
-  $("copy-ing-tsv").onclick = (e) => copy(ingAsTSV(), e.currentTarget);
-  $("dl-ing").onclick = async () => {
-    const q = (s) => '"' + String(s ?? "").replace(/"/g,'""') + '"';
-    const csv = "﻿" + ["No.,日本語表示名,INCI,Bahasa Indonesia,Fungsi,配合目的,確認事項",
-      ...ingRows.map((r,i) => [i+1,r.ja,r.inci,r.id,r.fungsi,r.yoto,r.note].map(q).join(","))].join("\r\n");
-    try { await downloads.save({ filename: "seibun-hyo-ID.csv", data: csv }); }
-    catch (e) { if (e?.code !== "declined") $("st-ing").textContent = "保存できませんでした。「Excel用にコピー」をお使いください。"; }
-  };
+  $("copy-ing-id").onclick = (e) => copy("Daftar bahan lengkap\nNo. | INCI | Nama (ID) | Fungsi\n" + ingRows.map((r, i) => `${i + 1}. ${r.inci} | ${r.id} | ${r.fungsi}`).join("\n"), e.currentTarget);
+  $("copy-ing-tsv").onclick = (e) => copy(["No.\t日本語表示名\tINCI\tBahasa Indonesia\tFungsi\t配合目的\t確認事項", ...ingRows.map((r, i) => [i + 1, r.ja, r.inci, r.id, r.fungsi, r.yoto, r.note].map(cell).join("\t"))].join("\n"), e.currentTarget);
 
-  /* ================= 開発依頼書 ================= */
-  const EXAMPLE_BRIEF = {
-    id: `PERMINTAAN PENGEMBANGAN FORMULA
-
-Kategori produk: Losion wajah (toner)
-Volume: 150 mL
-Produk acuan (benchmark): Losion pelembap yang dijual di drugstore Jepang (contoh)
-
-Sensasi pemakaian yang diinginkan:
-Tekstur agak kental, namun setelah meresap ke kulit terasa segar dan tidak lengket. Tanpa pewangi.
-
-Bahan aktif / klaim:
-Seramida dan niasinamida untuk kelembapan dan kekenyalan kulit.
-
-Bahan yang tidak boleh digunakan:
-Bahan yang tidak diizinkan dalam standar kosmetik Jepang, paraben, minyak mineral, alkohol (etanol).
-
-Target biaya bahan: maksimal JPY 100 per botol
-Target sampel uji coba: akhir Oktober 2026
-
-Catatan:
-Produksi akan dilakukan di pabrik kami sendiri di Kakegawa, Prefektur Shizuoka, Jepang. Mohon lampirkan spesifikasi bahan baku, SDS, dan COA untuk setiap bahan.`,
-    en: `FORMULA DEVELOPMENT REQUEST
-
-Product category: Facial lotion (toner)
-Volume: 150 mL
-Benchmark product: Moisturizing lotion sold at Japanese drugstores (example)
-
-Target sensory profile:
-Slightly viscous, but absorbs into the skin with a fresh, non-sticky finish. Fragrance-free.
-
-Key ingredients / claims:
-Ceramide and niacinamide for moisturization and skin firmness.
-
-Ingredients to avoid:
-Anything not permitted under the Japanese Standards for Cosmetics, parabens, mineral oil, alcohol (ethanol).
-
-Target raw material cost: JPY 100 or less per unit
-Target trial sample date: end of October 2026
-
-Notes:
-Manufacturing will take place at our own factory in Kakegawa, Shizuoka, Japan. Please provide raw material specifications, SDS and COA for each ingredient.`,
-    ja: `（例）入力内容をもとにした依頼書の確認用日本語訳がここに表示されます。`
-  };
-  let brief = store.get("brief") || EXAMPLE_BRIEF;
-  let outLang = "id";
-  function renderBrief(){
-    const el = $("brief-out");
-    el.textContent = brief[outLang] || "";
-    el.classList.toggle("ja", outLang === "ja");
-    document.querySelectorAll("[data-out]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.out === outLang)));
-  }
-  document.querySelectorAll("[data-out]").forEach(b => b.onclick = () => { outLang = b.dataset.out; renderBrief(); });
-  renderBrief();
-  $("copy-brief").onclick = (e) => copy(brief[outLang] || "", e.currentTarget);
-
-  const FIELDS = [["b-cat","製品カテゴリ"],["b-vol","容量"],["b-bench","ベンチマーク品"],["b-feel","目標とする使用感"],
-    ["b-claim","訴求成分・効果"],["b-avoid","使いたくない成分"],["b-cost","目標原価"],["b-date","試作サンプル希望日"],["b-note","その他"]];
-  const savedForm = store.get("briefForm");
-  if (savedForm) FIELDS.forEach(([id]) => { if (savedForm[id] != null) $(id).value = savedForm[id]; });
-
-  let ctlBrief = null;
-  $("brief-form").addEventListener("submit", async (ev) => {
-    ev.preventDefault();
-    const st = $("st-brief"), btn = $("go-brief");
-    if (!sample) return;
-    if (ctlBrief) { ctlBrief.abort(); return; }
-    const form = {}; FIELDS.forEach(([id]) => form[id] = $(id).value.trim());
-    store.set("briefForm", form);
-    const body = FIELDS.filter(([id]) => form[id]).map(([id,l]) => `${l}: ${form[id]}`).join("\n");
-    if (!body) { st.textContent = "少なくとも1項目は記入してください。"; return; }
-    ctlBrief = new AbortController();
-    btn.textContent = "止める"; btn.classList.add("stop");
-    st.className = "status"; st.textContent = "依頼書を作成しています…（20〜60秒）";
-    const prompt = `あなたは日本の化粧品メーカーの開発担当者です。インドネシアの化粧品原料メーカーの処方開発担当者に送る「処方開発依頼書」を作ります。
-下の日本語メモをもとに、見出し付きの簡潔な依頼書を作成してください。
-- 内容を創作しない。メモにない数値や条件は書かない。記入のない項目は省く。
-- 金額は円なら「JPY」で表記。日付は誤解のない形で。
-- 相手は処方技術者なので、使用感は具体的な技術用語（粘度感、伸び、仕上がり等）で明確に。
-- 出力は3言語: id=インドネシア語（丁寧なビジネス文）, en=英語, ja=日本語（インドネシア語版の内容確認用の訳）。
-${GLOSSARY}
-
-JSONのみで返答: {"id": string, "en": string, "ja": string}
-
-日本語メモ:
-${body}`;
-    try {
-      const r = await sample.json(prompt, { signal: ctlBrief.signal });
-      if (!r?.id) throw { code: "invalid_json" };
-      brief = { id: String(r.id), en: String(r.en ?? ""), ja: String(r.ja ?? "") };
-      store.set("brief", brief); outLang = "id"; renderBrief();
-      st.textContent = "作成しました。内容は「日本語（確認用）」で確認できます。";
-    } catch (e) {
-      if (e?.code === "cancelled") st.textContent = "止めました。";
-      else { st.className = "status err"; st.textContent = errText(e); if (HIDE.has(e?.code)) disableAll(errText(e)); }
-    } finally {
-      ctlBrief = null; btn.textContent = "依頼書を作成"; btn.classList.remove("stop");
-    }
-  });
-
-  /* ---------- Capabilities ---------- */
+  /* ================= Capabilities ================= */
+  window.addEventListener("pagehide", () => { flushAll(); });
   (async () => {
-    const s = window.claude ? await window.claude.use("sample") : null;
-    if (!s) { disableAll("翻訳機能は、claude.ai にサインインした状態でこのページを開くと使えます。表示中の内容は入力例です。"); return; }
-    sample = s;
-    $("avail").hidden = true;
-    try { const lim = await s.limits(); $("photo-wrap").hidden = !lim?.images; } catch {}
-    const d = window.claude ? await window.claude.use("downloads") : null;
-    if (d) { downloads = d; $("dl-ing").hidden = false; }
+    const C = window.claude;
+    const [s, d, a, dl] = C ? await Promise.all(["sample", "db", "assets", "downloads"].map((n) => C.use(n).catch(() => null))) : [null, null, null, null];
+    sample = s; db = d; assets = a; downloads = dl;
+    const notes = [];
+    if (!db) notes.push("案件データの保存は、claude.ai にサインインし、このページへのアクセス権がある状態で使えます。");
+    if (!sample) notes.push("翻訳・変換・企画書作成のAI機能は、claude.ai にサインインした状態で使えます。");
+    if (notes.length) { $("avail").textContent = notes.join(" "); $("avail").className = "notice off"; } else $("avail").hidden = true;
+    if (sample) { try { const lim = await sample.limits(); $("photo-wrap").hidden = !lim?.images; } catch {} }
+    if (!assets) $("upl").querySelector("label.btn").classList.add("ghost");
+    if (!db) return;
+    db.doc("market/current").onSnapshot((snap) => { S.market = snap.exists ? snap.data() : null; if (!$("view-plan").hidden) renderChecklist(); }, () => {});
+    let first = true;
+    db.collection("projects").orderBy("updatedAt", "desc").limit(100).onSnapshot((snap) => {
+      S.list = snap.docs.map((x) => ({ id: x.id, ...(x.data() || {}) }));
+      if (first) {
+        first = false;
+        const want = ls.get("pid");
+        const pid = S.list.some((p) => p.id === want) ? want : S.list[0]?.id || null;
+        renderProjectSelect(); subscribeProject(pid);
+      } else renderProjectSelect();
+    }, () => {});
   })();
 })();
 </script>
