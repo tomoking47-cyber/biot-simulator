@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>処方ブリッジ Formula Bridge</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="topbar" id="topbar" hidden>
+    <div class="brand"><b>処方ブリッジ</b><span class="pair">Formula Bridge</span></div>
+    <nav id="nav"></nav>
+    <div class="me"><span id="me-name"></span><button class="btn ghost" id="signout">ログアウト / Sign out</button></div>
+  </header>
+  <main id="app"><div class="empty">Loading…</div></main>
+  <footer>
+    処方ブリッジ Formula Bridge — 機密情報を含みます。Confidential.<br>
+    AI（Claude）による翻訳・変換・企画書作成を含みます。数値は必ず原典・相手の確認で確かめてください。
+  </footer>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><div><div class="tt" id="toast-t"></div><div class="tb" id="toast-b"></div></div><button class="x" id="toast-x" aria-label="閉じる">×</button></div>
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="export.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
