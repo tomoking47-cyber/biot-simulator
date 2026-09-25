@@ -129,6 +129,25 @@ Deno.serve(async (req) => {
     if (!count) return json({ error: "forbidden", message: "AI is available after a request has been received." }, 403);
   }
 
+  // Admin check of the AI setup: which keys are present and whether each one answers. Never returns key values.
+  if (provider === "status") {
+    if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
+    const has = { claude: !!Deno.env.get("ANTHROPIC_API_KEY"), openai: !!Deno.env.get("OPENAI_API_KEY"), gemini: !!Deno.env.get("GEMINI_API_KEY") };
+    const models = { claude: "claude-opus-5", openai: Deno.env.get("OPENAI_MODEL") || "gpt-5", gemini: Deno.env.get("GEMINI_MODEL") || "gemini-2.5-pro" };
+    const out: Record<string, unknown> = {};
+    const ping = "Reply with the single word OK.";
+    const check = async (k: "claude" | "openai" | "gemini", fn: () => Promise<Response>) => {
+      if (!has[k]) { out[k] = { key: false, model: models[k] }; return; }
+      const r = await fn(); const j = await r.json().catch(() => ({}));
+      out[k] = { key: true, model: j.model || models[k], ok: r.ok, error: r.ok ? undefined : j.error, message: r.ok ? undefined : String(j.message || "").slice(0, 200) };
+    };
+    await Promise.all([
+      check("claude", () => claude(ping, "low", {})),
+      check("openai", () => openai(ping, "low")),
+      check("gemini", () => gemini(ping, false)),
+    ]);
+    return json(out);
+  }
   if (provider === "openai") return openai(prompt, effort);
   if (provider === "gemini") return gemini(prompt, body.search !== false);
   return claude(prompt, effort, body);

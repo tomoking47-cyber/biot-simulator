@@ -889,6 +889,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         <div class="field"><label for="s-from">送信元（例: 処方ブリッジ &lt;noreply@御社ドメイン&gt;）</label><input id="s-from" value="${esc(conf.from_email || "")}" placeholder="未設定の場合はテスト用の送信元を使います"></div>
         <div class="field"><label for="s-url">このサイトのURL（メール内のリンク先）</label><input id="s-url" value="${esc(conf.app_url || location.origin + location.pathname.replace(/index\.html$/, ""))}"></div>
         <div class="row"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" id="mail-test">テストメールを送る</button></div><div class="status" id="st-set"></div></form>
+      <div class="card"><h2>AIの接続確認</h2><p class="sub">企画書は Claude・GPT・Gemini の3社のAIを使います。鍵（APIキー）が登録されているか、実際につながるかを確認します（鍵の中身は表示しません）。</p>
+        <button class="btn ghost" type="button" id="ai-test">3社のAIの接続を確認する</button><div class="status" id="st-ai"></div></div>
       <div class="card"><h2>管理者（日本側）のメールアドレス</h2><p class="sub">ここにあるアドレスで新規登録した人は、日本側の管理者になります。</p>
         <div class="tbl-wrap"><table class="view"><thead><tr><th>メールアドレス</th><th>状態</th><th></th></tr></thead><tbody>
         ${(admins || []).map((a) => { const r = regd(a.email); return `<tr><td class="mono">${esc(a.email)}</td><td>${r?.role === "admin" ? '<span class="chip done">利用中</span>' : r ? '<span class="chip requested">確認待ち</span>' : '<span class="chip draft">未登録</span>'}</td>
@@ -904,6 +906,13 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const { error } = await sb.from("settings").upsert(up);
       $("st-set").textContent = error ? "保存できませんでした: " + error.message : "保存しました ✓";
     };
+    $("ai-test").onclick = (e) => busy(e.currentTarget, $("st-ai"), "3社のAIに接続を確認しています…（〜30秒）", async () => {
+      const r = await aiRaw("status", { provider: "status" });
+      const L = { claude: "Claude（Anthropic）", openai: "GPT（OpenAI）", gemini: "Gemini（Google）" }, K = { claude: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" };
+      $("st-ai").className = "status";
+      $("st-ai").innerHTML = `<table class="ai-st">${Object.keys(L).map((k) => { const x = r[k] || {};
+        return `<tr><td><b>${L[k]}</b></td><td>${!x.key ? `<span class="chip draft">鍵が未登録</span> <span class="muted">Secrets に <code>${K[k]}</code> を登録してください</span>` : x.ok ? `<span class="chip done">接続OK ✓</span> <span class="muted">${esc(x.model)}</span>` : `<span class="chip" style="border-color:var(--warn);color:var(--warn)">鍵はあるが接続できない</span> <span class="muted">${esc(x.error || "")} ${esc(x.message || "")}</span>`}</td></tr>`; }).join("")}</table>`;
+    });
     $("mail-test").onclick = (e) => busy(e.currentTarget, $("st-set"), "テストメールを送っています…", async () => {
       const { data, error } = await sb.functions.invoke("notify", { body: { event: "test" } });
       if (error) throw { userMsg: "送信できませんでした（通信エラー）。" };
