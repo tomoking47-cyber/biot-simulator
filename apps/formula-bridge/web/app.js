@@ -9,6 +9,12 @@
   const sb = window.FB_DEMO ? window.FB_DEMO.client : supabase.createClient(FB_CONFIG.supabaseUrl, FB_CONFIG.supabaseKey);
   const $ = (id) => document.getElementById(id);
   const app = $("app");
+  // Phones show tables as stacked cards; each cell carries its column name for that layout.
+  const labelCells = () => app.querySelectorAll("table").forEach((t) => {
+    const hs = [...t.querySelectorAll("thead th")].map((th) => th.textContent.trim());
+    t.querySelectorAll("tbody tr").forEach((tr) => [...tr.children].forEach((td, i) => { if (td.colSpan === 1 && hs[i] && td.dataset.l !== hs[i]) td.dataset.l = hs[i]; }));
+  });
+  new MutationObserver(labelCells).observe(app, { childList: true, subtree: true });
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
   const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
@@ -219,14 +225,16 @@
   /* ---------------- Shared: formula tables ---------------- */
   const COLS = {
     formula: [
-      { k: "phase", l: "Phase", w: 60 }, { k: "trade", l: "Trade name", w: 150 }, { k: "idName", l: "Nama bahan (Indonesian label name)", w: 190 },
-      { k: "inci", l: "INCI name", w: 190 }, { k: "maker", l: "Supplier / maker", w: 130 }, { k: "pct", l: "% w/w", w: 80, num: true },
-      { k: "fn", l: "Function", w: 120 }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 },
+      { k: "phase", l: "Phase", w: 60, req: true }, { k: "trade", l: "Trade name", w: 150, req: true }, { k: "idName", l: "Nama bahan (Indonesian label name)", w: 190, req: true },
+      { k: "inci", l: "INCI name", w: 190, req: true }, { k: "maker", l: "Supplier / maker", w: 130, req: true }, { k: "pct", l: "% w/w", w: 80, num: true, req: true },
+      { k: "fn", l: "Function", w: 120, req: true }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 },
       { k: "jaNote", l: "確認事項（AI）", jn: true, ro: true, w: 280 } ],
     materials: [{ k: "material", l: "Raw material", w: 180 }, { k: "feature", l: "Key feature", w: 280 }, { k: "data", l: "Supporting data (supplier / literature)", w: 360 }],
     tests: [{ k: "lab", l: "Laboratory", w: 160 }, { k: "item", l: "Test item", w: 170 }, { k: "method", l: "Method / n", w: 170 }, { k: "result", l: "Result", w: 260 }, { k: "date", l: "Date", w: 100 }],
     additions: [{ k: "ja", l: "日本語表示名称", w: 200 }, { k: "inci", l: "INCI", w: 200 }, { k: "pct", l: "配合量 %", w: 90, num: true }, { k: "purpose", l: "配合目的", w: 160 }, { k: "note", l: "備考（仕入先など）", w: 200 }],
   };
+  const TPL_MARK = "Formula Bridge formula template v1";
+  const TPL_HEAD = ["No.", "Phase", "Trade name", "Nama bahan (Indonesian label name)", "INCI name", "Supplier / maker", "Amount", "Function"];
   /* An editable table bound to an array; onChange is called after every edit. */
   function editTable(el, cols, rows, onChange, { totalCheck = false, readOnly = false } = {}) {
     const render = () => {
@@ -236,13 +244,14 @@
       el.innerHTML = `<thead><tr><th>No.</th>${cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}${readOnly ? "" : "<th></th>"}</tr></thead>
         <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || c.ro || readOnly
           ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${esc(r[c.k] ?? "")}</td>`
-          : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
+          : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" class="${c.req && !String(r[c.k] ?? "").trim() ? "miss" : ""}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>
         ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
     };
     el.oninput = (e) => {
       const t = e.target; if (!t.dataset.k) return; const r = rows[+t.dataset.i]; if (!r) return;
       r[t.dataset.k] = t.value;
+      if (cols.find((c) => c.k === t.dataset.k)?.req) t.classList.toggle("miss", !t.value.trim());
       if (["idName", "inci", "trade"].includes(t.dataset.k) && "ja" in r && cols.some((c) => c.ja)) { r.ja = ""; r.jaNote = ""; }
       const tk = cols.find((c) => c.total)?.k || "pct";
       onChange();
@@ -340,7 +349,10 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE</span><b>${esc(rq.price || "—")}</b></div></div>
         <div id="prod-fields"></div></div>
       <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian label name (Nama bahan) and the amount. The Japanese name is filled in by the button.</p></div>
-        <button class="btn ghost" id="to-ja">Convert to Japanese names / 日本語表示名称に変換</button></div>
+        <div class="to-ja-wrap"><span class="next-tag" id="to-ja-tag" hidden>▶ Next step / Langkah berikutnya</span><button class="btn ghost" id="to-ja">Convert to Japanese names / 日本語表示名称に変換</button></div></div>
+        <div class="tpl-box"><div><b>① Download our formula template (Excel), fill in every cell, then ② drop it in the box below.</b>
+          <span>Unduh template formula kami (Excel), isi semua kolom, lalu letakkan di kotak di bawah. A PDF in your lab's own format is also OK — any empty cells must then be filled in here.</span></div>
+          <button type="button" class="btn saff" id="tpl-dl">⬇ Formula template (Excel)</button></div>
         <div class="drop" id="f-drop" tabindex="0" role="button" aria-label="Import formula from a file">
           <b>⬇ Drop your formula file here, or tap to choose</b>
           <span>PDF, Excel (.xlsx / .xls), CSV or a photo — the table below is filled in automatically.</span>
@@ -349,6 +361,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="status" id="st-drop" role="status" aria-live="polite"></div><div id="drop-preview"></div>
         <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated)</option><option value="mL">mL per batch (% is calculated)</option></select></div>
         <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
+        <div class="status err" id="st-miss" role="status"></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button></div><div class="status" id="st-toja"></div></div>
       <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E.</p>
         <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row</button></div></div>
@@ -362,7 +375,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="status" id="st-upl"></div></div>
       <div class="card"><h2>${FLAG_ID}Submit to Japan</h2><p class="sub">When the sample is ready and A–E are complete, press Submit. Japan's development team is notified by email.</p>
         <div class="row"><button class="btn saff big" id="submit">Submit to Japan</button><span class="spacer"></span>
-          <button class="btn ghost" id="xl-out">Excel template</button><label class="btn ghost" style="position:relative">Import from Excel<input type="file" id="xl-in" accept=".xlsx,.xls" style="position:absolute;width:1px;height:1px;opacity:0"></label></div>
+          </div>
         <div class="status" id="st-submit"></div></div>
       <div class="card" id="ship-card"><h2>${FLAG_ID}F. Sample shipment to Japan / Pengiriman sampel</h2>
         <p class="sub">After submitting, send the sample to Japan and enter the tracking number. Press "Shipment complete" — Japan's development team is emailed automatically.</p>
@@ -413,14 +426,23 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     // Formula amounts: % w/w (default) or g / mL per batch; % is then worked out automatically.
     sp.formulaUnit = sp.formulaUnit || "%";
     const formulaCols = () => sp.formulaUnit === "%" ? COLS.formula.map((c) => (c.k === "pct" ? { ...c, ph: "e.g. 2.5" } : c))
-      : COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) / batch`, w: 110, num: true, total: true, ph: "e.g. 25" }, { k: "pct", l: "% w/w (auto)", w: 90, num: true, ro: true }] : [c]);
+      : COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) / batch`, w: 110, num: true, total: true, req: true, ph: "e.g. 25" }, { k: "pct", l: "% w/w (auto)", w: 90, num: true, ro: true }] : [c]);
     const recalcPct = () => {
       if (sp.formulaUnit === "%") return;
       const tot = sp.formula.reduce((a, r) => a + num(r.amt), 0);
       sp.formula.forEach((r) => (r.pct = tot ? String(Math.round((num(r.amt) / tot) * 100000) / 1000) : ""));
     };
     let tF;
-    const mountFormula = () => { tF = editTable($("t-formula"), formulaCols(), sp.formula, () => { recalcPct(); save.soon(); }, { totalCheck: true }); };
+    // Empty required cells (highlighted) and the "convert to Japanese names" next-step cue.
+    const blanks = () => { const cols = formulaCols().filter((c) => c.req); return sp.formula.map((r, i) => ({ i, m: cols.filter((c) => !String(r[c.k] ?? "").trim()).map((c) => c.l) })).filter((x) => x.m.length); };
+    const needsJa = () => sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja);
+    const refreshCues = () => {
+      const b = blanks(), n = b.reduce((a, x) => a + x.m.length, 0);
+      $("st-miss").textContent = n ? `⚠ ${n} empty cell${n > 1 ? "s" : ""} (highlighted in yellow) — please fill in every cell before submitting. / Harap isi semua kolom yang kosong.` : "";
+      const next = !n && needsJa();
+      $("to-ja").classList.toggle("next", next); $("to-ja").classList.toggle("ghost", !next); $("to-ja-tag").hidden = !next;
+    };
+    const mountFormula = () => { tF = editTable($("t-formula"), formulaCols(), sp.formula, () => { recalcPct(); save.soon(); refreshCues(); }, { totalCheck: true }); refreshCues(); };
     $("f-unit").value = sp.formulaUnit;
     $("f-unit").onchange = () => {
       const prev = sp.formulaUnit; sp.formulaUnit = $("f-unit").value;
@@ -432,6 +454,42 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     // Import a formula sheet (PDF, Excel, CSV or photo): AI reads it, the supplier checks the preview, then it is applied.
     const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
     const drop = $("f-drop"), dropSt = $("st-drop");
+    $("tpl-dl").onclick = async () => {
+      const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new();
+      const head = TPL_HEAD.map((h) => h + (h === "No." ? "" : " *"));
+      const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English. Do not change the header row (row 7). / Isi SEMUA kolom dalam bahasa Inggris. Jangan ubah baris judul (baris 7)."],
+        ["Project", snap.name || ""], ["Company", S.company?.name || ""], ["Amount unit (write %, g or mL) *", "%"], [],
+        head, ...Array.from({ length: 40 }, (_, i) => [i + 1, "", "", "", "", "", "", ""]), ["", "", "", "", "", "Total", { f: "SUM(G8:G47)" }, ""]]);
+      ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
+      ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
+      XLSX.utils.book_append_sheet(wb, ws, "Formula");
+      const ex = XLSX.utils.aoa_to_sheet([["EXAMPLE — do not fill in this sheet / CONTOH"], [], TPL_HEAD,
+        [1, "A", "Purified water", "Air", "Water", "—", 83.7, "Solvent"], [2, "A", "Glycerin 99.5%", "Gliserin", "Glycerin", "Wilmar", 4, "Humectant"],
+        [3, "B", "Ceramide NP-3", "Seramida NP", "Ceramide NP", "Evonik", 0.05, "Skin conditioning"], [4, "C", "Euxyl PE 9010", "Fenoksietanol, Etilheksilgliserin", "Phenoxyethanol, Ethylhexylglycerin", "Schülke", 0.5, "Preservative"]]);
+      ex["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
+      XLSX.utils.book_append_sheet(wb, ex, "Example");
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["How to fill in / Cara mengisi"], [],
+        ["1", "One row per raw material, in the order you add them. / Satu baris per bahan baku."], ["2", "Phase: A, B, C … (the manufacturing phase). / Fase pembuatan."],
+        ["3", "Trade name: the product name of the raw material. / Nama dagang bahan baku."], ["4", "Nama bahan: the Indonesian label name. / Nama bahan sesuai label Indonesia."],
+        ["5", "INCI name: the international name. For a blend, list all INCI names separated by commas. / Untuk campuran, tulis semua nama INCI."],
+        ["6", "Supplier / maker: who makes the raw material. / Produsen bahan baku."], ["7", "Amount: numbers only, in the unit written in cell B5 (%, g or mL). If %, the total must be 100. / Hanya angka. Jika %, total harus 100."],
+        ["8", "Function: e.g. Humectant, Emulsifier, Preservative. / Fungsi bahan."], ["9", "Save the file and drop it into Formula Bridge (section B). / Simpan lalu unggah ke Formula Bridge (bagian B)."]]), "How to fill");
+      download("FormulaBridge_formula_template_" + (snap.name || "request").replace(/[\\/:*?"<>|\s]+/g, "_") + ".xlsx", new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })]));
+      toast("Template downloaded ✓", "Fill in every cell, save, then drop the file in the orange box.", "info");
+    };
+    // Our own template is read directly (exact, instant); anything else goes to the AI.
+    const readTemplate = (XLSX, wb) => {
+      const ws = wb.Sheets.Formula; if (!ws) return null;
+      const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
+      if (String(rows[0]?.[0] || "").trim() !== TPL_MARK) return null;
+      const u = rows.find((r) => /^Amount unit/i.test(String(r[0] || "")))?.[1];
+      const unit = { "%": "%", g: "g", ml: "mL" }[String(u || "%").trim().toLowerCase()] || "%";
+      const h = rows.findIndex((r) => /^Phase/.test(String(r[1] || "")));
+      const s = (v) => String(v ?? "").trim();
+      const items = rows.slice(h + 1).filter((r) => s(r[5]) !== "Total" && [2, 3, 4, 5, 6, 7].some((j) => s(r[j])))
+        .map((r) => ({ phase: s(r[1]), trade: s(r[2]), idName: s(r[3]), inci: s(r[4]), maker: s(r[5]), amt: s(r[6]), fn: s(r[7]) }));
+      return { unit, items, notes: "" };
+    };
     const importFile = async (file) => {
       if (!file) return;
       const name = file.name.toLowerCase(), isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
@@ -441,15 +499,12 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       if (file.size > 10 * 1024 * 1024) { dropSt.className = "status err"; dropSt.textContent = "The file is larger than 10 MB. Please send a smaller file."; return; }
       drop.classList.add("busy"); dropSt.textContent = `Reading ${file.name}… (20–60 seconds) / Membaca file…`; $("drop-preview").innerHTML = "";
       try {
-        let source = "", opts = { effort: "medium" };
-        if (isPdf) { opts.document = { media_type: "application/pdf", data: await readB64(file) }; source = "the attached PDF"; }
+        let source = "", opts = { effort: "medium" }, res = null;
+        if (/\.xlsx?$/.test(name)) { const XLSX = await lib("XLSX"), wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); res = readTemplate(XLSX, wb); if (!res) source = "this spreadsheet (converted to CSV):\n" + wb.SheetNames.map((n) => `### Sheet: ${n}\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n").slice(0, 60000); }
+        else if (isPdf) { opts.document = { media_type: "application/pdf", data: await readB64(file) }; source = "the attached PDF"; }
         else if (isImg) { opts.image = { media_type: file.type, data: await readB64(file) }; source = "the attached photo"; }
-        else if (name.endsWith(".csv")) { source = "this CSV:\n" + (await file.text()).slice(0, 60000); }
-        else {
-          const XLSX = await lib("XLSX"), wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-          source = "this spreadsheet (converted to CSV):\n" + wb.SheetNames.map((n) => `### Sheet: ${n}\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n").slice(0, 60000);
-        }
-        const res = await ai(`You are a cosmetic formulation assistant. Extract the cosmetic formula from ${source}
+        else { source = "this CSV:\n" + (await file.text()).slice(0, 60000); }
+        if (!res) res = await ai(`You are a cosmetic formulation assistant. Extract the cosmetic formula from ${source}
 Rules:
 - List every raw material row in the original order. Skip headers, totals and blank rows.
 - Copy names and numbers exactly. Do not invent, round or change any value. Leave a field "" when it is not shown.
@@ -461,10 +516,11 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         if (!items.length) throw { userMsg: "No formula rows were found in this file. Please check the file or enter the rows by hand." };
         const unit = ["%", "g", "mL"].includes(res.unit) ? res.unit : "%";
         const tot = items.reduce((a, x) => a + num(x.amt), 0);
-        dropSt.textContent = `✓ ${items.length} rows found (${unit === "%" ? `total ${fmt(tot)}%` : `total ${fmt(tot)} ${unit}`}). Please check them, then press "Use these rows".`;
+        const F7 = ["phase", "trade", "idName", "inci", "maker", "amt", "fn"], empty = items.reduce((a, x) => a + F7.filter((k) => !String(x[k] ?? "").trim()).length, 0);
+        dropSt.textContent = `✓ ${items.length} rows found (${unit === "%" ? `total ${fmt(tot)}%` : `total ${fmt(tot)} ${unit}`}). Please check them, then press "Use these rows".` + (empty ? ` ${empty} empty cell${empty > 1 ? "s" : ""} (yellow) must be filled in after importing.` : "");
         $("drop-preview").innerHTML = `<div class="confirm-box">${res.notes ? `<div class="status err" style="margin:0">Note: ${esc(res.notes)}</div>` : ""}
           <div class="tbl-wrap"><table class="view"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI</th><th>Maker</th><th>Amount (${esc(unit)})</th><th>Function</th></tr></thead><tbody>
-          ${items.map((x, i) => `<tr><td class="no">${i + 1}</td><td>${esc(x.phase)}</td><td>${esc(x.trade)}</td><td>${esc(x.idName)}</td><td class="inci">${esc(x.inci)}</td><td>${esc(x.maker)}</td><td class="num">${esc(x.amt)}</td><td>${esc(x.fn)}</td></tr>`).join("")}</tbody></table></div>
+          ${items.map((x, i) => `<tr><td class="no">${i + 1}</td>${F7.map((k) => `<td class="${k === "inci" ? "inci " : k === "amt" ? "num " : ""}${String(x[k] ?? "").trim() ? "" : "miss"}">${esc(x[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
           <div class="row"><button type="button" class="btn saff" id="imp-replace">Use these rows${sp.formula.length ? " (replace current table)" : ""}</button>
           ${sp.formula.length ? '<button type="button" class="btn ghost" id="imp-append">Add below current rows</button>' : ""}<button type="button" class="btn ghost" id="imp-cancel">Cancel</button></div></div>`;
         const apply = (replace) => {
@@ -472,7 +528,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
           if (replace) { sp.formula.splice(0, sp.formula.length, ...rows); sp.formulaUnit = unit; }
           else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead.`; return; } sp.formula.push(...rows); }
           $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
-          $("drop-preview").innerHTML = ""; dropSt.textContent = `✓ ${rows.length} rows added to the formula. Next, press "Convert to Japanese names".`;
+          $("drop-preview").innerHTML = ""; const nb = blanks().length;
+          dropSt.textContent = nb ? `✓ ${rows.length} rows added. Next, fill in the empty (yellow) cells, then press "Convert to Japanese names" (top right).` : `✓ ${rows.length} rows added. Next, press "Convert to Japanese names" (top right, highlighted).`;
+          $("to-ja").scrollIntoView({ behavior: "smooth", block: "center" });
           toast("Formula imported ✓", `${rows.length} rows`);
         };
         $("imp-replace").onclick = () => apply(true);
@@ -493,7 +551,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     $("add-formula").onclick = () => tF.add(); $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;
     $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Converting… / 変換しています…", async () => {
       const n = await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); save.soon(); await save.now();
-      $("st-toja").textContent = `${n} rows converted.`;
+      $("st-toja").textContent = `✓ ${n} rows converted. Please check the notes column (確認事項) if any.`;
     });
 
     const renderFiles = () => {
@@ -546,7 +604,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       if (!sp.product.name) miss.push("Product name");
       if (!sp.formula.length) miss.push("Formula");
       else if (Math.abs(tot - 100) > 0.01) miss.push(sp.formulaUnit === "%" ? `Formula total is ${fmt(tot)}% (must be 100%)` : "Formula amounts");
+      const b = blanks(); if (b.length) miss.push("Empty cells in the formula — " + b.slice(0, 5).map((x) => `row ${x.i + 1}: ${x.m.join(", ")}`).join("; ") + (b.length > 5 ? " …" : ""));
       if (miss.length) throw { userMsg: "Please check: " + miss.join(", ") };
+      if (needsJa()) { $("st-submit").textContent = "Converting to Japanese names first… / 日本語表示名称に変換しています…"; await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); }
       await save.now();
       const { error } = await sb.from("assignments").update({ supplier: sp, status: "submitted" }).eq("id", aid);
       if (error) throw { userMsg: "Could not submit: " + error.message };
@@ -558,29 +618,6 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       document.querySelector(".who").classList.add("is-done"); document.querySelector(".who .state").textContent = "Done ✓";
     });
 
-    // Excel round-trip
-    const SHEETS = { Formula: "formula", Materials: "materials", ThirdParty: "tests" };
-    $("xl-out").onclick = async () => {
-      const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Formula Bridge — Development sheet"], ["Fill in every sheet in English. Formula total must be 100%."], [], ["Request from Japan:"], ...String(snap.brief?.en || "").split("\n").map((l) => [l])]), "Guide");
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Field", "Value"], ...PRODUCT_FIELDS.map(([k, l]) => [l, sp.product[k] || ""])]), "Product");
-      Object.entries(SHEETS).forEach(([sheet, key]) => { const cols = COLS[key].filter((c) => !c.ja); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([cols.map((c) => c.l), ...sp[key].map((r) => cols.map((c) => r[c.k] ?? ""))]), sheet); });
-      download("FormulaBridge_" + (snap.name || "request").replace(/[^\w\-]+/g, "_") + ".xlsx", new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })]));
-    };
-    $("xl-in").onchange = async (e) => {
-      const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
-      try {
-        const XLSX = await lib("XLSX"), wb = XLSX.read(await f.arrayBuffer(), { type: "array" });
-        if (wb.Sheets.Product) XLSX.utils.sheet_to_json(wb.Sheets.Product, { header: 1 }).slice(1).forEach(([l, v]) => { const hit = PRODUCT_FIELDS.find(([, x]) => x === String(l || "").trim()); if (hit && v != null) sp.product[hit[0]] = String(v); });
-        Object.entries(SHEETS).forEach(([sheet, key]) => {
-          const ws = wb.Sheets[sheet]; if (!ws) return; const cols = COLS[key].filter((c) => !c.ja);
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1 }), head = (rows[0] || []).map((h) => String(h || "").trim());
-          const out = rows.slice(1).filter((r) => r.some((c) => String(c ?? "").trim())).map((r) => { const o = {}; cols.forEach((c) => { const j = head.indexOf(c.l); if (j >= 0 && r[j] != null) o[c.k] = String(r[j]); }); return o; });
-          if (out.length) sp[key].splice(0, sp[key].length, ...out);
-        });
-        save.soon(); await save.now(); supplierAssignment(aid); toast("Imported ✓", f.name);
-      } catch { $("st-submit").className = "status err"; $("st-submit").textContent = "This file could not be read. Please use the template."; }
-    };
   }
 
   async function supplierCompany() {
@@ -626,7 +663,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       <div class="card"><h2>${FLAG_JP}案件一覧</h2><div class="tbl-wrap" style="margin-top:10px"><table class="view master"><thead><tr><th>案件</th><th>依頼先と進捗</th><th>完成処方</th><th>企画書</th><th>更新</th></tr></thead><tbody>
       ${P.map((p) => { const as = (p.assignments || []).filter((a) => a.status !== "draft"), f = one(p.finals), pl = one(p.plans);
         return `<tr><td><a href="#/p/${p.id}">${esc(p.name)}</a><div class="muted" style="font-size:12px">${esc(p.request?.cat || "")}</div></td>
-        <td>${as.length ? as.map((a) => `<div style="display:flex;gap:6px;align-items:center;margin:2px 0">${FLAG_ID}<span>${esc(coName(a.company_id))}</span>${chip(a.status)}${a.shipped_at ? '<span class="chip done">発送済み</span>' : ""}${a.feedback_at ? '<span class="chip done">FB済み</span>' : needsFeedback(a) ? '<span class="chip" style="border-color:var(--warn);color:var(--warn)">FB未実施</span>' : ""}<span class="muted" style="font-size:11px">${a.submitted_at ? "提出 " + d(a.submitted_at) : "依頼 " + d(a.requested_at)}</span></div>`).join("") : '<span class="chip draft">未依頼</span>'}</td>
+        <td>${as.length ? as.map((a) => `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:2px 0">${FLAG_ID}<span>${esc(coName(a.company_id))}</span>${chip(a.status)}${a.shipped_at ? '<span class="chip done">発送済み</span>' : ""}${a.feedback_at ? '<span class="chip done">FB済み</span>' : needsFeedback(a) ? '<span class="chip" style="border-color:var(--warn);color:var(--warn)">FB未実施</span>' : ""}<span class="muted" style="font-size:11px">${a.submitted_at ? "提出 " + d(a.submitted_at) : "依頼 " + d(a.requested_at)}</span></div>`).join("") : '<span class="chip draft">未依頼</span>'}</td>
         <td>${f?.finalized_at ? '<span class="chip done">確定 ✓</span>' : "—"}</td><td>${pl ? '<span class="chip done">完成 ✓</span>' : "—"}</td><td>${d(p.updated_at)}</td></tr>`; }).join("") || `<tr><td colspan="5" class="empty">案件はまだありません。「＋ 新規案件」から始めてください。</td></tr>`}
       </tbody></table></div></div>`;
     $("new-proj").onclick = async () => {
@@ -858,7 +895,7 @@ ${body}`, { effort: "medium" });
         <div class="cotabs">${sent.map((a) => `<button type="button" data-a="${a.id}" aria-pressed="${a.id === cur.id}">${FLAG_ID}${esc(coName(a.company_id))} ${chip(a.status)}</button>`).join("")}</div>
         <div class="stack en">
           <div class="card"><h2>${FLAG_ID}A. Product overview</h2><dl class="kv">${PRODUCT_FIELDS.map(([k, l]) => `<dt>${esc(l)}</dt><dd>${esc(sp.product[k] || "—")}</dd>`).join("")}</dl></div>
-          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2><button class="btn ghost" id="to-ja">日本語表示名称に変換</button></div><div class="tbl-wrap"><table class="view" id="t-f"></table></div><div class="status" id="st-toja"></div></div>
+          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><div class="tbl-wrap"><table class="view" id="t-f"></table></div><div class="status" id="st-toja"></div></div>
           <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><div class="tbl-wrap"><table class="view" id="t-m"></table></div></div>
           <div class="card"><h2>${FLAG_ID}D. Third-party tests</h2><div class="tbl-wrap"><table class="view" id="t-t"></table></div></div>
           <div class="card"><h2>${FLAG_ID}E. Attachments</h2><div class="files">${sp.files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span><div><button class="linkbtn" data-open="${i}">${esc(f.name)}</button>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div><span></span></div>`).join("") || '<div class="hint">なし</div>'}</div></div>
