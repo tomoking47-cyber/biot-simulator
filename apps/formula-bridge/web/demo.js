@@ -125,7 +125,7 @@
       updateUser: async () => ({ error: { message: "demo" } }),
     },
     functions: {
-      invoke: async (name) => name === "notify"
+      invoke: async (name) => name === "notify" || name === "invite"
         ? { data: { sent: false, reason: "demo" }, error: null }
         : { data: null, error: { context: { json: async () => ({ error: "demo" }) } } },
     },

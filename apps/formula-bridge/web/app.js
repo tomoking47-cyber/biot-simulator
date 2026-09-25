@@ -4,6 +4,8 @@
  */
 (() => {
   "use strict";
+  // An invitation link lands here with "type=invite" in the URL; the invited person then sets a password.
+  const FROM_INVITE = /type=invite/.test(location.hash);
   const sb = window.FB_DEMO ? window.FB_DEMO.client : supabase.createClient(FB_CONFIG.supabaseUrl, FB_CONFIG.supabaseKey);
   const $ = (id) => document.getElementById(id);
   const app = $("app");
@@ -526,7 +528,8 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     const { data: rows } = await sb.from("settings").select("*");
     const conf = Object.fromEntries((rows || []).map((r) => [r.key, r.value]));
     const { data: logs } = await sb.from("mail_log").select("*").order("created_at", { ascending: false }).limit(20);
-    const { data: admins } = await sb.from("admin_emails").select("email");
+    const [{ data: admins }, { data: people }] = await Promise.all([sb.from("admin_emails").select("email"), sb.from("profiles").select("email, role")]);
+    const regd = (e) => (people || []).find((p) => String(p.email || "").toLowerCase() === String(e).toLowerCase());
     app.innerHTML = `<div class="who jp">${FLAG_JP}設定</div><div class="stack">
       <form class="card" id="f-set"><h2>メールの設定</h2><p class="sub">インドネシア側からの提出は「開発専用メールアドレス」に自動で届きます。</p>
         <div class="field"><label for="s-dev">開発専用メールアドレス（複数はカンマ区切り）</label><input id="s-dev" type="text" value="${esc(conf.dev_email || "")}" placeholder="dev@example.co.jp"></div>
@@ -534,10 +537,13 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="field"><label for="s-url">このサイトのURL（メール内のリンク先）</label><input id="s-url" value="${esc(conf.app_url || location.origin + location.pathname.replace(/index\.html$/, ""))}"></div>
         <div class="row"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" id="mail-test">テストメールを送る</button></div><div class="status" id="st-set"></div></form>
       <div class="card"><h2>管理者（日本側）のメールアドレス</h2><p class="sub">ここにあるアドレスで新規登録した人は、日本側の管理者になります。</p>
-        <ul>${(admins || []).map((a) => `<li class="mono">${esc(a.email)}</li>`).join("")}</ul>
+        <div class="tbl-wrap"><table class="view"><thead><tr><th>メールアドレス</th><th>状態</th><th></th></tr></thead><tbody>
+        ${(admins || []).map((a) => { const r = regd(a.email); return `<tr><td class="mono">${esc(a.email)}</td><td>${r?.role === "admin" ? '<span class="chip done">利用中</span>' : r ? '<span class="chip requested">確認待ち</span>' : '<span class="chip draft">未登録</span>'}</td>
+          <td>${r?.role === "admin" ? "" : `<button class="btn ghost" data-invite="${esc(a.email)}">招待メールを送る</button>`}</td></tr>`; }).join("")}
+        </tbody></table></div><div class="status" id="st-inv"></div>
         <div class="row"><input id="adm-new" type="email" placeholder="staff@example.co.jp" style="font:inherit;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--ground);color:var(--ink)"><button class="btn ghost" id="adm-add">追加</button></div></div>
       <div class="card"><h2>メール送信の記録（最新20件）</h2><div class="tbl-wrap"><table class="view"><thead><tr><th>日時</th><th>種類</th><th>宛先</th><th>件名</th><th>結果</th></tr></thead><tbody>
-        ${(logs || []).map((l) => `<tr><td>${dt(l.created_at)}</td><td>${{ request: "依頼", submit: "提出", shipped: "発送", feedback: "フィードバック", test: "テスト" }[l.kind] || esc(l.kind)}</td><td>${esc(l.to_email)}</td><td>${esc(l.subject)}</td><td>${l.ok ? '<span class="chip done">送信済み</span>' : `<span class="chip draft" title="${esc(l.detail)}">未送信</span>`}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">まだありません</td></tr>`}
+        ${(logs || []).map((l) => `<tr><td>${dt(l.created_at)}</td><td>${{ request: "依頼", submit: "提出", shipped: "発送", feedback: "フィードバック", test: "テスト", invite: "招待" }[l.kind] || esc(l.kind)}</td><td>${esc(l.to_email)}</td><td>${esc(l.subject)}</td><td>${l.ok ? '<span class="chip done">送信済み</span>' : `<span class="chip draft" title="${esc(l.detail)}">未送信</span>`}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">まだありません</td></tr>`}
       </tbody></table></div></div></div>`;
     $("f-set").onsubmit = async (e) => {
       e.preventDefault();
@@ -555,6 +561,16 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         : "送信に失敗しました：" + (data?.detail || "") ;
       if (data?.reason !== "demo") setTimeout(() => adminSettings(), 4000);
     });
+    document.querySelectorAll("[data-invite]").forEach((b) => (b.onclick = (e) => busy(e.currentTarget, $("st-inv"), "招待メールを送っています…", async () => {
+      const email = b.dataset.invite;
+      const { data, error } = await sb.functions.invoke("invite", { body: { email } });
+      if (error) throw { userMsg: "送信できませんでした（通信エラー）。" };
+      $("st-inv").className = data?.sent ? "status" : "status err";
+      $("st-inv").textContent = data?.sent ? `✓ ${email} に招待メールを送りました。メール内のリンクからパスワードを設定してもらってください。`
+        : data?.reason === "already_registered" ? `${email} は既に登録済みです。ログイン画面の「Forgot password?」からパスワードを再設定できます。`
+        : data?.reason === "demo" ? "デモ画面では送信されません。"
+        : `送信できませんでした：${data?.detail || ""}（メール送信の設定が済んでいない可能性があります）`;
+    })));
     $("adm-add").onclick = async () => { const v = $("adm-new").value.trim(); if (!v) return; const { error } = await sb.from("admin_emails").insert({ email: v }); if (error) toast("追加できませんでした", error.message, "info"); else adminSettings(); };
   }
 
@@ -937,6 +953,7 @@ ${src}`, { effort: "low" });
       if (/^#\/(a|p)\//.test(h)) pendingHash = h;
       return viewLogin();
     }
+    if (FROM_INVITE && S.user && !sessionStorage.getItem("fb-invite-done")) { try { sessionStorage.setItem("fb-invite-done", "1"); } catch {} return viewUpdatePassword(); }
     if (fromLogin && pendingHash) { const x = pendingHash; pendingHash = null; if (location.hash !== x) { location.hash = x; return; } }
     if (!S.profile) { app.innerHTML = `<div class="card">Your account is being set up. Please reload in a moment. / アカウントを準備中です。</div>`; return; }
     $("topbar").hidden = false;
