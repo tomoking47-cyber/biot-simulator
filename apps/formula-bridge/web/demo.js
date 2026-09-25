@@ -6,7 +6,9 @@
   const q = new URLSearchParams(location.search);
   if (!q.has("demo")) return;
   const role = q.get("demo") === "supplier" ? "supplier" : "admin";
-  const KEY = "fb-demo-db-v2";
+  const svgLogo = (bg, t) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='${bg}'/><text x='50' y='62' font-family='Arial' font-weight='700' font-size='34' fill='#fff' text-anchor='middle'>${t}</text></svg>`);
+  const DEMO_LOGOS = { "demo/logo-a.jpg": svgLogo("#1F6F5C", "BN"), "demo/logo-c.jpg": svgLogo("#8A3B8F", "SK") };
+  const KEY = "fb-demo-db-v3";
   const now = Date.now(), ago = (h) => new Date(now - h * 3600e3).toISOString();
 
   const CA = "c-demo-a", CB = "c-demo-b", CC = "c-demo-c", P1 = "p-demo-1", ADMIN = "u-demo-admin", SUP = "u-demo-sup";
@@ -31,9 +33,9 @@
     profiles: [{ id: ADMIN, role: "admin", company_id: null, email: "demo-admin@example.com", full_name: "（デモ）日本側 管理者" },
       { id: SUP, role: "supplier", company_id: CA, email: "demo-a@example.com", full_name: "Budi (demo)" }],
     companies: [
-      { id: CA, name: "PT Demo Bahan Nusantara", contact_name: "Budi (demo)", contact_email: "demo-a@example.com", phone: "+62-21-000-0001", whatsapp: "+62-811-000-0001", address: "Jakarta", nib: "DEMO-0001", halal: "BPJPH certified (demo)", materials: "Ceramides, humectants", nda_agreed_at: ago(200), created_at: ago(240) },
+      { id: CA, name: "PT Demo Bahan Nusantara", contact_name: "Budi (demo)", contact_email: "demo-a@example.com", phone: "+62-21-000-0001", whatsapp: "+62-811-000-0001", address: "Jakarta", nib: "DEMO-0001", halal: "BPJPH certified (demo)", materials: "Ceramides, humectants", logo_path: "demo/logo-a.jpg", nda_agreed_at: ago(200), created_at: ago(240) },
       { id: CB, name: "PT Demo Kimia Indah", contact_name: "Sari (demo)", contact_email: "demo-b@example.com", phone: "+62-21-000-0002", address: "Surabaya", nib: "DEMO-0002", halal: "In progress", materials: "Botanical extracts", nda_agreed_at: ago(190), created_at: ago(230) },
-      { id: CC, name: "PT Demo Sumber Kosmetik", contact_name: "Andi (demo)", contact_email: "demo-c@example.com", phone: "+62-21-000-0003", address: "Bandung", nib: "DEMO-0003", halal: "BPJPH certified (demo)", materials: "Emulsifiers, preservatives", nda_agreed_at: ago(180), created_at: ago(220) } ],
+      { id: CC, name: "PT Demo Sumber Kosmetik", logo_path: "demo/logo-c.jpg", contact_name: "Andi (demo)", contact_email: "demo-c@example.com", phone: "+62-21-000-0003", address: "Bandung", nib: "DEMO-0003", halal: "BPJPH certified (demo)", materials: "Emulsifiers, preservatives", nda_agreed_at: ago(180), created_at: ago(220) } ],
     projects: [{ id: P1, name: "【デモ】セラミド保湿化粧水", request: { cat: "化粧水（ローション）", vol: "150mL", bench: "国内ドラッグストアの保湿化粧水", feel: "ややとろみ、なじむとさっぱり。無香料。", claim: "セラミドNP・ナイアシンアミド", avoid: "パラベン、鉱物油、エタノール", costRaw: "100円", costFin: "250円", price: "1,980円", date: "2026年10月末", markets: ["jp", "id"] }, brief, created_at: ago(170), updated_at: ago(2) }],
     assignments: [
       { id: "a-demo-a", project_id: P1, company_id: CA, status: "submitted", request_snapshot: snapshot, supplier: supplierA, requested_at: ago(168), submitted_at: ago(30), shipment: { carrier: "DHL", tracking: "DEMO1234567890", date: "2026-10-22", qty: "3 × 150 mL" }, shipped_at: ago(20), feedback: {}, feedback_at: null, updated_at: ago(20) },
@@ -157,6 +159,7 @@
       upload: async () => ({ error: { message: "Uploading is disabled in the demo." } }),
       remove: async () => ({ error: null }),
       createSignedUrl: async () => ({ error: { message: "demo" } }),
+      createSignedUrls: async (paths) => ({ data: paths.map((x) => ({ path: x, signedUrl: DEMO_LOGOS[x] || null })), error: null }),
       download: async () => ({ error: { message: "demo" } }),
     }) },
     channel: () => ({ on() { return this; }, subscribe() { return this; } }),

@@ -332,25 +332,25 @@ td.miss{background:#FFF6D6}
   .to-ja-wrap .btn{width:100%}
   .tpl-box .btn,.row .btn.big{width:100%}
   .tbl-wrap{overflow:visible;border:0;background:transparent}
-  table,table.edit,table.view,table.master{min-width:0!important;width:100%}
-  table thead{display:none}
-  table tbody,table tbody tr,table tbody td,table tfoot,table tfoot tr{display:block}
-  table tbody tr{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:6px 10px;margin-bottom:10px}
-  table.edit tbody tr:nth-child(even) td{background:transparent}
-  table tbody td,table.view tbody td,table.master td{display:grid;grid-template-columns:minmax(90px,38%) minmax(0,1fr);gap:8px;align-items:center;border:0;padding:5px 0!important;min-width:0!important;max-width:none;width:auto;text-align:left}
-  table tbody td::before{content:attr(data-l);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em;overflow-wrap:anywhere}
-  table.view tbody td,table.master tbody td{display:block}
-  table.view tbody td::before,table.master tbody td::before{display:block;margin-bottom:2px}
-  table.view tbody td.no::before,table.master tbody td.no::before{display:inline;margin-right:8px}
-  table tbody td:not([data-l]){display:block}
-  table tbody td:not([data-l])::before{content:none}
-  table tbody td.no{font-weight:700;color:var(--ink);border-bottom:1px solid var(--line-2)!important;padding-bottom:6px!important;margin-bottom:2px}
-  table tbody td:last-child:has(> .x){display:flex;justify-content:flex-end}
-  table tbody td.miss{background:#FFF6D6;border-radius:6px;padding-inline:6px!important}
+  #app table,#app table.edit,#app table.view,#app table.master{min-width:0!important;width:100%}
+  #app table thead{display:none}
+  #app table tbody,#app table tbody tr,#app table tbody td,#app table tfoot,#app table tfoot tr{display:block}
+  #app table tbody tr{border:1px solid var(--line);border-radius:10px;background:var(--paper);padding:6px 10px;margin-bottom:10px}
+  #app table.edit tbody tr:nth-child(even) td{background:transparent}
+  #app table tbody td,#app table.view tbody td,#app table.master td{display:grid;grid-template-columns:minmax(90px,38%) minmax(0,1fr);gap:8px;align-items:center;border:0;padding:5px 0!important;min-width:0!important;max-width:none;width:auto;text-align:left}
+  #app table tbody td::before{content:attr(data-l);font-size:11.5px;color:var(--ink-3);letter-spacing:.02em;overflow-wrap:anywhere}
+  #app table.view tbody td,#app table.master tbody td{display:block}
+  #app table.view tbody td::before,#app table.master tbody td::before{display:block;margin-bottom:2px}
+  #app table.view tbody td.no::before,#app table.master tbody td.no::before{display:inline;margin-right:8px}
+  #app table tbody td:not([data-l]){display:block}
+  #app table tbody td:not([data-l])::before{content:none}
+  #app table tbody td.no{font-weight:700;color:var(--ink);border-bottom:1px solid var(--line-2)!important;padding-bottom:6px!important;margin-bottom:2px}
+  #app table tbody td:last-child:has(> .x){display:flex;justify-content:flex-end}
+  #app table tbody td.miss{background:#FFF6D6;border-radius:6px;padding-inline:6px!important}
   td.num input,td.num{text-align:left}
-  table tfoot tr{display:flex;justify-content:flex-end;gap:10px;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
-  table tfoot td{border:0;padding:4px!important}
-  table tfoot td:empty{display:none}
+  #app table tfoot tr{display:flex;justify-content:flex-end;gap:10px;border:1px solid var(--line);border-radius:10px;padding:6px 10px}
+  #app table tfoot td{border:0;padding:4px!important}
+  #app table tfoot td:empty{display:none}
 }
 
 /* STEP 1 recipients: rectangular company tiles */
@@ -366,3 +366,35 @@ td.miss{background:#FFF6D6}
 .co-st{margin-bottom:6px}
 .pick.co-tiles .co-grid{grid-template-columns:1fr;gap:3px;border-top:1px solid var(--line-2);padding-top:8px;font-size:13px}
 .co-grid .unset{color:var(--warn);font-weight:500}
+
+/* Company logos */
+.co-logo{display:inline-block;flex:none;object-fit:contain;background:#fff;border:1px solid var(--line);border-radius:8px;vertical-align:middle}
+.co-logo.none{display:inline-flex;align-items:center;justify-content:center;background:var(--ground);color:var(--ink-3);font-weight:700;border-style:dashed;font-family:var(--id)}
+.pick.co-tiles .co-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px}
+.pick.co-tiles .co-name{margin-right:44px}
+.kpi .co .co-logo{margin-right:6px}
+.logo-in{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.logo-in input[type=file]{width:auto;flex:1;min-width:200px}
+.unset{color:var(--warn);font-weight:500}
+/* Adopted / not adopted */
+.dec-cols{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:14px}
+.card.dec.yes{border-top:4px solid var(--ok)}
+.card.dec.no{border-top:4px solid var(--ink-3)}
+.card.dec.yes h2{color:var(--ok)}
+@media (max-width:900px){.dec-cols{grid-template-columns:1fr}}
+/* Formula PDF page (rendered off-screen, A4 landscape at 96 dpi) */
+.pdf-page{width:1123px;height:794px;background:#fff;color:#111;padding:36px 40px;box-sizing:border-box;font-family:var(--id),var(--jp),sans-serif;position:relative}
+.pdf-head{display:flex;gap:16px;align-items:center;border-bottom:2px solid #23507A;padding-bottom:12px;margin-bottom:14px}
+.pdf-head img{width:64px;height:64px;object-fit:contain;border:1px solid #ddd;border-radius:6px}
+.pdf-head>div:nth-child(2),.pdf-head>div:first-child:not(.pdf-brand){flex:1}
+.pdf-t{font-size:22px;font-weight:700;color:#23507A}
+.pdf-m{font-size:12.5px;color:#333;margin-top:2px}
+.pdf-brand{margin-left:auto;text-align:right;font-weight:700;color:#23507A;font-size:14px}
+.pdf-brand span{font-weight:400;color:#555;font-size:11px}
+.pdf-tbl{width:100%;border-collapse:collapse;font-size:11.5px}
+.pdf-tbl th{background:#EEF3F8;color:#23507A;text-align:left;font-weight:700;padding:6px;border:1px solid #C9D6E3;white-space:nowrap}
+.pdf-tbl td{padding:5px 6px;border:1px solid #DCE3EA;vertical-align:top;color:#111}
+.pdf-tbl td.n{text-align:right;font-family:var(--mono)}
+.pdf-tbl tr.tot td{font-weight:700;background:#F7F9FB}
+.pdf-foot{position:absolute;left:40px;right:40px;bottom:22px;font-size:10px;color:#777;border-top:1px solid #eee;padding-top:6px}
+.card.dec table.master{min-width:0}

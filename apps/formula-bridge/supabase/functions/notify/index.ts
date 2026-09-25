@@ -10,12 +10,17 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
 
-async function sendMail(from: string, to: string[], subject: string, html: string): Promise<{ ok: boolean; detail: string } | null> {
+type Att = { filename: string; content: Uint8Array; contentType: string };
+function b64(u: Uint8Array) { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); }
+async function sendMail(from: string, to: string[], subject: string, html: string, atts: Att[] = []): Promise<{ ok: boolean; detail: string } | null> {
   const host = Deno.env.get("SMTP_HOST");
   if (host) {
     const client = new SMTPClient({ connection: { hostname: host, port: Number(Deno.env.get("SMTP_PORT") || 465), tls: true,
       auth: { username: Deno.env.get("SMTP_USER") ?? "", password: Deno.env.get("SMTP_PASS") ?? "" } } });
-    try { await client.send({ from, to, subject, html, content: "auto" }); return { ok: true, detail: "smtp" }; }
+    try {
+      await client.send({ from, to, subject, html, content: "auto", attachments: atts.map((a) => ({ filename: a.filename, content: a.content, encoding: "binary" as const, contentType: a.contentType })) });
+      return { ok: true, detail: "smtp" + (atts.length ? ` (+${atts.length} files)` : "") };
+    }
     catch (e) { return { ok: false, detail: "smtp: " + String(e) }; }
     finally { try { await client.close(); } catch { /* already closed */ } }
   }
@@ -24,7 +29,7 @@ async function sendMail(from: string, to: string[], subject: string, html: strin
   const r = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to, subject, html }),
+    body: JSON.stringify({ from, to, subject, html, ...(atts.length ? { attachments: atts.map((a) => ({ filename: a.filename, content: b64(a.content) })) } : {}) }),
   });
   return { ok: r.ok, detail: (await r.text()).slice(0, 500) };
 }
@@ -67,7 +72,7 @@ Deno.serve(async (req) => {
   }
 
   const { data: me } = await service.from("profiles").select("role, company_id, full_name, email").eq("id", who.user.id).single();
-  const { data: a } = await service.from("assignments").select("id, status, company_id, project_id, request_snapshot, shipment, shipped_at, feedback").eq("id", body.assignment_id ?? "").single();
+  const { data: a } = await service.from("assignments").select("id, status, company_id, project_id, request_snapshot, supplier, shipment, shipped_at, feedback").eq("id", body.assignment_id ?? "").single();
   if (!me || !a) return json({ error: "not_found" }, 404);
   const { data: co } = await service.from("companies").select("name, contact_name, contact_email").eq("id", a.company_id).single();
   const { data: pj } = await service.from("projects").select("name").eq("id", a.project_id).single();
@@ -77,6 +82,7 @@ Deno.serve(async (req) => {
   const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Artisans Production Formula Bridge <onboarding@resend.dev>");
 
   let to: string[] = [], subject = "", html = "";
+  const atts: Att[] = [];
   if (body.event === "request") {
     if (me.role !== "admin" || a.status === "draft") return json({ error: "forbidden" }, 403);
     const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
@@ -87,6 +93,7 @@ Deno.serve(async (req) => {
     html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p>
       <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Jepang.</p>
       <p><a href="${esc(link)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open the request / Buka permintaan</a></p>
+      ${(a.request_snapshot as any)?.request?.requester ? `<p>Requested by / Diminta oleh: <b>${esc((a.request_snapshot as any).request.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}
       <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(brief.slice(0, 4000))}</pre>
       <p style="color:#888;font-size:12px">This request is confidential. / Permintaan ini bersifat rahasia.</p>`;
@@ -96,7 +103,16 @@ Deno.serve(async (req) => {
     if (!dev) return json({ sent: false, reason: "no_dev_email" });
     to = dev.split(/[,\s]+/).filter(Boolean);
     subject = `[処方ブリッジ] ${co?.name ?? ""} から開発内容の提出がありました：${pj?.name ?? ""}`;
+    // The formula Excel + PDF made on submit are attached (max ~15 MB in total).
+    let total = 0;
+    for (const f of ((a.supplier as any)?.files ?? []).filter((f: any) => f?.auto && typeof f.path === "string" && f.path.startsWith(a.company_id + "/")).slice(0, 4)) {
+      const { data: blob } = await service.storage.from("attachments").download(f.path);
+      if (!blob) continue;
+      const u = new Uint8Array(await blob.arrayBuffer()); total += u.length; if (total > 15 * 1024 * 1024) break;
+      atts.push({ filename: String(f.name || f.path.split("/").pop()).replace(/[^\x20-\x7E]+/g, "_"), content: u, contentType: String(f.type || "application/octet-stream") });
+    }
     html = `<p>インドネシアの ${esc(co?.name)}（担当：${esc(me.full_name || me.email)}）から、案件「${esc(pj?.name)}」の開発内容が提出されました。</p>
+      ${atts.length ? `<p>処方表（Excel・PDF）を添付しています：${atts.map((x) => esc(x.filename)).join("、")}</p>` : ""}
       <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
   } else if (body.event === "shipped") {
     if (me.role !== "admin" && me.company_id !== a.company_id) return json({ error: "forbidden" }, 403);
@@ -129,7 +145,7 @@ Deno.serve(async (req) => {
 
   // With the company's own server the sender must be an address on that server (SMTP_FROM).
   const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
-  const res = await sendMail(sender, to, subject, html);
+  const res = await sendMail(sender, to, subject, html, atts);
   if (!res) {
     await service.from("mail_log").insert({ kind: body.event, to_email: to.join(","), subject, ok: false, detail: "mail server not configured" });
     return json({ sent: false, reason: "not_configured", to });
