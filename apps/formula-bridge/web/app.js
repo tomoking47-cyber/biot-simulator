@@ -188,7 +188,7 @@
         return;
       }
       if (!data.session) { st.className = "status"; st.innerHTML = "✓ Registered. We sent a confirmation email — please open the link in it, then sign in.<br>✓ Terdaftar. Silakan buka tautan di email konfirmasi, lalu masuk."; return; }
-      toast("Registered ✓", "Welcome to Formula Bridge."); await loadMe(); route(true);
+      toast("Registered ✓", "Welcome to Formula Bridge."); await loadMe(); location.hash = "#/"; route(true);
     };
   }
   function viewReset() {
@@ -479,6 +479,13 @@ ${JSON.stringify(list)}`, { effort: "medium" });
 
   /* ================= ADMIN (Japan) ================= */
   async function loadCompanies() { const { data } = await sb.from("companies").select("*").order("created_at"); S.companies = data || []; return S.companies; }
+  // Full company details, so the right manufacturer is chosen.
+  function coCard(c, a) {
+    const line = (label, v) => (v ? `<div><span class="k">${label}</span>${esc(v)}</div>` : "");
+    return `<div class="co-card"><div class="co-head">${FLAG_ID}<b>${esc(c.name)}</b>${a ? chip(a.status) : ""}</div>
+      <div class="co-grid">${line("担当者", c.contact_name)}${line("メール", c.contact_email)}${line("電話", c.phone)}${line("WhatsApp", c.whatsapp)}
+        ${line("所在地", c.address)}${line("取扱原料", c.materials)}${line("NIB", c.nib)}${line("ハラール", c.halal)}${line("ホームページ", c.website)}</div></div>`;
+  }
   const needsFeedback = (a) => (a.status === "submitted" || a.shipped_at) && !a.feedback_at;
   const coName = (id) => S.companies.find((c) => c.id === id)?.name || "(company)";
 
@@ -646,7 +653,9 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     pv.innerHTML = `<div class="who jp ${done.req ? "is-done" : ""}">${FLAG_JP}日本側が入力する画面<small>依頼先の各社は、自社あての依頼だけを見られます</small><span class="state">${done.req ? "完了 ✓" : "入力中"}</span></div>
     <div class="cols"><form class="card" id="f-req" autocomplete="off"><h2>${FLAG_JP}開発依頼の内容</h2><p class="sub">入力は自動で保存されます。<span class="saved" id="saved"></span></p>
       <div class="field"><label for="r-name">案件名</label><input id="r-name" value="${esc(p.name)}"></div>
-      ${REQ_LABELS.map(([k, l]) => `<div class="field"><label for="r-${k}">${l}</label>${["feel", "claim", "avoid", "note"].includes(k) ? `<textarea id="r-${k}">${esc(r[k] || "")}</textarea>` : `<input id="r-${k}" value="${esc(r[k] || "")}">`}</div>`).join("")}
+      ${REQ_LABELS.map(([k, l]) => `<div class="field"><label for="r-${k}">${l}${k === "date" ? " <small>（カレンダーから選択）</small>" : ""}</label>${["feel", "claim", "avoid", "note"].includes(k) ? `<textarea id="r-${k}">${esc(r[k] || "")}</textarea>`
+        : k === "date" ? `<input id="r-date" type="date" min="${today()}" value="${/^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? esc(r.date) : ""}">${r.date && !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? `<span class="hint">以前の入力：${esc(r.date)}（カレンダーで選び直してください）</span>` : ""}`
+        : `<input id="r-${k}" value="${esc(r[k] || "")}">`}</div>`).join("")}
       <div class="field"><label>販売予定の市場</label><div class="checks" id="r-markets">${Object.entries(MK).map(([k, l]) => `<label><input type="checkbox" value="${k}" ${(r.markets || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     </form>
     <div class="stack">
@@ -654,12 +663,12 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div class="brief-out" id="brief"></div>
         <div class="row" style="margin-top:10px"><button class="btn" id="go-brief">依頼書を作成（英語・インドネシア語）</button><button class="btn ghost" id="copy-brief">コピー</button></div><div class="status" id="st-brief"></div></div>
       <div class="card"><h2>${FLAG_JP}依頼先を選んで送る</h2><p class="sub">選んだ会社の登録メールアドレスに、入力用リンクが自動で送られます。</p>
-        <div class="pick" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label><input type="checkbox" value="${c.id}" ${a && a.status !== "draft" ? "checked" : ""}> ${FLAG_ID}<span>${esc(c.name)}<br><span class="muted" style="font-size:12px">${esc(c.contact_email || "")}</span></span>${a ? chip(a.status) : ""}</label>`; }).join("") || '<div class="muted">登録企業がありません。インドネシア各社に登録してもらってください。</div>'}</div>
-        <div class="row" style="margin-top:10px"><button class="btn saff big" id="send">依頼を送る</button></div><div class="status" id="st-send"></div></div>
+        <div class="pick" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label class="co-pick"><input type="checkbox" value="${c.id}" ${a && a.status !== "draft" ? "checked" : ""}>${coCard(c, a)}</label>`; }).join("") || '<div class="muted">登録企業がありません。「登録企業」の画面から仕入先を登録してください。</div>'}</div>
+        <div class="row" style="margin-top:10px"><button class="btn saff big" id="send">依頼先を確認する</button></div><div class="status" id="st-send"></div><div id="send-confirm"></div></div>
     </div></div>`;
     const save = saver(async () => { const { error } = await sb.from("projects").update({ name: p.name, request: r, brief }).eq("id", p.id); if (error) throw error; }, $("saved"));
     $("r-name").oninput = (e) => { p.name = e.target.value; save.soon(); };
-    REQ_LABELS.forEach(([k]) => ($("r-" + k).oninput = (e) => { r[k] = e.target.value; save.soon(); }));
+    REQ_LABELS.forEach(([k]) => ($("r-" + k)[k === "date" ? "onchange" : "oninput"] = (e) => { r[k] = e.target.value; save.soon(); }));
     $("r-markets").onchange = () => { r.markets = [...$("r-markets").querySelectorAll("input:checked")].map((i) => i.value); save.soon(); };
     let bl = "en";
     const renderBrief = () => { $("brief").textContent = brief[bl] || "まだ作成していません。左を記入して「依頼書を作成」を押してください。"; $("brief").classList.toggle("ja", bl === "ja" || !brief[bl]); document.querySelectorAll("[data-b]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.b === bl))); };
@@ -685,10 +694,23 @@ ${body}`, { effort: "medium" });
       Object.assign(brief, { en: String(res.en), id: String(res.id || ""), ja: String(res.ja || "") });
       save.soon(); await save.now(); bl = "en"; renderBrief(); $("st-brief").textContent = "作成しました。「日本語（確認用）」で内容を確認してください。";
     });
-    $("send").onclick = (e) => busy(e.currentTarget, $("st-send"), "送信しています…", async () => {
-      const ids = [...$("pick").querySelectorAll("input:checked")].map((i) => i.value);
-      if (!brief.en) throw { userMsg: "先に「依頼書を作成」を押してください。" };
-      if (!ids.length) throw { userMsg: "依頼先を1社以上選んでください。" };
+    // Step 1: show exactly who will receive the request. Step 2: send.
+    $("send").onclick = () => {
+      const ids = [...$("pick").querySelectorAll("input:checked")].map((i) => i.value), st = $("st-send");
+      st.className = "status err";
+      if (!brief.en) { st.textContent = "先に「依頼書を作成」を押してください。"; return; }
+      if (!ids.length) { st.textContent = "依頼先を1社以上選んでください。"; return; }
+      st.textContent = "";
+      const list = ids.map((id) => S.companies.find((c) => c.id === id)).filter(Boolean);
+      $("send-confirm").innerHTML = `<div class="confirm-box"><b>次の${list.length}社に、案件「${esc(p.name)}」の依頼を送ります。会社名と担当者に間違いがないか確認してください。</b>
+        ${list.map((c) => `<div class="co-card-wrap">${coCard(c)}</div>`).join("")}
+        <div class="row" style="margin-top:10px"><button class="btn saff big" id="send-go">この${list.length}社に依頼を送る</button><button class="btn ghost" id="send-back">選び直す</button></div></div>`;
+      $("send-back").onclick = () => { $("send-confirm").innerHTML = ""; };
+      $("send-go").onclick = (ev) => doSend(ev.currentTarget, ids);
+      $("send-confirm").scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    const doSend = (btn, ids) => busy(btn, $("st-send"), "送信しています…", async () => {
+      $("send-confirm").innerHTML = "";
       await save.now();
       const snapshot = { name: p.name, brief: { en: brief.en, id: brief.id }, request: { costRaw: r.costRaw || "", costFin: r.costFin || "", price: r.price || "", vol: r.vol || "", date: r.date || "" } };
       const results = [];
