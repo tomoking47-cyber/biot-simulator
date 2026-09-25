@@ -288,13 +288,14 @@
 
   /* An editable table bound to an array; onChange is called after every edit. */
   function editTable(el, cols, rows, onChange, { totalCheck = false, readOnly = false } = {}) {
+    const boxed = readOnly && el.classList.contains("mirror");
     const render = () => {
       if (el.contains(document.activeElement)) return;
       const tk = cols.find((c) => c.total)?.k || "pct";
       const tot = rows.reduce((a, r) => a + num(r[tk]), 0), pi = cols.findIndex((c) => c.k === tk);
       el.innerHTML = `<thead><tr><th>No.</th>${cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}${readOnly ? "" : "<th></th>"}</tr></thead>
         <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || c.ro || readOnly
-          ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${esc(r[c.k] ?? "")}</td>`
+          ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${boxed && !c.ja && !c.jn ? `<span class="cellbox">${esc(r[c.k] ?? "")}</span>` : esc(r[c.k] ?? "")}</td>`
           : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" class="${c.req && !String(r[c.k] ?? "").trim() ? "miss" : ""}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>
         ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
@@ -1040,14 +1041,18 @@ ${body}`, { effort: "medium" });
     let cur = sent.find((a) => a.status === "submitted") || sent[0];
     const draw = () => {
       const sp = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, cur.supplier || {});
+      const rq = cur.request_snapshot?.request || {};
       pv.innerHTML = `<div class="who id ${cur.status === "submitted" ? "is-done" : ""}">${FLAG_ID}インドネシア側が入力する内容（閲覧のみ）<small>各社は自社の依頼だけを見られます</small><span class="state">${cur.status === "submitted" ? "提出済み ✓" : "未提出"}</span></div>
-        <div class="cotabs">${sent.map((a) => `<button type="button" data-a="${a.id}" aria-pressed="${a.id === cur.id}">${FLAG_ID}${esc(coName(a.company_id))} ${chip(a.status)}</button>`).join("")}</div>
+        <div class="cotabs">${sent.map((a) => `<button type="button" data-a="${a.id}" aria-pressed="${a.id === cur.id}">${logoImg(S.companies.find((c) => c.id === a.company_id), 26)}${esc(coName(a.company_id))} ${chip(a.status)}</button>`).join("")}</div>
         <div class="stack en">
-          <div class="card"><h2>${FLAG_ID}A. Product overview</h2><dl class="kv">${PRODUCT_FIELDS.map(([k, l]) => `<dt>${esc(l)}</dt><dd>${esc(sp.product[k] || "—")}</dd>`).join("")}</dl></div>
-          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><div class="tbl-wrap"><table class="view" id="t-f"></table></div>
+          <div class="card"><h2>${FLAG_ID}A. Product overview</h2><p class="sub">メーカーが入力した内容（メーカー側と同じ画面配置・閲覧のみ）</p>
+            <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE</span><b>${esc(rq.price || "—")}</b></div></div>
+            <div class="grid2 mirror">${PRODUCT_FIELDS.map(([k, l]) => { const wide = ["concept", "features", "claims", "stability", "process"].includes(k), v = sp.product[k];
+              return `<div class="field ${wide ? "span2" : ""}"><label>${esc(l)}${k === "name" ? " *" : ""}</label><div class="ro-box ${wide ? "tall" : ""} ${v ? "" : "empty"}">${v ? esc(v) : "未入力 / not filled in"}</div></div>`; }).join("")}</div></div>
+          <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><p class="sub" style="margin:0 0 8px">Amount unit / 単位：<b>${sp.formulaUnit && sp.formulaUnit !== "%" ? esc(sp.formulaUnit) + " per batch（%は自動計算）" : "% w/w（合計100%）"}</b></p><div class="tbl-wrap"><table class="edit mirror" id="t-f"></table></div>
             <div class="row" style="margin-top:8px"><span class="spacer"></span><span class="muted" style="font-size:12.5px">処方表を保存：</span><button type="button" class="btn ghost" id="a-xlsx">⬇ Excel</button><button type="button" class="btn ghost" id="a-pdf">⬇ PDF</button></div><div class="status" id="st-toja"></div></div>
-          <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><div class="tbl-wrap"><table class="view" id="t-m"></table></div></div>
-          <div class="card"><h2>${FLAG_ID}D. Third-party tests</h2><div class="tbl-wrap"><table class="view" id="t-t"></table></div></div>
+          <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><p class="sub">Features of key raw materials and the maker's data</p><div class="tbl-wrap"><table class="edit mirror" id="t-m"></table></div></div>
+          <div class="card"><h2>${FLAG_ID}D. Third-party test data</h2><p class="sub">Tests by independent laboratories</p><div class="tbl-wrap"><table class="edit mirror" id="t-t"></table></div></div>
           <div class="card"><h2>${FLAG_ID}E. Attachments</h2><div class="files">${sp.files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span><div><button class="linkbtn" data-open="${i}">${esc(f.name)}</button>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div><span></span></div>`).join("") || '<div class="hint">なし</div>'}</div></div>
           <div class="card" style="${cur.shipped_at ? "border-color:var(--ok)" : ""}"><h2>${FLAG_ID}F. サンプル発送</h2>
             ${cur.shipped_at ? `<dl class="kv"><dt>発送完了の連絡</dt><dd>${dt(cur.shipped_at)}</dd><dt>運送会社</dt><dd>${esc(cur.shipment?.carrier || "—")}</dd><dt>追跡番号</dt><dd><b class="mono">${esc(cur.shipment?.tracking || "—")}</b> <button class="btn ghost" id="copy-trk">コピー</button></dd><dt>発送日</dt><dd>${esc(cur.shipment?.date || "—")}</dd><dt>数量</dt><dd>${esc(cur.shipment?.qty || "—")}</dd><dt>備考</dt><dd>${esc(cur.shipment?.note || "—")}</dd></dl>` : '<p class="muted">まだ発送の連絡はありません。</p>'}</div>
@@ -1080,7 +1085,8 @@ ${ja}`, { effort: "low" });
         draw(); $("st-fb").textContent = "✓ 完了：フィードバックを送りました" + (n?.sent ? "（メール送信済み）" : "（メール未設定のため画面のみ）");
         toast("完了：フィードバックを送りました", `${coName(cur.company_id)} に英語・インドネシア語で届きます。`);
       });
-      editTable($("t-f"), COLS.formula, sp.formula, () => {}, { totalCheck: true, readOnly: true });
+      const fcols = sp.formulaUnit && sp.formulaUnit !== "%" ? COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) / batch`, w: 110, num: true, total: true }, { k: "pct", l: "% w/w (auto)", w: 90, num: true }] : [c]) : COLS.formula;
+      editTable($("t-f"), fcols, sp.formula, () => {}, { totalCheck: true, readOnly: true });
       const co = S.companies.find((c) => c.id === cur.company_id), am = () => ({ project: P.p.name, company: co?.name, logo: logoUrls[co?.logo_path], unit: sp.formulaUnit || "%", rows: sp.formula, requester: cur.request_snapshot?.request?.requester });
       $("a-xlsx").onclick = async () => download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".xlsx", await formulaXlsx(am()));
       $("a-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "PDFを作成しています…", async () => { if (!sp.formula.length) throw { userMsg: "処方がまだありません。" }; download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".pdf", await formulaPdf(am())); $("st-toja").textContent = "✓ PDFを保存しました"; });

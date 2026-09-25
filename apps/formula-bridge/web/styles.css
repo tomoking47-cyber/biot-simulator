@@ -398,3 +398,11 @@ td.miss{background:#FFF6D6}
 .pdf-tbl tr.tot td{font-weight:700;background:#F7F9FB}
 .pdf-foot{position:absolute;left:40px;right:40px;bottom:22px;font-size:10px;color:#777;border-top:1px solid #eee;padding-top:6px}
 .card.dec table.master{min-width:0}
+
+/* Japan-side mirror of the supplier page: same boxes, read-only */
+.mirror .ro-box{background:var(--paper);border:1.5px solid #9DB0C2;border-radius:8px;padding:10px 12px;font-size:15px;min-height:44px;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--id)}
+.mirror .ro-box.tall{min-height:90px}
+.mirror .ro-box.empty{color:#A6B0AB;font-size:13px}
+.mirror .field label{font-size:13px;font-weight:700;color:var(--ink)}
+table.edit.mirror tbody td:not(.no):not(.ja):not(.jnote){padding:4px 6px!important}
+table.edit.mirror tbody td:not(.no):not(.ja):not(.jnote)>.cellbox{display:block;border:1.5px solid #B8C6D3;border-radius:6px;padding:7px 8px;min-height:36px;background:var(--paper)}
