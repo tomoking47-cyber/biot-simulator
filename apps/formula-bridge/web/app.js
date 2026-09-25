@@ -4,7 +4,7 @@
  */
 (() => {
   "use strict";
-  const sb = supabase.createClient(FB_CONFIG.supabaseUrl, FB_CONFIG.supabaseKey);
+  const sb = window.FB_DEMO ? window.FB_DEMO.client : supabase.createClient(FB_CONFIG.supabaseUrl, FB_CONFIG.supabaseKey);
   const $ = (id) => document.getElementById(id);
   const app = $("app");
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -78,7 +78,7 @@
 防腐剤=preservative / pengawet, 増粘剤=thickener / pengental, 保湿剤=humectant / humektan, 乳化剤=emulsifier / pengemulsi,
 安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期=lead time,
 化粧品基準=Japanese Standards for Cosmetics, 医薬部外品=quasi-drug, ハラール=halal, BPOM.`;
-  const AI_ERR = { not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。", rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。", refused: "この内容は処理できませんでした。表現を変えてお試しください。", unauthorized: "ログインし直してください。" };
+  const AI_ERR = { demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。", not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。", rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。", refused: "この内容は処理できませんでした。表現を変えてお試しください。", unauthorized: "ログインし直してください。" };
   function parseJSON(text) {
     const t = String(text).trim();
     try { return JSON.parse(t); } catch {}
