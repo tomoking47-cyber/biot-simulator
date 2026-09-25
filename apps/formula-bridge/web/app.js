@@ -95,14 +95,17 @@
     if (isFinite(a) && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
     throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
   }
-  async function ai(prompt, { effort = "medium", image, document } = {}) {
-    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document } });
+  // provider: "claude" (default) | "gemini" (Google Search research) | "openai" (review). aiRaw keeps the model name and web sources.
+  async function aiRaw(prompt, { effort = "medium", image, document, images, documents, provider, search } = {}) {
+    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document, images, documents, provider, search } });
     if (error) {
       let code = ""; try { code = (await error.context.json()).error; } catch {}
-      throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。" };
+      throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。", code };
     }
-    return parseJSON(data.text);
+    return data;
   }
+  async function ai(prompt, opts = {}) { return parseJSON((await aiRaw(prompt, opts)).text); }
+  const blobB64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
   async function busy(btn, stEl, msg, fn) {
     if (btn.disabled) return;
     const label = btn.textContent; btn.disabled = true; btn.textContent = "処理中… / Working…";
@@ -1203,33 +1206,140 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "low" });
     <div class="stack"><div class="cols">
       <div class="card"><h2>${FLAG_JP}出来上がり前のチェック</h2><p class="sub">不足があっても作れますが、その部分は【要確認】と表示されます。</p>
         <ul class="checklist">${checks.map(([ok, t]) => `<li><span class="mk ${ok ? "ok" : "ng"}">${ok ? "OK" : "未完了"}</span><span>${esc(t)}</span></li>`).join("")}</ul></div>
-      <div class="card"><h2>${FLAG_JP}企画書を作る</h2><p class="sub">市場・競合は出典つきの調査データだけを使い、数字は作りません。配合%は社外秘として載せません。</p>
+      <div class="card"><h2>${FLAG_JP}企画書を作る</h2><p class="sub">3社のAIで作成します：①Gemini が Google 検索で最新の市場を調査 → ②Claude がメーカー提出資料（添付PDF・画像を含む）から下書き → ③GPT が取締役目線で査読 → ④Claude が指摘を反映して仕上げ。数字は作らず、出典のないものは【要確認】と表示します。配合%は社外秘として載せません。</p>
         <button class="btn big" id="go-plan">出来上がり（企画書を作成）</button><div class="status" id="st-plan"></div>
         <h3>ダウンロード（10ページ）</h3><div class="row"><button class="btn saff" id="dl-pptx" ${P.plan ? "" : "disabled"}>PowerPoint</button><button class="btn saff" id="dl-docx" ${P.plan ? "" : "disabled"}>Word</button></div><div class="status" id="st-dl"></div>
         <h3>市場データ</h3><div class="src">${S.market ? `調査時点: ${esc(S.market.asOf || "—")}<br><span style="color:var(--warn)">${esc(S.market.verification || "")}</span>` : "未登録"}</div></div></div>
-      <div class="card"><div class="head"><h2>${esc(P.plan?.title || "企画書プレビュー")}</h2><span class="saved">${P.plan ? "作成日 " + esc(P.plan.date) : ""}</span></div><div class="slides" id="slides"></div></div></div>`;
+      <div class="card"><div class="head"><h2>${esc(P.plan?.title || "企画書プレビュー")}</h2><span class="saved">${P.plan ? "作成日 " + esc(P.plan.date) : ""}</span></div><div id="council"></div><div class="slides" id="slides"></div></div></div>`;
+    const cn = P.plan?.council;
+    if (cn) {
+      const sev = { high: "重要", medium: "中", low: "軽微" }, SL = Object.fromEntries(SLIDE_KEYS);
+      $("council").innerHTML = `<details class="council" open><summary>AIの分担と経過（${dt(cn.at)}）</summary>
+        <ol class="cn-steps">
+          <li><b>① 市場調査：</b>${cn.research ? `${esc(cn.research.model)}（Google検索）— 情報 ${cn.research.items}件、うち出典サイトを検索結果で確認できたもの ${cn.research.verified}件` : '<span class="muted">省略</span>'}</li>
+          <li><b>② 下書き：</b>${esc(cn.draftModel)}${cn.attachments?.length ? `（読んだ添付資料：${cn.attachments.map(esc).join("、")}）` : "（添付資料なし）"}</li>
+          <li><b>③ 査読：</b>${cn.critique ? `${esc(cn.critique.model)} — 評価 ${esc(cn.critique.score ?? "—")}/10、指摘 ${cn.critique.issues.length}件` : '<span class="muted">省略</span>'}</li>
+          <li><b>④ 仕上げ：</b>${cn.finalModel ? `${esc(cn.finalModel)} — 反映 ${cn.changes.length}件／不採用 ${cn.rejected.length}件` : '<span class="muted">下書きをそのまま採用</span>'}</li></ol>
+        ${cn.log?.length ? `<div class="status err">${cn.log.map(esc).join("<br>")}</div>` : ""}
+        ${cn.critique ? `<h4>GPT の総評</h4><p>${esc(cn.critique.overall)}</p><div class="tbl-wrap"><table class="view"><thead><tr><th>重要度</th><th>ページ</th><th>指摘</th><th>直し方</th></tr></thead><tbody>${cn.critique.issues.map((x) => `<tr><td>${esc(sev[x.severity] || x.severity)}</td><td>${esc(SL[x.slide] || x.slide)}</td><td>${esc(x.problem)}</td><td>${esc(x.fix)}</td></tr>`).join("")}</tbody></table></div>` : ""}
+        ${cn.changes?.length ? `<h4>Claude が反映した修正</h4><ul>${cn.changes.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${cn.rejected?.length ? `<h4>採用しなかった指摘</h4><ul>${cn.rejected.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+        ${cn.research?.sources?.length ? `<h4>Gemini が参照したWebページ（必ず開いて内容を確認してください）</h4><ul class="cn-src">${cn.research.sources.map((x) => `<li><a href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(x.title || x.url)}</a></li>`).join("")}</ul>` : ""}</details>`;
+    }
     const renderSlides = () => {
       const pl = P.plan;
       $("slides").innerHTML = pl ? pl.slides.map((s, i) => `<div class="slide ${s.key === "cover" ? "cover" : ""}"><span class="sn">${String(i + 1).padStart(2, "0")}</span><h4>${esc(s.key === "cover" ? pl.title : s.title)}</h4><p>${esc(s.key === "cover" ? pl.subtitle : s.lead)}</p><ul>${(s.bullets || []).map((b) => `<li>${esc(b)}</li>`).join("")}</ul><div class="att">${[s.chart ? "グラフ: " + esc(s.chart.title) : "", s.table ? `表 ${s.table.rows.length}行` : "", s.imagePath ? "画像" : "", (s.sources || []).length ? `出典 ${s.sources.length}件` : ""].filter(Boolean).join("　")}</div></div>`).join("") : '<div class="hint">「出来上がり」を押すと、ここに10ページの構成が表示されます。</div>';
     };
     renderSlides();
-    $("go-plan").onclick = (e) => busy(e.currentTarget, $("st-plan"), "企画書を作成しています…（1〜3分お待ちください）", async () => {
+    // Plan builder (4 steps): Gemini researches the market with Google Search → Claude drafts from the supplier's data and
+    // attachments → GPT reviews the draft like a board member → Claude revises. If a key is missing, that step is skipped.
+    $("go-plan").onclick = (e) => busy(e.currentTarget, $("st-plan"), "企画書を作成しています…", async () => {
       const mkSel = p.request?.markets || ["jp"];
       const pick = (o) => Object.fromEntries(Object.entries(o || {}).filter(([k]) => mkSel.includes(k)));
       const market = S.market ? { asOf: S.market.asOf, markets: pick(S.market.markets), competitors: pick(S.market.competitors), regulatory: S.market.regulatory || [] } : null;
-      const input = { project: p.name, request: p.request, supplier_en: supplierEnglish(sp).slice(0, 12000), supplier_ja: (fin.sup_ja || "").slice(0, 8000), final_formula_names: rows.map((r) => ({ name: r.ja || r.label, inci: r.inci, purpose: r.fn, origin: r.src === "base" ? "インドネシア側ベース" : "当社追記" })), product_plan: fin.plan || {}, market };
-      const plan = await ai(`あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
-次のJSONデータだけを根拠に書くこと。厳守事項:
-- 数字（市場規模、成長率、価格、原価、販売目標、試験結果など）はデータにあるものだけを使う。データにない数字は作らず「【要確認】」と書く。
-- 市場・競合・規制の記述には、データ内の source と url を sources に必ず付ける。データにない市場情報は書かない。
+      const log = [], step = (i, t) => { $("st-plan").className = "status"; $("st-plan").textContent = `（${i}/4）${t}`; };
+      const soft = async (label, fn) => { try { return await fn(); } catch (err) { log.push(`${label}：${err?.userMsg || "失敗"}（この工程は省略しました）`); return null; } };
+      const rq = p.request || {};
+
+      // 1) Gemini — latest market facts with sources
+      step(1, "Gemini が Google 検索で最新の市場・競合・規制を調べています…（〜1分）");
+      const gr = await soft("Gemini（市場調査）", () => aiRaw(`あなたは化粧品業界の市場リサーチャーです。Google検索で最新の情報を調べ、次の新商品の企画に必要な市場データを集めてください。
+対象市場: ${mkSel.map((m) => MK[m] || m).join("、")}
+製品: ${rq.cat || ""} ${rq.vol || ""}／訴求: ${rq.claim || ""}／ベンチマーク: ${rq.bench || ""}／想定販売価格: ${rq.price || ""}／使用感: ${rq.feel || ""}
+厳守:
+- 検索で確認できた事実だけを書く。推測・創作は禁止。見つからない項目は空配列にする。
+- すべての項目に出典名(source)とそのページのURL(url)を付ける。数字は原文どおり、対象年(year)も書く。
+- 日本語で簡潔に。
+JSONのみで返答: {"asOf":"YYYY-MM","markets":{"<jp|id|asia>":{"summary":"","stats":[{"label":"","value":"","unit":"","year":"","source":"","url":""}]}},"competitors":{"<jp|id|asia>":[{"name":"","note":"","price":"","source":"","url":""}]},"trends":[{"text":"","source":"","url":""}],"regulatory":[{"text":"","source":"","url":""}]}`, { provider: "gemini", search: true }));
+      let research = null;
+      if (gr) {
+        try {
+          const j = parseJSON(gr.text), src = (gr.sources || []).slice(0, 40), doms = src.map((x) => String(x.title || "").toLowerCase()).filter(Boolean);
+          const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, "").toLowerCase(); } catch { return ""; } };
+          const ok = (x) => x && /^https?:\/\//.test(String(x.url || ""));
+          const mark = (x) => ({ ...x, verified: doms.some((d) => host(x.url) && (host(x.url).endsWith(d) || d.endsWith(host(x.url)))) });
+          const mapM = (o, f) => Object.fromEntries(Object.entries(o || {}).map(([k, v]) => [k, f(v)]));
+          research = { asOf: String(j.asOf || ""), model: gr.model, queries: gr.queries || [], sources: src,
+            markets: mapM(j.markets, (v) => ({ summary: String(v?.summary || ""), stats: (v?.stats || []).filter(ok).map(mark) })),
+            competitors: mapM(j.competitors, (v) => (v || []).filter(ok).map(mark)), trends: (j.trends || []).filter(ok).map(mark), regulatory: (j.regulatory || []).filter(ok).map(mark) };
+        } catch { log.push("Gemini（市場調査）：結果を読み取れませんでした（この工程は省略しました）"); }
+      }
+
+      // 2) Claude — draft from the supplier's data and attachments
+      step(2, "Claude がメーカーの提出資料（添付PDF・画像を含む）を読み、下書きしています…（1〜3分）");
+      const files = { documents: [], images: [], names: [] };
+      let size = 0;
+      for (const f of (sp.files || []).filter((x) => !x.auto)) {
+        const isPdf = f.type === "application/pdf" || /\.pdf$/i.test(f.name || ""), isImg = /^image\/(png|jpeg|webp|gif)$/.test(f.type || "");
+        if ((!isPdf && !isImg) || (f.size || 0) > 8e6 || files.names.length >= 6) continue;
+        try {
+          const { data } = await sb.storage.from("attachments").download(f.path); if (!data) continue;
+          const b64 = await blobB64(data); if (size + b64.length > 10e6) continue; size += b64.length;
+          (isPdf ? files.documents : files.images).push({ media_type: isPdf ? "application/pdf" : f.type, data: b64 }); files.names.push(`${f.name}（${f.cat || "添付"}）`);
+        } catch { /* skip unreadable files */ }
+      }
+      const input = { project: p.name, request: p.request, supplier_en: supplierEnglish(sp).slice(0, 12000), supplier_ja: (fin.sup_ja || "").slice(0, 8000), final_formula_names: rows.map((r) => ({ name: r.ja || r.label, inci: r.inci, purpose: r.fn, origin: r.src === "base" ? "インドネシア側ベース" : "当社追記" })), product_plan: fin.plan || {}, market,
+        research_latest: research ? { asOf: research.asOf, markets: research.markets, competitors: research.competitors, trends: research.trends, regulatory: research.regulatory } : null, supplier_attachments: files.names };
+      const RULES = `厳守事項:
+- 数字（市場規模、成長率、価格、原価、販売目標、試験結果など）はデータ・添付資料にあるものだけを使う。ないものは作らず「【要確認】」と書く。
+- 市場・競合・規制の記述には、データ内の source と url を sources に必ず付ける。research_latest の verified=false の項目を使うときは文頭に【要確認】を付ける。データにない市場情報は書かない。
+- メーカー提出の添付資料（supplier_attachments）の内容を使ったときは sources に {"label":"メーカー提出資料：ファイル名","url":""} を付ける。
+- 化粧品の効能表現は日本の薬機法の範囲（化粧品の効能56項目等）に収める。医薬品的な表現は使わない。
 - 配合量（%）は社外秘なので書かない。
 - 各ページ: title（20字以内）、lead（結論を1文、60字以内）、bullets（3〜6項目、各60字以内）、sources（[{label,url}]）。
 - ページ構成は次の key の順で必ず10ページ: ${SLIDE_KEYS.map(([k, t]) => `${k}=${t}`).join(", ")}。
-- cover の bullets には案件名・カテゴリ・販売市場・作成日(${today()})を入れる。summary は何を・なぜ今・いくらで・いつまでに。roadmap にはリスク（規制・原料調達・為替・品質）と対策、次のアクション。
+- cover の bullets には案件名・カテゴリ・販売市場・作成日(${today()})を入れる。summary は何を・なぜ今・いくらで・いつまでに。roadmap にはリスク（規制・原料調達・為替・品質）と対策、次のアクション。`;
+      const draftPrompt = `あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
+次のJSONデータと、添付されたメーカー提出資料（PDF・画像）だけを根拠に書くこと。
+${RULES}
 JSONのみで返答: {"title": string, "subtitle": string, "slides":[{"key":"cover","title":"","lead":"","bullets":[],"sources":[]}]}
 
 データ:
-${JSON.stringify(input)}`, { effort: "high" });
+${JSON.stringify(input)}`;
+      let dr;
+      try { dr = await aiRaw(draftPrompt, { effort: "high", documents: files.documents, images: files.images }); }
+      catch (err) {
+        if (!files.names.length || err?.code === "demo") throw err;
+        log.push("添付資料を含めると処理できなかったため、添付なしで作成しました"); files.names.length = 0; input.supplier_attachments = [];
+        dr = await aiRaw(draftPrompt, { effort: "high" });
+      }
+      const draft = parseJSON(dr.text);
+      if (!Array.isArray(draft?.slides)) throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
+
+      // 3) GPT — independent board-level review
+      step(3, "GPT が取締役の目線で下書きを査読しています…（〜1分）");
+      const cr = await soft("GPT（査読）", () => aiRaw(`あなたは日本の上場化粧品メーカーの社外取締役で、厳しい査読者です。次の新商品企画書の下書き（draft）を、根拠データ（data）と照らしてチェックし、日本語で指摘してください。
+確認する点: dataにない数字・出典のない市場記述、論理の飛躍、リスクや対策の抜け、薬機法上問題になりうる効能表現、配合%の記載、取締役が判断するのに足りない情報。
+良い点は書かなくてよい。指摘は具体的に、どのページ（slide の key）をどう直すべきか書く。最大12件。
+JSONのみで返答: {"overall":"総評（100字以内）","score":1から10の整数,"issues":[{"slide":"key","severity":"high|medium|low","problem":"","fix":""}]}
+
+data:
+${JSON.stringify({ ...input, supplier_en: input.supplier_en.slice(0, 6000) })}
+
+draft:
+${JSON.stringify(draft)}`, { provider: "openai", effort: "medium" }));
+      let critique = null;
+      if (cr) { try { const j = parseJSON(cr.text); critique = { model: cr.model, overall: String(j.overall || ""), score: j.score, issues: (j.issues || []).slice(0, 12).map((x) => ({ slide: String(x.slide || ""), severity: String(x.severity || ""), problem: String(x.problem || ""), fix: String(x.fix || "") })) }; } catch { log.push("GPT（査読）：結果を読み取れませんでした（この工程は省略しました）"); } }
+
+      // 4) Claude — revise with the review
+      let plan = draft, fr = dr, changes = [], rejected = [];
+      if (critique?.issues?.length) {
+        step(4, "Claude が査読の指摘を反映して仕上げています…（1〜2分）");
+        const rv = await soft("Claude（仕上げ）", () => aiRaw(`あなたは上場化粧品メーカーの経営企画室長です。企画書の下書き（draft）に対して、別のAIが査読（review）を行いました。
+指摘が妥当なものは修正し、根拠データ（data）に照らして誤っている指摘や、データにない数字を求める指摘は採用しないでください。
+${RULES}
+JSONのみで返答: {"title": string, "subtitle": string, "slides":[...draftと同じ形...], "changes":["反映した修正（各60字以内）"], "rejected":["採用しなかった指摘と理由（各60字以内）"]}
+
+data:
+${JSON.stringify(input)}
+
+draft:
+${JSON.stringify(draft)}
+
+review:
+${JSON.stringify(critique)}`, { effort: "high" }));
+        if (rv) { try { const j = parseJSON(rv.text); if (Array.isArray(j.slides)) { plan = j; fr = rv; changes = (j.changes || []).map(String).slice(0, 15); rejected = (j.rejected || []).map(String).slice(0, 15); } } catch { log.push("Claude（仕上げ）：結果を読み取れませんでした（下書きを採用しました）"); } }
+      } else step(4, "仕上げています…");
       if (!Array.isArray(plan?.slides)) throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
       const byKey = Object.fromEntries(plan.slides.map((s) => [s.key, s]));
       const slides = SLIDE_KEYS.map(([k, t]) => { const s = byKey[k] || { lead: "【要確認】", bullets: [], sources: [] };
@@ -1243,9 +1353,13 @@ ${JSON.stringify(input)}`, { effort: "high" });
       const tests = sp.tests || [], img = (sp.files || []).find((f) => /^image\/(png|jpe?g|gif)/.test(f.type || ""));
       if (tests.length) sl("evidence").table = { headers: ["試験機関", "試験項目", "方法", "結果", "日付"], rows: tests.map((t) => [t.lab, t.item, t.method, t.result, t.date].map((x) => String(x || ""))) };
       else if (img) { sl("evidence").imagePath = img.path; sl("evidence").imageCaption = img.desc || img.name; }
-      P.plan = { title: String(plan.title || p.name), subtitle: String(plan.subtitle || ""), date: today(), slides };
+      if (research) { const rc = Object.entries(pick(research.competitors)).flatMap(([m, arr]) => (arr || []).slice(0, 4).map((c) => [MK[m] || m, c.name + (c.price ? `（${c.price}）` : ""), (c.verified ? "" : "【要確認】") + (c.note || "") + ` ［${c.source || ""}］`])); if (rc.length && !compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要・出典"], rows: rc, caption: `Gemini による Google 検索（${research.asOf || today()}時点）` }; }
+      P.plan = { title: String(plan.title || p.name), subtitle: String(plan.subtitle || ""), date: today(), slides,
+        council: { at: new Date().toISOString(), log, attachments: files.names,
+          research: research ? { model: research.model, asOf: research.asOf, queries: research.queries.slice(0, 8), sources: research.sources.slice(0, 20), verified: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].filter((x) => x.verified).length, items: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].length } : null,
+          draftModel: dr.model || "Claude", critique, finalModel: fr === dr ? null : fr.model || "Claude", changes, rejected } };
       const { error } = await sb.from("plans").upsert({ project_id: p.id, plan: P.plan }); if (error) throw error;
-      toast("完了：企画書ができました", "PowerPoint・Word ボタンから保存できます。"); adminProject(p.id, "plan");
+      toast("完了：企画書ができました", (log.length ? "一部の工程を省略しました。詳細は画面の「AIの分担と経過」をご覧ください。" : "Gemini・Claude・GPT の3社AIで作成しました。") + "PowerPoint・Word ボタンから保存できます。"); adminProject(p.id, "plan");
     });
     const exportPlan = (kind) => busy($(kind === "pptx" ? "dl-pptx" : "dl-docx"), $("st-dl"), "ファイルを作成しています…", async () => {
       const pl = JSON.parse(JSON.stringify(P.plan)); pl.footer = fin.plan?.brand || "";

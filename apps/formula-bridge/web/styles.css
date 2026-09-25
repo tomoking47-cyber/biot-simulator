@@ -411,3 +411,10 @@ a.kpi-link:hover,a.kpi-link:focus-visible{border-color:var(--accent);box-shadow:
 .kpi-go{margin-left:auto;font-size:12px;font-weight:500;color:var(--accent);white-space:nowrap}
 .co-detail .co-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 @media (max-width:560px){.co-detail .co-grid{grid-template-columns:1fr}}
+/* Plan: AI council log */
+.council{border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:12px;background:var(--ground);font-size:13.5px}
+.council summary{cursor:pointer;font-weight:700}
+.council h4{margin:12px 0 4px;font-size:13.5px}
+.council .cn-steps{margin:8px 0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.council ul{margin:4px 0;padding-left:20px}
+.council .cn-src a{color:var(--accent);overflow-wrap:anywhere}
