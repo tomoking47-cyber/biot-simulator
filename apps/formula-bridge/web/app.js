@@ -132,8 +132,7 @@
         <div class="status" id="st-login" role="status" aria-live="polite"></div>
       </form>
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-      <p class="sub" style="margin:0 0 8px">${FLAG_ID} New supplier? Register your company here. / Perusahaan baru? Daftar di sini.</p>
-      <a class="btn saff" href="#/register" style="text-decoration:none;display:inline-block">Register company / Daftar perusahaan</a>
+      <p class="sub" style="margin:0">${FLAG_ID} Supplier accounts are issued by Artisans Production. Please contact your representative in Japan.<br>Akun pemasok diterbitkan oleh Artisans Production. Silakan hubungi perwakilan Anda di Jepang.<br>仕入先のアカウントは当社が発行します。</p>
     </div>`;
     $("to-reset").onclick = () => (location.hash = "#/reset");
     $("f-login").onsubmit = async (e) => {
@@ -515,13 +514,49 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     await loadCompanies();
     const [{ data: logs }, terms] = await Promise.all([sb.from("agreement_log").select("company_id, doc, version, accepted_at, user_id"), loadTerms()]);
     const agreed = (cid, doc) => (logs || []).filter((l) => l.company_id === cid && l.doc === doc).sort((a, b) => b.accepted_at.localeCompare(a.accepted_at))[0];
-    app.innerHTML = `<div class="who jp">${FLAG_JP}登録企業</div><div class="card"><div class="tbl-wrap"><table class="view master"><thead><tr><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
+    app.innerHTML = `<div class="who jp">${FLAG_JP}登録企業</div>
+      <form class="card" id="f-sup" autocomplete="off" style="margin-bottom:14px"><h2>${FLAG_JP}＋ 仕入先の企業を登録する</h2>
+        <p class="sub">当社が代わりに登録し、ログイン情報（仮パスワード）を発行します。3つの合意（NDA・購入宣言・処方の帰属）は、相手が最初にログインしたときに本人が同意します。</p>
+        <div class="grid2">
+          <div class="field"><label for="s-company_name">会社名 *</label><input id="s-company_name" required placeholder="PT ○○○ Indonesia"></div>
+          <div class="field"><label for="s-full_name">担当者名 *</label><input id="s-full_name" required></div>
+          <div class="field"><label for="s-email">担当者のメールアドレス *（ログインIDになります）</label><input id="s-email" type="email" required></div>
+          <div class="field"><label for="s-title">役職</label><input id="s-title"></div>
+          <div class="field"><label for="s-phone">電話</label><input id="s-phone"></div>
+          <div class="field"><label for="s-whatsapp">WhatsApp</label><input id="s-whatsapp"></div>
+          <div class="field"><label for="s-address">住所</label><input id="s-address"></div>
+          <div class="field"><label for="s-website">ホームページ</label><input id="s-website"></div>
+          <div class="field"><label for="s-nib">事業許可番号（NIB）</label><input id="s-nib"></div>
+          <div class="field"><label for="s-halal">ハラール認証</label><input id="s-halal"></div>
+        </div>
+        <div class="field"><label for="s-materials">主な取扱原料</label><input id="s-materials"></div>
+        <button class="btn saff" type="submit">登録してログイン情報を発行</button><div class="status" id="st-sup"></div>
+        <div id="sup-result"></div></form>
+      <div class="card"><div class="tbl-wrap"><table class="view master"><thead><tr><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
       ${S.companies.map((c) => `<tr><td>${FLAG_ID}<b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${esc(c.address || "")}${c.website ? `<br>${esc(c.website)}` : ""}</div></td><td>${esc(c.contact_name || "")}</td>
         <td>${esc(c.contact_email || "")}<div class="muted" style="font-size:12px">${esc(c.phone || "")}${c.whatsapp ? " / WA " + esc(c.whatsapp) : ""}</div></td><td>${esc(c.nib || "—")}<div class="muted" style="font-size:12px">${esc(c.halal || "")}</div></td>
         <td style="max-width:240px">${esc(c.materials || "")}</td><td>${DOC_ORDER.map((k) => { const l = agreed(c.id, k); return `<div>${l ? `<span class="chip done">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} ✓</span> <span class="muted" style="font-size:11px">${dt(l.accepted_at)}</span>` : `<span class="chip draft">${{ nda: "NDA", purchase: "購入宣言", ip: "処方帰属" }[k]} 未</span>`}</div>`; }).join("")}</td><td>${d(c.created_at)}</td></tr>`).join("") || `<tr><td colspan="7" class="empty">まだ登録がありません。</td></tr>`}
       </tbody></table></div></div>
       <div class="card" style="margin-top:14px"><h2>${FLAG_JP}合意文（日本語訳・確認用）</h2><p class="sub">相手は英語とインドネシア語の版に同意します。本番運用の前に、必ず弁護士の確認を受けてください。</p>
         ${terms.map((t) => `<h3>${esc(t.title_ja)}（版 ${esc(t.version)}）</h3><div class="brief-out ja">${esc(t.text_ja)}</div>`).join("")}</div>`;
+    const SF = ["company_name", "full_name", "email", "title", "phone", "whatsapp", "address", "website", "nib", "halal", "materials"];
+    $("f-sup").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-sup").querySelector("button"), $("st-sup"), "登録しています…", async () => {
+      const body = Object.fromEntries(SF.map((k) => [k, $("s-" + k).value.trim()]));
+      const { data, error } = await sb.functions.invoke("create-supplier", { body });
+      let err = null; if (error) { try { err = await error.context.json(); } catch { err = { error: "network" }; } }
+      if (err || !data?.ok) {
+        const code = err?.error || data?.error;
+        throw { userMsg: code === "already_registered" ? "このメールアドレスは既に登録されています。" : code === "is_admin_email" ? "管理者のアドレスは仕入先に使えません。" : code === "demo" ? "デモ画面では登録できません。" : "登録できませんでした：" + (err?.message || code || "") };
+      }
+      const url = location.origin + location.pathname;
+      const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, purchase declaration, ownership of adopted formulas).\n3. Change your password from the "Password" menu.\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
+      $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
+      $("sup-result").innerHTML = `<div class="brief-out" style="margin-top:10px" id="sup-msg"></div><div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="copy-sup">案内文をコピー（英語・インドネシア語）</button><button type="button" class="btn ghost" id="done-sup">一覧を更新</button></div>`;
+      $("sup-msg").textContent = msg;
+      $("copy-sup").onclick = (ev) => copy(msg, ev.currentTarget);
+      $("done-sup").onclick = () => adminCompanies();
+      toast("完了：仕入先を登録しました", `${body.company_name}（${data.email}）`);
+    }); };
   }
 
   async function adminSettings() {

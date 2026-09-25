@@ -1,0 +1,53 @@
+// Formula Bridge — Japan-side admins register a supplier company and its first user.
+// Returns a one-time temporary password for the admin to pass on. The supplier accepts the
+// agreements themselves on first sign-in (the app blocks everything else until they do).
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "npm:@supabase/supabase-js@2";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+
+function tempPassword() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return "Fb-" + Array.from(bytes, (b) => chars[b % chars.length]).join("");
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+  if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
+
+  const service = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const { data: who } = await service.auth.getUser(jwt);
+  if (!who?.user) return json({ error: "unauthorized" }, 401);
+  const { data: me } = await service.from("profiles").select("role").eq("id", who.user.id).single();
+  if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
+
+  let b: Record<string, string>;
+  try { b = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
+  const s = (k: string) => String(b[k] ?? "").trim();
+  const email = s("email").toLowerCase();
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !s("company_name") || !s("full_name")) {
+    return json({ error: "bad_request", message: "company name, contact name and email are required" }, 400);
+  }
+  // Never turn an administrator address into a supplier (or vice versa).
+  const { data: adminHit } = await service.from("admin_emails").select("email").eq("email", email).maybeSingle();
+  if (adminHit) return json({ error: "is_admin_email" }, 400);
+
+  const password = tempPassword();
+  const { data, error } = await service.auth.admin.createUser({
+    email, password, email_confirm: true,
+    user_metadata: {
+      full_name: s("full_name"), title: s("title"), phone: s("phone"), whatsapp: s("whatsapp"),
+      company: { name: s("company_name"), address: s("address"), website: s("website"), nib: s("nib"), halal: s("halal"), materials: s("materials") },
+    },
+  });
+  if (error) return json({ error: /already|registered|exists/i.test(error.message) ? "already_registered" : "create_failed", message: error.message }, 400);
+  return json({ ok: true, user_id: data.user?.id, email, password });
+});
