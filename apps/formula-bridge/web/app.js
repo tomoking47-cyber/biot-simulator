@@ -89,8 +89,8 @@
     if (isFinite(a) && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
     throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
   }
-  async function ai(prompt, { effort = "medium", image } = {}) {
-    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image } });
+  async function ai(prompt, { effort = "medium", image, document } = {}) {
+    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document } });
     if (error) {
       let code = ""; try { code = (await error.context.json()).error; } catch {}
       throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。" };
@@ -340,6 +340,12 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         <div id="prod-fields"></div></div>
       <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian label name (Nama bahan) and the amount. The Japanese name is filled in by the button.</p></div>
         <button class="btn ghost" id="to-ja">Convert to Japanese names / 日本語表示名称に変換</button></div>
+        <div class="drop" id="f-drop" tabindex="0" role="button" aria-label="Import formula from a file">
+          <b>⬇ Drop your formula file here, or tap to choose</b>
+          <span>PDF, Excel (.xlsx / .xls), CSV or a photo — the table below is filled in automatically.</span>
+          <span>Letakkan file formula di sini (PDF, Excel, CSV, foto). ／ 成分表ファイルをここにドロップすると自動で入力されます。</span>
+          <input type="file" id="f-drop-in" accept=".pdf,.xlsx,.xls,.csv,image/jpeg,image/png,image/webp" hidden></div>
+        <div class="status" id="st-drop" role="status" aria-live="polite"></div><div id="drop-preview"></div>
         <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated)</option><option value="mL">mL per batch (% is calculated)</option></select></div>
         <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button></div><div class="status" id="st-toja"></div></div>
@@ -421,6 +427,66 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       recalcPct(); save.soon(); $("t-formula").innerHTML = ""; mountFormula();
     };
     mountFormula();
+
+    // Import a formula sheet (PDF, Excel, CSV or photo): AI reads it, the supplier checks the preview, then it is applied.
+    const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
+    const drop = $("f-drop"), dropSt = $("st-drop");
+    const importFile = async (file) => {
+      if (!file) return;
+      const name = file.name.toLowerCase(), isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
+      const isSheet = /\.(xlsx|xls|csv)$/.test(name), isImg = /^image\/(jpeg|png|webp)$/.test(file.type);
+      dropSt.className = "status";
+      if (!isPdf && !isSheet && !isImg) { dropSt.className = "status err"; dropSt.textContent = "Please use a PDF, Excel (.xlsx/.xls), CSV, JPG or PNG file."; return; }
+      if (file.size > 10 * 1024 * 1024) { dropSt.className = "status err"; dropSt.textContent = "The file is larger than 10 MB. Please send a smaller file."; return; }
+      drop.classList.add("busy"); dropSt.textContent = `Reading ${file.name}… (20–60 seconds) / Membaca file…`; $("drop-preview").innerHTML = "";
+      try {
+        let source = "", opts = { effort: "medium" };
+        if (isPdf) { opts.document = { media_type: "application/pdf", data: await readB64(file) }; source = "the attached PDF"; }
+        else if (isImg) { opts.image = { media_type: file.type, data: await readB64(file) }; source = "the attached photo"; }
+        else if (name.endsWith(".csv")) { source = "this CSV:\n" + (await file.text()).slice(0, 60000); }
+        else {
+          const XLSX = await lib("XLSX"), wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
+          source = "this spreadsheet (converted to CSV):\n" + wb.SheetNames.map((n) => `### Sheet: ${n}\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n").slice(0, 60000);
+        }
+        const res = await ai(`You are a cosmetic formulation assistant. Extract the cosmetic formula from ${source}
+Rules:
+- List every raw material row in the original order. Skip headers, totals and blank rows.
+- Copy names and numbers exactly. Do not invent, round or change any value. Leave a field "" when it is not shown.
+- Fields per row: phase (e.g. A/B/C), trade (trade name), idName (Indonesian label name / Nama bahan), inci (INCI name), maker (supplier or manufacturer), amt (the amount as written, number only), fn (function, only if shown).
+- unit: "%" if the amounts are percentages (w/w) or add up to about 100; "g" if grams; "mL" if millilitres.
+- notes: anything unclear or unreadable, in English, short. "" if none.
+Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","inci":"","maker":"","amt":"","fn":""}],"notes":""}`, opts);
+        const items = (Array.isArray(res.items) ? res.items : []).filter((x) => x && (x.trade || x.idName || x.inci));
+        if (!items.length) throw { userMsg: "No formula rows were found in this file. Please check the file or enter the rows by hand." };
+        const unit = ["%", "g", "mL"].includes(res.unit) ? res.unit : "%";
+        const tot = items.reduce((a, x) => a + num(x.amt), 0);
+        dropSt.textContent = `✓ ${items.length} rows found (${unit === "%" ? `total ${fmt(tot)}%` : `total ${fmt(tot)} ${unit}`}). Please check them, then press "Use these rows".`;
+        $("drop-preview").innerHTML = `<div class="confirm-box">${res.notes ? `<div class="status err" style="margin:0">Note: ${esc(res.notes)}</div>` : ""}
+          <div class="tbl-wrap"><table class="view"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI</th><th>Maker</th><th>Amount (${esc(unit)})</th><th>Function</th></tr></thead><tbody>
+          ${items.map((x, i) => `<tr><td class="no">${i + 1}</td><td>${esc(x.phase)}</td><td>${esc(x.trade)}</td><td>${esc(x.idName)}</td><td class="inci">${esc(x.inci)}</td><td>${esc(x.maker)}</td><td class="num">${esc(x.amt)}</td><td>${esc(x.fn)}</td></tr>`).join("")}</tbody></table></div>
+          <div class="row"><button type="button" class="btn saff" id="imp-replace">Use these rows${sp.formula.length ? " (replace current table)" : ""}</button>
+          ${sp.formula.length ? '<button type="button" class="btn ghost" id="imp-append">Add below current rows</button>' : ""}<button type="button" class="btn ghost" id="imp-cancel">Cancel</button></div></div>`;
+        const apply = (replace) => {
+          const rows = items.map((x) => ({ phase: String(x.phase || ""), trade: String(x.trade || ""), idName: String(x.idName || ""), inci: String(x.inci || ""), maker: String(x.maker || ""), fn: String(x.fn || ""), ...(unit === "%" ? { pct: String(x.amt || "") } : { amt: String(x.amt || "") }) }));
+          if (replace) { sp.formula.splice(0, sp.formula.length, ...rows); sp.formulaUnit = unit; }
+          else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead.`; return; } sp.formula.push(...rows); }
+          $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
+          $("drop-preview").innerHTML = ""; dropSt.textContent = `✓ ${rows.length} rows added to the formula. Next, press "Convert to Japanese names".`;
+          toast("Formula imported ✓", `${rows.length} rows`);
+        };
+        $("imp-replace").onclick = () => apply(true);
+        if ($("imp-append")) $("imp-append").onclick = () => apply(false);
+        $("imp-cancel").onclick = () => { $("drop-preview").innerHTML = ""; dropSt.textContent = ""; };
+      } catch (e) {
+        dropSt.className = "status err"; dropSt.textContent = e?.userMsg || "The file could not be read. Please try again or enter the rows by hand.";
+      } finally { drop.classList.remove("busy"); }
+    };
+    drop.onclick = () => $("f-drop-in").click();
+    drop.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("f-drop-in").click(); } };
+    $("f-drop-in").onchange = (e) => { const f = e.target.files?.[0]; e.target.value = ""; importFile(f); };
+    ["dragenter", "dragover"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.add("over"); }));
+    ["dragleave", "drop"].forEach((ev) => drop.addEventListener(ev, (e) => { e.preventDefault(); drop.classList.remove("over"); }));
+    drop.addEventListener("drop", (e) => importFile(e.dataTransfer?.files?.[0]));
     const tM = editTable($("t-materials"), COLS.materials, sp.materials, save.soon);
     const tT = editTable($("t-tests"), COLS.tests, sp.tests, save.soon);
     $("add-formula").onclick = () => tF.add(); $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;

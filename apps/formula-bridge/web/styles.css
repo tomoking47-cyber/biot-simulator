@@ -294,3 +294,11 @@ table.edit td input{border:1.5px solid #B8C6D3;background:var(--paper);padding:7
 table.edit td input:hover{border-color:var(--ink-3)}
 table.edit td input:focus{border-color:var(--saffron);box-shadow:0 0 0 3px var(--saffron-soft);outline:none}
 table.edit tbody tr:nth-child(even) td{background:rgba(0,0,0,.015)}
+
+/* Formula file drop zone */
+.drop{display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;border:2px dashed var(--saffron);border-radius:var(--radius);background:var(--saffron-soft);padding:18px 14px;margin:10px 0;cursor:pointer}
+.drop b{font-size:15px;color:var(--saffron)}
+.drop span{font-size:12.5px;color:var(--ink-2)}
+.drop.over{background:var(--paper);border-style:solid}
+.drop.busy{opacity:.6;pointer-events:none}
+.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
