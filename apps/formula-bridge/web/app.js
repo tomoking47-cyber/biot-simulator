@@ -170,14 +170,22 @@
       e.preventDefault();
       const agreements = agreedFrom($("g-terms"));
       if (!terms.length || terms.some((t) => agreements[t.doc] !== t.version)) { $("st-reg").className = "status err"; $("st-reg").textContent = "Please agree to all three agreements. / Harap setujui ketiga perjanjian."; return; }
-      const v = (k) => $("g-" + k).value.trim(), st = $("st-reg");
-      st.className = "status"; st.textContent = "Registering…";
+      const v = (k) => $("g-" + k).value.trim(), st = $("st-reg"), btn = e.submitter || $("f-reg").querySelector('button[type="submit"]');
+      if (btn.disabled) return;
+      btn.disabled = true; setTimeout(() => (btn.disabled = false), 60000);
+      st.className = "status"; st.textContent = "Registering… / 登録しています…";
       const company = {}; REG_FIELDS.filter(([k]) => k.startsWith("company.")).forEach(([k]) => (company[k.slice(8)] = v(k)));
       const { data, error } = await sb.auth.signUp({
         email: v("email"), password: $("g-password").value,
         options: { emailRedirectTo: location.origin + location.pathname, data: { full_name: v("full_name"), title: v("title"), phone: v("phone"), whatsapp: v("whatsapp"), agreements, user_agent: navigator.userAgent, company } },
       });
-      if (error) { st.className = "status err"; st.textContent = /registered/i.test(error.message) ? "This email is already registered. Please sign in." : "Could not register: " + error.message; return; }
+      if (error) {
+        st.className = "status err";
+        st.textContent = /registered/i.test(error.message) ? "This email is already registered. Please sign in. / 登録済みです。ログインしてください。"
+          : /seconds|rate/i.test(error.message) ? "Your registration may already have been received. Please check your email, or wait one minute and try again. / 登録は受け付け済みの可能性があります。メールを確認するか、1分後にもう一度お試しください。"
+          : "Could not register: " + error.message;
+        return;
+      }
       if (!data.session) { st.className = "status"; st.innerHTML = "✓ Registered. We sent a confirmation email — please open the link in it, then sign in.<br>✓ Terdaftar. Silakan buka tautan di email konfirmasi, lalu masuk."; return; }
       toast("Registered ✓", "Welcome to Formula Bridge."); await loadMe(); route(true);
     };
