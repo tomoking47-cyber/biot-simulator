@@ -834,20 +834,12 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     app.innerHTML = `<div class="who jp">${FLAG_JP}登録企業</div>
       <form class="card" id="f-sup" autocomplete="off" style="margin-bottom:14px"><h2>${FLAG_JP}＋ 仕入先の企業を登録する</h2>
         <p class="sub">当社が代わりに登録し、ログイン情報（仮パスワード）を発行します。3つの合意（NDA・購入宣言・処方の帰属）は、相手が最初にログインしたときに本人が同意します。</p>
-        <div class="grid2">
+        <div class="grid3">
           <div class="field"><label for="s-company_name">会社名 *</label><input id="s-company_name" required placeholder="PT ○○○ Indonesia"></div>
           <div class="field"><label for="s-full_name">担当者名 *</label><input id="s-full_name" required></div>
           <div class="field"><label for="s-email">担当者のメールアドレス *（ログインIDになります）</label><input id="s-email" type="email" required></div>
-          <div class="field"><label for="s-title">役職</label><input id="s-title"></div>
-          <div class="field"><label for="s-phone">電話</label><input id="s-phone"></div>
-          <div class="field"><label for="s-whatsapp">WhatsApp</label><input id="s-whatsapp"></div>
-          <div class="field"><label for="s-address">住所</label><input id="s-address"></div>
-          <div class="field"><label for="s-website">ホームページ</label><input id="s-website"></div>
-          <div class="field"><label for="s-nib">事業許可番号（NIB）</label><input id="s-nib"></div>
-          <div class="field"><label for="s-halal">ハラール認証</label><input id="s-halal"></div>
         </div>
-        <div class="field"><label for="s-materials">主な取扱原料</label><input id="s-materials"></div>
-        <div class="field"><label for="s-logo">会社ロゴ（JPG）*　<small>依頼先の取り違えを防ぐため必須です</small></label><div class="logo-in"><input id="s-logo" type="file" accept="image/jpeg,image/png" required><span id="s-logo-prev"></span></div></div>
+        <div class="notice info" style="margin:0 0 12px">電話・住所・NIB・ハラール認証・取扱原料・<b>会社ロゴ（JPG）</b>と<b>パスワードの変更</b>は、先方が<b>初めてログインしたときに必ず入力</b>します。入力が終わるまで、先方は依頼を見られません。</div>
         <button class="btn saff" type="submit">登録してログイン情報を発行</button><div class="status" id="st-sup"></div>
         <div id="sup-result"></div></form>
       <div class="card" id="co-list"><div class="tbl-wrap"><table class="view master"><thead><tr><th>ロゴ</th><th>会社</th><th>担当者</th><th>連絡先</th><th>NIB / ハラール</th><th>主な原料</th><th>合意（NDA／購入宣言／処方帰属）</th><th>登録日</th></tr></thead><tbody>
@@ -857,33 +849,23 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       </tbody></table></div></div>
       <div class="card" style="margin-top:14px"><h2>${FLAG_JP}合意文（日本語訳・確認用）</h2><p class="sub">相手は英語とインドネシア語の版に同意します。本番運用の前に、必ず弁護士の確認を受けてください。</p>
         ${terms.map((t) => `<h3>${esc(t.title_ja)}（版 ${esc(t.version)}）</h3><div class="brief-out ja">${esc(t.text_ja)}</div>`).join("")}</div>`;
-    logoPreview($("s-logo"), $("s-logo-prev"));
     $("co-list").onchange = async (e) => {
       const inp = e.target.closest("[data-logo]"); if (!inp) return; const f = inp.files?.[0]; if (!f) return;
       const c = S.companies.find((x) => x.id === inp.dataset.logo);
       try { await uploadLogo(c, f); toast("完了：ロゴを登録しました", c.name); adminCompanies(); } catch (err) { toast("ロゴを登録できませんでした", err?.userMsg || String(err), "info"); }
     };
-    const SF = ["company_name", "full_name", "email", "title", "phone", "whatsapp", "address", "website", "nib", "halal", "materials"];
+    const SF = ["company_name", "full_name", "email"];
     $("f-sup").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-sup").querySelector("button"), $("st-sup"), "登録しています…", async () => {
       const body = Object.fromEntries(SF.map((k) => [k, $("s-" + k).value.trim()]));
-      const logo = $("s-logo").files?.[0];
-      if (!logo) throw { userMsg: "会社ロゴ（JPG）を選んでください。" };
-      await toJpeg(logo); // check the image before creating the account
       const { data, error } = await sb.functions.invoke("create-supplier", { body });
       let err = null; if (error) { try { err = await error.context.json(); } catch { err = { error: "network" }; } }
       if (err || !data?.ok) {
         const code = err?.error || data?.error;
         throw { userMsg: code === "already_registered" ? "このメールアドレスは既に登録されています。" : code === "is_admin_email" ? "管理者のアドレスは仕入先に使えません。" : code === "demo" ? "デモ画面では登録できません。" : "登録できませんでした：" + (err?.message || code || "") };
       }
-      let logoMsg = "";
-      try {
-        const { data: prof } = await sb.from("profiles").select("company_id").eq("email", data.email).maybeSingle();
-        if (!prof?.company_id) throw { userMsg: "会社が見つかりません" };
-        await uploadLogo({ id: prof.company_id, name: body.company_name }, logo);
-      } catch (e) { logoMsg = "（ロゴは保存できませんでした。一覧の「ロゴを登録」から入れ直してください）"; }
       const url = location.origin + location.pathname;
-      const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, purchase declaration, ownership of adopted formulas).\n3. Change your password from the "Password" menu.\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
-      $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました" + logoMsg + "。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
+      const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, purchase declaration, ownership of adopted formulas).\n3. Set your own password and complete your company profile (address, NIB, halal status, main raw materials and your company logo as a JPG).\n\n1. Masuk dengan email dan kata sandi sementara.\n2. Setujui tiga perjanjian.\n3. Buat kata sandi baru dan lengkapi profil perusahaan (termasuk logo perusahaan dalam JPG).\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
+      $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
       $("sup-result").innerHTML = `<div class="brief-out" style="margin-top:10px" id="sup-msg"></div><div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="copy-sup">案内文をコピー（英語・インドネシア語）</button><button type="button" class="btn ghost" id="done-sup">一覧を更新</button></div>`;
       $("sup-msg").textContent = msg;
       $("copy-sup").onclick = (ev) => copy(msg, ev.currentTarget);
@@ -1334,6 +1316,52 @@ ${src}`, { effort: "low" });
     };
   }
 
+  /* First sign-in of a supplier: own password + company profile (with logo) before anything else. */
+  const mustChangePassword = () => !!S.user?.user_metadata?.must_change_password;
+  const needsOnboarding = () => !S.isAdmin && (mustChangePassword() || (S.company && !S.company.profile_completed_at));
+  const ONB = [["phone", "Phone / Telepon", true], ["whatsapp", "WhatsApp", false], ["address", "Company address / Alamat perusahaan", true], ["website", "Website", false],
+    ["nib", "Business ID (NIB) / Nomor Induk Berusaha", true], ["halal", "Halal certification (write \"None\" if none) / Sertifikasi halal", true], ["materials", "Main raw materials / Bahan baku utama", true]];
+  async function viewOnboarding() {
+    $("nav").innerHTML = "";
+    const c = S.company || {}; await loadLogos([c]);
+    const pw = mustChangePassword();
+    app.innerHTML = `<div class="auth card en" style="max-width:760px"><h1>${FLAG_ID}Welcome — first-time setup</h1>
+      <p class="lang-note">Please complete these steps once. You can see requests from Japan after this. / Harap lengkapi langkah berikut satu kali sebelum melihat permintaan dari Jepang.</p>
+      <form id="f-onb" autocomplete="off">
+        ${pw ? `<h2 style="font-size:16px;margin:14px 0 6px">1. Your own password / Kata sandi baru</h2>
+        <div class="grid2"><div class="field"><label for="o-p1">New password (min. 8) *</label><input id="o-p1" type="password" minlength="8" required autocomplete="new-password"></div>
+          <div class="field"><label for="o-p2">New password again *</label><input id="o-p2" type="password" minlength="8" required autocomplete="new-password"></div></div>` : ""}
+        <h2 style="font-size:16px;margin:14px 0 6px">${pw ? "2" : "1"}. Company profile / Profil perusahaan</h2>
+        <div class="field"><label>Company name / Nama perusahaan</label><div class="ro-box" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--ground)">${esc(c.name || "")}</div></div>
+        <p class="req-note">* Required / Wajib diisi</p>
+        <div class="grid2">${ONB.map(([k, l, req]) => `<div class="field ${k === "materials" || k === "address" ? "span2" : ""}"><label for="o-${k}">${l}${req ? " *" : ""}</label><input id="o-${k}" value="${esc(c[k] || "")}" ${req ? "required" : ""}></div>`).join("")}</div>
+        <div class="field"><label for="o-logo">Company logo (JPG) * / Logo perusahaan</label><div class="logo-in">${logoImg(c, 72)}<input id="o-logo" type="file" accept="image/jpeg,image/png" ${c.logo_path ? "" : "required"}><span id="o-logo-prev"></span></div>
+          <p class="sub" style="margin:4px 0 0">Japan uses your logo to tell suppliers apart. / Logo digunakan untuk membedakan pemasok.</p></div>
+        <button class="btn saff big" type="submit">Save and continue / Simpan dan lanjutkan</button><div class="status" id="st-onb"></div></form></div>`;
+    logoPreview($("o-logo"), $("o-logo-prev"));
+    $("f-onb").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-onb").querySelector("button"), $("st-onb"), "Saving… / Menyimpan…", async () => {
+      if (pw) {
+        if ($("o-p1").value !== $("o-p2").value) throw { userMsg: "The two passwords do not match. / Kata sandi tidak sama." };
+        if ($("o-p1").value.length < 8) throw { userMsg: "Use at least 8 characters. / Minimal 8 karakter." };
+      }
+      const patch = {}; for (const [k, l, req] of ONB) { patch[k] = $("o-" + k).value.trim(); if (req && !patch[k]) throw { userMsg: "Please fill in: " + l }; }
+      const f = $("o-logo").files?.[0];
+      if (!f && !c.logo_path) throw { userMsg: "Please choose your company logo (JPG). / Pilih logo perusahaan (JPG)." };
+      if (f) await uploadLogo(c, f);
+      if (pw) {
+        const { data, error } = await sb.auth.updateUser({ password: $("o-p1").value, data: { must_change_password: false } });
+        if (error) throw { userMsg: "Could not change the password: " + error.message };
+        if (data?.user) S.user = data.user;
+      }
+      patch.profile_completed_at = new Date().toISOString();
+      const { error } = await sb.from("companies").update(patch).eq("id", c.id);
+      if (error) throw { userMsg: "Could not save: " + error.message };
+      Object.assign(S.company, patch);
+      toast("Setup complete ✓ / Selesai", "Thank you. You can now see requests from Japan.");
+      location.hash = "#/"; route();
+    }); };
+  }
+
   /* ---------------- Router ---------------- */
   function nav(items) {
     const h = location.hash || "#/";
@@ -1366,6 +1394,7 @@ ${src}`, { effort: "low" });
       return adminHome();
     }
     if (!(await agreementsOk())) return viewAgreementGate();
+    if (needsOnboarding()) return viewOnboarding();
     nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahan"], ["#/password", "Password"]]);
     if (parts[0] === "password") return viewUpdatePassword(true);
     if (parts[0] === "a" && parts[1]) return supplierAssignment(parts[1]);
