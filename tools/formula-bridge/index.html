@@ -63,7 +63,19 @@ nav.steps button .t{font-weight:500;font-size:14px;color:var(--ink)}
 nav.steps button .w{font-size:11px;color:var(--ink-3)}
 nav.steps button[aria-selected="true"]{border-color:var(--accent);box-shadow:inset 0 -3px 0 var(--accent)}
 nav.steps button.id-side .w{color:var(--saffron)}
-nav.steps button.done .n::after{content:" ✓";color:var(--ok)}
+nav.steps button.done{background:var(--ok-soft);border-color:var(--ok)}
+nav.steps button.done .t::after{content:"完了 ✓";margin-left:8px;font-size:11px;font-weight:500;color:#fff;background:var(--ok);border-radius:999px;padding:1px 8px;vertical-align:.1em}
+nav.steps button.id-side.done .t::after{content:"Done ✓"}
+nav.steps button.done[aria-selected="true"]{box-shadow:inset 0 -3px 0 var(--ok)}
+.who .state{margin-left:auto;font-size:12px;border-radius:999px;padding:2px 10px;border:1px solid var(--line);color:var(--ink-3);font-weight:500}
+.who.is-done{background:var(--ok-soft);border-color:var(--ok)}
+.who.is-done .state{background:var(--ok);border-color:var(--ok);color:#fff}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom, 0px));z-index:50;width:min(560px,calc(100% - 32px));background:var(--paper);border:1px solid var(--ok);border-left:6px solid var(--ok);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,.18);padding:14px 16px;display:flex;gap:12px;align-items:flex-start}
+.toast .tt{font-weight:700;font-size:15px;color:var(--ok)}
+.toast .tb{font-size:13px;color:var(--ink-2);margin-top:2px}
+.toast.info{border-color:var(--saffron);border-left-color:var(--saffron)}
+.toast.info .tt{color:var(--saffron)}
+.toast .x{margin-left:auto}
 
 button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .notice{font-size:13px;color:var(--ink-2);background:var(--paper);border:1px solid var(--line);border-radius:var(--radius);padding:10px 14px;margin-bottom:14px}
@@ -238,7 +250,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 1 依頼 ================= -->
   <section id="view-req" role="tabpanel" hidden>
-    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側はこの内容を STEP 2 で英語・インドネシア語で読みます</small></div>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側はこの内容を STEP 2 で英語・インドネシア語で読みます</small><span class="state" data-state="req"></span></div>
     <div class="cols">
       <form class="card" id="req-form" autocomplete="off">
         <h2><i class="flag jp" role="img" aria-label="日本"></i>開発依頼の内容</h2>
@@ -304,7 +316,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 2 Development (English) ================= -->
   <section id="view-dev" role="tabpanel" class="en" hidden>
-    <div class="who id"><i class="flag id" role="img" aria-label="Indonesia"></i>Indonesia team fills in this page · Diisi oleh tim Indonesia<small>Please write in English · 英語で入力</small></div>
+    <div class="who id"><i class="flag id" role="img" aria-label="Indonesia"></i>Indonesia team fills in this page · Diisi oleh tim Indonesia<small>Please write in English · 英語で入力</small><span class="state" data-state="dev"></span></div>
     <div class="stack">
       <div class="card">
         <div class="head">
@@ -404,7 +416,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 3 完成処方 ================= -->
   <section id="view-fin" role="tabpanel" hidden>
-    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側の提出内容（<i class="flag id" role="img" aria-label="Indonesia"></i>）をもとに完成させます</small></div>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側の提出内容（<i class="flag id" role="img" aria-label="Indonesia"></i>）をもとに完成させます</small><span class="state" data-state="fin"></span></div>
     <div class="stack">
       <div class="card">
         <div class="head">
@@ -451,12 +463,18 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
         </div>
         <div class="field"><label for="p-usp">当社としての強み・差別化ポイント</label><textarea id="p-usp" data-doc="final" data-path="plan.usp"></textarea></div>
       </div>
+      <div class="card">
+        <h2><i class="flag jp" role="img" aria-label="日本"></i>完成処方を確定する</h2>
+        <p class="sub">合計100%・全成分の日本語表示名称・商品名がそろっていれば確定できます。確定すると STEP 3 が「完了」になります。</p>
+        <div class="row"><button class="btn big" id="fix-final">完成処方を確定</button></div>
+        <div class="status" id="st-fix" role="status" aria-live="polite"></div>
+      </div>
     </div>
   </section>
 
   <!-- ================= STEP 4 企画書 ================= -->
   <section id="view-plan" role="tabpanel" hidden>
-    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が操作する画面</div>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が操作する画面<span class="state" data-state="plan"></span></div>
     <div class="stack">
       <div class="cols">
         <div class="card">
@@ -548,6 +566,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   </footer>
 </div>
 
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><div><div class="tt" id="toast-t"></div><div class="tb" id="toast-b"></div></div><button class="x" id="toast-x" aria-label="閉じる">×</button></div>
 <script src="export.js"></script>
 <script>
 (() => {
@@ -622,7 +641,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   showStep(["req", "dev", "fin", "plan", "tr"].includes(hash) ? hash : ls.get("step") || "req");
 
   /* ================= Project state + sync ================= */
-  const STATUS = { draft: "下書き", requested: "依頼済み / Requested", developing: "開発中 / In development", submitted: "提出済み / Submitted", finalizing: "完成処方を作成中", done: "企画書完成" };
+  const STATUS = { draft: "下書き", requested: "依頼済み / Requested", developing: "開発中 / In development", submitted: "提出済み / Submitted", finalizing: "完成処方 確定", done: "企画書完成" };
   const COLS = { project: "projects", supplier: "supplier", final: "final", plans: "plans" };
   const S = { pid: null, list: [], docs: { project: {}, supplier: {}, final: {}, plans: {} }, dirty: {}, unsub: [], market: null };
 
@@ -653,6 +672,21 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
     return chains[doc];
   }
   const flushAll = () => Promise.all(Object.keys(COLS).map(flush));
+  const ORDER = ["draft", "requested", "developing", "submitted", "finalizing", "done"];
+  const rank = (st) => Math.max(0, ORDER.indexOf(st || "draft"));
+  let toastTimer;
+  function toast(title, body, kind = "ok") {
+    $("toast-t").textContent = title; $("toast-b").textContent = body || "";
+    $("toast").className = "toast" + (kind === "info" ? " info" : ""); $("toast").hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => ($("toast").hidden = true), 9000);
+  }
+  $("toast-x").addEventListener("click", () => ($("toast").hidden = true));
+  /* Advance the status only forward, so re-sending never undoes later steps. */
+  async function advance(st, patch = {}) {
+    const next = rank(st) > rank(S.docs.project.status) ? { status: st } : {};
+    S.localStatus = next.status || S.localStatus;
+    await touchProject(Object.assign(next, patch));
+  }
   async function touchProject(patch) {
     Object.assign(S.docs.project, patch); S.dirty.project = true; await flush("project");
   }
@@ -668,7 +702,15 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       S.unsub.push(db.doc(col + "/" + pid).onSnapshot((snap) => {
         if (S.pid !== pid || S.dirty[doc]) return;
         const base = doc === "project" ? blankProject() : doc === "supplier" ? blankSupplier() : doc === "final" ? blankFinal() : {};
+        const prev = doc === "project" ? S.docs.project.status : null;
         S.docs[doc] = Object.assign(base, snap.exists ? snap.data() : {});
+        if (doc === "project" && S.seen === pid && prev && prev !== S.docs.project.status && S.docs.project.status !== S.localStatus) {
+          const m = { requested: ["日本から新しい依頼が届きました / New request from Japan", "STEP 2 をご確認ください。 Please open STEP 2."],
+            submitted: ["インドネシア側から提出がありました", "STEP 3 で内容を確認し、当社の原料を追記してください。"],
+            finalizing: ["完成処方が確定しました", "STEP 4 で企画書を作れます。"], done: ["企画書ができました", "STEP 4 から保存できます。"] }[S.docs.project.status];
+          if (m) toast(m[0], m[1], "info");
+        }
+        if (doc === "project") S.seen = pid;
         renderDoc(doc);
       }, () => {}));
     });
@@ -820,8 +862,11 @@ ${body}`, { signal });
   $("send-req").addEventListener("click", async () => {
     const st = $("st-send");
     if (!(S.docs.project.brief || {}).en) { st.className = "status err"; st.textContent = "先に「依頼書を作成」を押してください。"; return; }
-    await touchProject({ status: "requested", requestedAt: Date.now() });
-    st.className = "status"; st.textContent = "依頼済みにしました。インドネシア側の STEP 2 に依頼書が表示されます。";
+    const again = rank(S.docs.project.status) >= 1;
+    await advance("requested", { requestedAt: Date.now() });
+    if (S.dirty.project) { st.className = "status err"; st.textContent = "送れませんでした。通信を確認して、もう一度押してください。"; return; }
+    st.className = "status"; st.textContent = "✓ 完了：依頼を送りました（" + new Date().toLocaleString("ja-JP", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) + "）";
+    toast(again ? "完了：依頼書を再送しました" : "完了：インドネシアへ依頼を送りました", "インドネシア側の STEP 2 画面に依頼書が表示されます。相手が提出すると、この画面でお知らせします。");
     renderStatus();
   });
 
@@ -900,8 +945,10 @@ ${JSON.stringify(list)}`, { signal });
     if ((sp.formula || []).length && Math.abs(tot - 100) > 0.001) missing.push(`Formula total is ${fmt(tot)}% (should be 100%)`);
     if (missing.length) { st.className = "status err"; st.textContent = "Please check: " + missing.join(", "); return; }
     await flush("supplier");
-    await touchProject({ status: "submitted", submittedAt: Date.now() });
-    st.className = "status"; st.textContent = "Submitted. Thank you! / 提出しました。"; renderStatus();
+    await advance("submitted", { submittedAt: Date.now() });
+    if (S.dirty.project) { st.className = "status err"; st.textContent = "Could not submit. Please check your connection and try again."; return; }
+    st.className = "status"; st.textContent = "✓ Done: submitted to Japan. Thank you!";
+    toast("Done: submitted to Japan ✓", "Japan has been notified on this page. Terima kasih!"); renderStatus();
   });
 
   /* Excel template round-trip (for teams that cannot open this page) */
@@ -1122,7 +1169,8 @@ ${JSON.stringify(input)}`, { signal, modelTier: "complex" });
 
     S.docs.plans = { title: String(plan.title || p.name || "新商品企画書"), subtitle: String(plan.subtitle || ""), date: today(), slides, createdAt: Date.now() };
     S.dirty.plans = true; await flush("plans");
-    await touchProject({ status: "done" });
+    await advance("done");
+    toast("完了：企画書ができました", "下の PowerPoint・Word ボタンから保存できます。");
     renderPlan(); renderStatus();
     $("st-plan").textContent = "作成しました。下のボタンからPowerPoint・Wordを保存できます。";
   }));
@@ -1170,12 +1218,30 @@ ${JSON.stringify(input)}`, { signal, modelTier: "complex" });
   $("dl-pptx").addEventListener("click", () => exportPlan("pptx"));
   $("dl-docx").addEventListener("click", () => exportPlan("docx"));
 
+  $("fix-final").addEventListener("click", async () => {
+    const st = $("st-fix"), fr = finalRows(), tot = fr.reduce((a, r) => a + r.pct, 0), miss = [];
+    if (!fr.length) miss.push("完成処方がありません");
+    else if (Math.abs(tot - 100) > 0.001) miss.push(`合計が ${fmt(tot)}% です（100%にしてください）`);
+    if (fr.some((r) => !r.ja)) miss.push("日本語表示名称が未変換の原料があります（STEP 2 の変換ボタン）");
+    if (!(S.docs.final.plan || {}).productName) miss.push("商品名が未入力です");
+    if (miss.length) { st.className = "status err"; st.textContent = "確定できません：" + miss.join("／"); return; }
+    await flushAll(); await advance("finalizing", { finalizedAt: Date.now() });
+    st.className = "status"; st.textContent = "✓ 完了：完成処方を確定しました。";
+    toast("完了：完成処方を確定しました", "STEP 4 の「出来上がり」で企画書を作れます。"); renderStatus();
+  });
+
   /* ================= Render ================= */
   function renderStatus() {
     const s = S.docs.project.status || "draft";
     const el = $("proj-status"); el.className = "pill s-" + s; el.textContent = STATUS[s] || s;
     const order = ["draft", "requested", "developing", "submitted", "finalizing", "done"], k = order.indexOf(s);
-    steps.forEach((b) => b.classList.toggle("done", (b.dataset.step === "req" && k >= 1) || (b.dataset.step === "dev" && k >= 3) || (b.dataset.step === "plan" && k >= 5)));
+    const doneAt = { req: 1, dev: 3, fin: 4, plan: 5 };
+    steps.forEach((b) => b.classList.toggle("done", doneAt[b.dataset.step] != null && k >= doneAt[b.dataset.step]));
+    const txt = { req: ["入力中", "完了 ✓"], dev: ["In progress", "Done ✓"], fin: ["入力中", "完了 ✓"], plan: ["未作成", "完了 ✓"] };
+    document.querySelectorAll("[data-state]").forEach((el) => {
+      const key = el.dataset.state, done = k >= doneAt[key];
+      el.textContent = txt[key][done ? 1 : 0]; el.closest(".who").classList.toggle("is-done", done);
+    });
   }
   function renderDoc(doc) {
     fillForms(doc);
