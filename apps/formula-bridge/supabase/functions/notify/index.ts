@@ -3,6 +3,7 @@
 //   event "submit":  a supplier submitted → email Japan's development address.
 //   event "shipped": a supplier shipped the sample → email Japan's development address with the tracking number.
 //   event "feedback": Japan sent feedback → email the supplier company.
+//   event "test":     an admin checks the mail setup → email Japan's development address.
 // Sends through the company's own mail server when SMTP_HOST is set (port 465, SSL),
 // otherwise through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -49,6 +50,21 @@ Deno.serve(async (req) => {
 
   let body: { event?: string; assignment_id?: string };
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
+
+  if (body.event === "test") {
+    const { data: me } = await service.from("profiles").select("role").eq("id", who.user.id).single();
+    if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
+    const { data: settings } = await service.from("settings").select("key, value");
+    const conf = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
+    const to = String(conf.dev_email || "").split(/[,\s]+/).filter(Boolean);
+    if (!to.length) return json({ sent: false, reason: "no_dev_email" });
+    const from = String(conf.from_email || "Artisans Production Formula Bridge <onboarding@resend.dev>");
+    const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
+    const subject = "[処方ブリッジ] テストメール（送信設定の確認）";
+    const res = await sendMail(sender, to, subject, `<p>処方ブリッジからのテストメールです。このメールが届いていれば、メール送信の設定は完了しています。</p><p>送信元: ${esc(sender)}<br>送信日時: ${esc(new Date().toISOString())}</p>`);
+    await service.from("mail_log").insert({ kind: "test", to_email: to.join(","), subject, ok: !!res?.ok, detail: res ? res.detail : "mail server not configured" });
+    return json(res ? (res.ok ? { sent: true, to } : { sent: false, reason: "send_failed", detail: res.detail }) : { sent: false, reason: "not_configured" });
+  }
 
   const { data: me } = await service.from("profiles").select("role, company_id, full_name, email").eq("id", who.user.id).single();
   const { data: a } = await service.from("assignments").select("id, status, company_id, project_id, request_snapshot, shipment, shipped_at, feedback").eq("id", body.assignment_id ?? "").single();
