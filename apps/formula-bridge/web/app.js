@@ -230,20 +230,22 @@
   function editTable(el, cols, rows, onChange, { totalCheck = false, readOnly = false } = {}) {
     const render = () => {
       if (el.contains(document.activeElement)) return;
-      const tot = rows.reduce((a, r) => a + num(r.pct), 0), pi = cols.findIndex((c) => c.k === "pct");
+      const tk = cols.find((c) => c.total)?.k || "pct";
+      const tot = rows.reduce((a, r) => a + num(r[tk]), 0), pi = cols.findIndex((c) => c.k === tk);
       el.innerHTML = `<thead><tr><th>No.</th>${cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}${readOnly ? "" : "<th></th>"}</tr></thead>
-        <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || readOnly
+        <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || c.ro || readOnly
           ? `<td class="${c.ja ? "ja" : c.num ? "num" : ""}" style="padding:8px">${esc(r[c.k] ?? "")}${c.ja && r.jaNote ? `<span class="nt">${esc(r.jaNote)}</span>` : ""}</td>`
-          : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" aria-label="${esc(c.l)} ${i + 1}" ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
+          : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>
-        ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
+        ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
     };
     el.oninput = (e) => {
       const t = e.target; if (!t.dataset.k) return; const r = rows[+t.dataset.i]; if (!r) return;
       r[t.dataset.k] = t.value;
       if (["idName", "inci", "trade"].includes(t.dataset.k) && "ja" in r && cols.some((c) => c.ja)) { r.ja = ""; r.jaNote = ""; }
-      if (t.dataset.k === "pct") { const c = el.querySelector("tfoot td.num"); if (c) { const tot = rows.reduce((a, x) => a + num(x.pct), 0); c.textContent = fmt(tot); if (totalCheck) c.className = "num " + (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"); } }
+      const tk = cols.find((c) => c.total)?.k || "pct";
       onChange();
+      if (t.dataset.k === tk) { const c = el.querySelector("tfoot td.num"); if (c) { const tot = rows.reduce((a, x) => a + num(x[tk]), 0); c.textContent = fmt(tot); if (totalCheck && tk === "pct") c.className = "num " + (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"); } }
     };
     el.onclick = (e) => { const b = e.target.closest("[data-del]"); if (b) { rows.splice(+b.dataset.del, 1); onChange(); render(); } };
     el.addEventListener("focusout", () => setTimeout(render, 0));
@@ -277,6 +279,18 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     return n;
   }
 
+  const UNIT_FIELDS = {
+    viscosity: ["mPa·s", "cP", "Pa·s"], shelfLife: ["months", "years"],
+    cost: ["IDR / unit", "JPY / unit", "USD / unit", "IDR / kg", "JPY / kg", "USD / kg"],
+    moq: ["kg", "g", "L", "mL", "pcs"], leadTime: ["days", "weeks", "months"],
+  };
+  const PRODUCT_PH = {
+    name: "e.g. Ceramide Hydrating Lotion", concept: "Who it is for and what it does, in 1–3 sentences",
+    features: "One feature per line\ne.g. Fragrance-free\ne.g. Absorbs quickly", claims: "e.g. Moisturizing for 24 hours (supported by test)",
+    appearance: "e.g. Clear, slightly viscous liquid", ph: "e.g. 5.5–6.5", viscosity: "e.g. 3000", shelfLife: "e.g. 36",
+    stability: "e.g. 3 months at 4/25/45°C, no separation", cost: "e.g. 15000", moq: "e.g. 25", leadTime: "e.g. 4",
+    process: "Main steps and temperatures, e.g. Phase A at 75°C → cool → add Phase B below 40°C",
+  };
   const PRODUCT_FIELDS = [["name", "Product name"], ["concept", "Concept"], ["features", "Key features (one per line)"], ["claims", "Possible marketing claims"], ["appearance", "Appearance / texture"], ["ph", "pH"], ["viscosity", "Viscosity"], ["shelfLife", "Shelf life"], ["stability", "Stability test summary"], ["cost", "Your quote: raw material cost per unit"], ["moq", "MOQ"], ["leadTime", "Lead time"], ["process", "Manufacturing process"]];
   function supplierEnglish(sp) {
     const p = sp.product || {};
@@ -324,8 +338,9 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       <div class="card"><h2>${FLAG_ID}A. Product overview</h2><p class="sub">Changes are saved automatically. <span class="saved" id="saved"></span></p>
         <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE</span><b>${esc(rq.price || "—")}</b></div></div>
         <div id="prod-fields"></div></div>
-      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula (% w/w)</h2><p class="sub" style="margin:0">Enter the Indonesian label name (Nama bahan) and %. The Japanese name is filled in by the button.</p></div>
+      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian label name (Nama bahan) and the amount. The Japanese name is filled in by the button.</p></div>
         <button class="btn ghost" id="to-ja">Convert to Japanese names / 日本語表示名称に変換</button></div>
+        <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated)</option><option value="mL">mL per batch (% is calculated)</option></select></div>
         <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button></div><div class="status" id="st-toja"></div></div>
       <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E.</p>
@@ -348,7 +363,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
           <div class="field"><label for="s-carrier">Courier / Kurir</label><select id="s-carrier"><option></option><option>DHL</option><option>FedEx</option><option>UPS</option><option>EMS (Pos Indonesia)</option><option>JNE</option><option>Other</option></select></div>
           <div class="field"><label for="s-tracking">Tracking number / Nomor resi *</label><input id="s-tracking"></div>
           <div class="field"><label for="s-date">Ship date / Tanggal kirim</label><input id="s-date" type="date"></div>
-          <div class="field"><label for="s-qty">Number of samples / Jumlah sampel</label><input id="s-qty" placeholder="e.g. 3 × 100 mL"></div>
+          <div class="field"><label for="s-qty">Samples / Jumlah sampel</label><div class="num-unit"><input id="s-qty" inputmode="decimal" placeholder="e.g. 3"><select id="s-qtyu" aria-label="unit"><option>pcs</option><option>bottles</option><option>mL</option><option>g</option><option>kg</option><option>L</option></select></div></div>
         </div>
         <div class="field"><label for="s-note">Note / Catatan</label><input id="s-note"></div>
         <div class="row"><button class="btn saff big" id="ship">Shipment complete / Pengiriman selesai</button></div>
@@ -368,14 +383,49 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       if (patch.status) status = patch.status;
     }, $("saved"));
 
-    $("prod-fields").innerHTML = PRODUCT_FIELDS.map(([k, l]) => `<div class="field"><label for="p-${k}">${esc(l)}</label>${["concept", "features", "claims", "stability", "process"].includes(k) ? `<textarea id="p-${k}"></textarea>` : `<input id="p-${k}">`}</div>`).join("");
-    PRODUCT_FIELDS.forEach(([k]) => { const el = $("p-" + k); el.value = sp.product[k] || ""; el.oninput = () => { sp.product[k] = el.value; save.soon(); }; });
-    const tF = editTable($("t-formula"), COLS.formula, sp.formula, save.soon, { totalCheck: true });
+    // Fields with a number and a unit keep both parts (productParts) and a readable text (product[k]).
+    sp.productParts = sp.productParts || {};
+    $("prod-fields").innerHTML = `<p class="req-note">* Required / Wajib diisi</p><div class="grid2">` + PRODUCT_FIELDS.map(([k, l]) => {
+      const u = UNIT_FIELDS[k], ph = PRODUCT_PH[k] || "", req = k === "name" ? " *" : "";
+      const wide = ["concept", "features", "claims", "stability", "process"].includes(k);
+      const ctl = wide ? `<textarea id="p-${k}" placeholder="${esc(ph)}"></textarea>`
+        : u ? `<div class="num-unit"><input id="p-${k}" inputmode="decimal" placeholder="${esc(ph)}"><select id="pu-${k}" aria-label="unit">${u.map((x) => `<option>${esc(x)}</option>`).join("")}</select></div>`
+        : `<input id="p-${k}" placeholder="${esc(ph)}">`;
+      return `<div class="field ${wide ? "span2" : ""}"><label for="p-${k}">${esc(l)}${req}</label>${ctl}</div>`;
+    }).join("") + `</div>`;
+    PRODUCT_FIELDS.forEach(([k]) => {
+      const el = $("p-" + k), sel = $("pu-" + k), part = sp.productParts[k];
+      if (sel) {
+        if (part) { el.value = part.v || ""; sel.value = part.u || sel.value; }
+        else if (sp.product[k]) { const m = String(sp.product[k]).match(/^\s*([\d.,]+)\s*(.*)$/); el.value = m ? m[1] : sp.product[k]; if (m && [...sel.options].some((o) => o.value === m[2])) sel.value = m[2]; }
+        const upd = () => { sp.productParts[k] = { v: el.value.trim(), u: sel.value }; sp.product[k] = el.value.trim() ? `${el.value.trim()} ${sel.value}` : ""; save.soon(); };
+        el.oninput = upd; sel.onchange = upd;
+      } else { el.value = sp.product[k] || ""; el.oninput = () => { sp.product[k] = el.value; save.soon(); }; }
+    });
+
+    // Formula amounts: % w/w (default) or g / mL per batch; % is then worked out automatically.
+    sp.formulaUnit = sp.formulaUnit || "%";
+    const formulaCols = () => sp.formulaUnit === "%" ? COLS.formula.map((c) => (c.k === "pct" ? { ...c, ph: "e.g. 2.5" } : c))
+      : COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) / batch`, w: 110, num: true, total: true, ph: "e.g. 25" }, { k: "pct", l: "% w/w (auto)", w: 90, num: true, ro: true }] : [c]);
+    const recalcPct = () => {
+      if (sp.formulaUnit === "%") return;
+      const tot = sp.formula.reduce((a, r) => a + num(r.amt), 0);
+      sp.formula.forEach((r) => (r.pct = tot ? String(Math.round((num(r.amt) / tot) * 100000) / 1000) : ""));
+    };
+    let tF;
+    const mountFormula = () => { tF = editTable($("t-formula"), formulaCols(), sp.formula, () => { recalcPct(); save.soon(); }, { totalCheck: true }); };
+    $("f-unit").value = sp.formulaUnit;
+    $("f-unit").onchange = () => {
+      const prev = sp.formulaUnit; sp.formulaUnit = $("f-unit").value;
+      if (sp.formulaUnit !== "%" && prev === "%") sp.formula.forEach((r) => (r.amt = r.amt || r.pct || ""));
+      recalcPct(); save.soon(); $("t-formula").innerHTML = ""; mountFormula();
+    };
+    mountFormula();
     const tM = editTable($("t-materials"), COLS.materials, sp.materials, save.soon);
     const tT = editTable($("t-tests"), COLS.tests, sp.tests, save.soon);
-    $("add-formula").onclick = tF.add; $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;
+    $("add-formula").onclick = () => tF.add(); $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;
     $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Converting… / 変換しています…", async () => {
-      const n = await convertToJapanese(sp.formula); tF.render(); save.soon(); await save.now();
+      const n = await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); save.soon(); await save.now();
       $("st-toja").textContent = `${n} rows converted.`;
     });
 
@@ -404,6 +454,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     const sh = Object.assign({}, a.shipment || {});
     const SH = ["carrier", "tracking", "date", "qty", "note"];
     SH.forEach((k) => ($("s-" + k).value = sh[k] || ""));
+    { const m = String(sh.qty || "").match(/^\s*([\d.,]+)\s*(.*)$/); if (m) { $("s-qty").value = m[1]; if ([...$("s-qtyu").options].some((o) => o.value === m[2])) $("s-qtyu").value = m[2]; } }
     const shipState = () => {
       const ok = status === "submitted";
       $("ship").disabled = !ok;
@@ -413,6 +464,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     shipState();
     $("ship").onclick = (e) => busy(e.currentTarget, $("st-ship"), "Sending…", async () => {
       SH.forEach((k) => (sh[k] = $("s-" + k).value.trim()));
+      if (sh.qty) sh.qty = `${sh.qty} ${$("s-qtyu").value}`;
       if (!sh.tracking) throw { userMsg: "Please enter the tracking number. / Harap isi nomor resi." };
       const { data: up, error } = await sb.from("assignments").update({ shipment: sh, shipped_at: new Date().toISOString() }).eq("id", aid).select("shipped_at").single();
       if (error) throw { userMsg: "Could not save: " + error.message };
@@ -426,7 +478,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       const miss = [], tot = sp.formula.reduce((x, r) => x + num(r.pct), 0);
       if (!sp.product.name) miss.push("Product name");
       if (!sp.formula.length) miss.push("Formula");
-      else if (Math.abs(tot - 100) > 0.001) miss.push(`Formula total is ${fmt(tot)}% (must be 100%)`);
+      else if (Math.abs(tot - 100) > 0.01) miss.push(sp.formulaUnit === "%" ? `Formula total is ${fmt(tot)}% (must be 100%)` : "Formula amounts");
       if (miss.length) throw { userMsg: "Please check: " + miss.join(", ") };
       await save.now();
       const { error } = await sb.from("assignments").update({ supplier: sp, status: "submitted" }).eq("id", aid);
