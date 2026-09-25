@@ -43,6 +43,17 @@ header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:spac
 .pill.s-draft{color:var(--ink-3)}.pill.s-requested{color:var(--saffron)}.pill.s-developing{color:var(--saffron)}
 .pill.s-submitted{color:var(--accent)}.pill.s-finalizing{color:var(--accent)}.pill.s-done{color:var(--ok)}
 .spacer{flex:1}
+.flag{display:inline-block;width:1.5em;height:1em;border-radius:2px;box-shadow:0 0 0 1px var(--line);vertical-align:-0.14em;flex:none;margin-right:.35em}
+.flag.jp{background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 20'%3E%3Crect width='30' height='20' fill='%23fff'/%3E%3Ccircle cx='15' cy='10' r='6' fill='%23BC002D'/%3E%3C/svg%3E") center/cover no-repeat}
+.flag.id{background:linear-gradient(#CE1126 50%,#fff 50%)}
+.who{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:13px;font-weight:500;border-radius:var(--radius);padding:8px 14px;margin-bottom:14px;border:1px solid var(--line);background:var(--paper)}
+.who.jp{border-left:4px solid #BC002D}
+.who.id{border-left:4px solid #CE1126;font-family:var(--id)}
+.who small{color:var(--ink-3);font-weight:400;margin-left:6px}
+.targets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;background:var(--ground);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.targets div{display:flex;flex-direction:column;min-width:0}
+.targets span{font-size:11px;color:var(--ink-3);letter-spacing:.04em}
+.targets b{font-weight:500;font-size:15px;overflow-wrap:anywhere}
 
 /* Step navigation: a real sequence, so numbered */
 nav.steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin-bottom:16px}
@@ -190,6 +201,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   .pane.ja{order:-1}
 }
 @media (max-width:560px){
+  .targets{grid-template-columns:1fr}
   nav.steps{grid-template-columns:repeat(2,minmax(0,1fr))}
   .grid2,.grid3,.upl{grid-template-columns:1fr}
 }
@@ -217,18 +229,19 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   </div>
 
   <nav class="steps" role="tablist" aria-label="工程">
-    <button role="tab" data-step="req"><span class="n">STEP 1</span><span class="t">依頼</span><span class="w">当社が記入</span></button>
-    <button role="tab" data-step="dev" class="id-side"><span class="n">STEP 2</span><span class="t">Development</span><span class="w">Indonesia team · English</span></button>
-    <button role="tab" data-step="fin"><span class="n">STEP 3</span><span class="t">完成処方</span><span class="w">当社で原料を追記</span></button>
-    <button role="tab" data-step="plan"><span class="n">STEP 4</span><span class="t">企画書</span><span class="w">出来上がり → PPT / Word</span></button>
+    <button role="tab" data-step="req"><span class="n"><i class="flag jp" role="img" aria-label="日本"></i>STEP 1</span><span class="t">依頼</span><span class="w">当社が記入</span></button>
+    <button role="tab" data-step="dev" class="id-side"><span class="n"><i class="flag id" role="img" aria-label="Indonesia"></i>STEP 2</span><span class="t">Development</span><span class="w">Indonesia team · English</span></button>
+    <button role="tab" data-step="fin"><span class="n"><i class="flag jp" role="img" aria-label="日本"></i>STEP 3</span><span class="t">完成処方</span><span class="w">当社で原料を追記</span></button>
+    <button role="tab" data-step="plan"><span class="n"><i class="flag jp" role="img" aria-label="日本"></i>STEP 4</span><span class="t">企画書</span><span class="w">出来上がり → PPT / Word</span></button>
     <button role="tab" data-step="tr"><span class="n">TOOL</span><span class="t">翻訳ツール</span><span class="w">文章・成分表</span></button>
   </nav>
 
   <!-- ================= STEP 1 依頼 ================= -->
   <section id="view-req" role="tabpanel" hidden>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側はこの内容を STEP 2 で英語・インドネシア語で読みます</small></div>
     <div class="cols">
       <form class="card" id="req-form" autocomplete="off">
-        <h2>開発依頼の内容</h2>
+        <h2><i class="flag jp" role="img" aria-label="日本"></i>開発依頼の内容</h2>
         <p class="sub">日本語で記入してください。入力内容は自動で保存されます。</p>
         <div class="field"><label for="r-name">案件名</label><input id="r-name" data-doc="project" data-path="name"></div>
         <div class="grid2">
@@ -239,10 +252,13 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
         <div class="field"><label for="r-feel">目標とする使用感</label><textarea id="r-feel" data-doc="project" data-path="request.feel"></textarea></div>
         <div class="field"><label for="r-claim">訴求したい成分・効果</label><textarea id="r-claim" data-doc="project" data-path="request.claim"></textarea></div>
         <div class="field"><label for="r-avoid">使いたくない成分</label><textarea id="r-avoid" data-doc="project" data-path="request.avoid"></textarea></div>
-        <div class="grid2">
-          <div class="field"><label for="r-cost">目標原価（1本あたり）</label><input id="r-cost" data-doc="project" data-path="request.cost"></div>
-          <div class="field"><label for="r-date">試作サンプル希望日</label><input id="r-date" data-doc="project" data-path="request.date"></div>
+        <h3>希望コスト（1本あたり）</h3>
+        <div class="grid3">
+          <div class="field"><label for="r-costRaw">原料費 <small>中身の原料代</small></label><input id="r-costRaw" data-doc="project" data-path="request.costRaw" placeholder="例: 100円"></div>
+          <div class="field"><label for="r-costFin">完成品コスト <small>原料＋容器＋充填・製造</small></label><input id="r-costFin" data-doc="project" data-path="request.costFin" placeholder="例: 250円"></div>
+          <div class="field"><label for="r-price">想定販売価格 <small>税込</small></label><input id="r-price" data-doc="project" data-path="request.price" placeholder="例: 1,980円"></div>
         </div>
+        <div class="field"><label for="r-date">試作サンプル希望日</label><input id="r-date" data-doc="project" data-path="request.date"></div>
         <div class="field"><label>販売予定の市場</label>
           <div class="checks" id="r-markets">
             <label><input type="checkbox" value="jp"> 日本国内</label>
@@ -256,7 +272,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       <div class="stack">
         <div class="card">
           <div class="head">
-            <h2>依頼書（インドネシア側が読む版）</h2>
+            <h2><i class="flag jp" role="img" aria-label="日本"></i>依頼書（インドネシア側が読む版）</h2>
             <div class="seg" role="group" aria-label="言語">
               <button type="button" data-bout="en" aria-pressed="true">English</button>
               <button type="button" data-bout="id" aria-pressed="false">Indonesia</button>
@@ -271,7 +287,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
           <div class="status" id="st-brief" role="status" aria-live="polite"></div>
         </div>
         <div class="card">
-          <h2>インドネシアへ依頼を送る</h2>
+          <h2><i class="flag jp" role="img" aria-label="日本"></i>インドネシアへ依頼を送る</h2>
           <p class="sub">押すと状態が「依頼済み」になり、インドネシア側の STEP 2 画面の上部にこの依頼書が表示されます。</p>
           <div class="row"><button class="btn saff" id="send-req">依頼を送る</button></div>
           <div class="status" id="st-send"></div>
@@ -288,10 +304,11 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 2 Development (English) ================= -->
   <section id="view-dev" role="tabpanel" class="en" hidden>
+    <div class="who id"><i class="flag id" role="img" aria-label="Indonesia"></i>Indonesia team fills in this page · Diisi oleh tim Indonesia<small>Please write in English · 英語で入力</small></div>
     <div class="stack">
       <div class="card">
         <div class="head">
-          <h2>Request from Japan</h2>
+          <h2><i class="flag jp" role="img" aria-label="日本"></i>Request from Japan</h2>
           <div class="seg" role="group" aria-label="Language">
             <button type="button" data-rq="en" aria-pressed="true">English</button>
             <button type="button" data-rq="id" aria-pressed="false">Bahasa Indonesia</button>
@@ -301,8 +318,13 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <h2>A. Product overview</h2>
+        <h2><i class="flag id" role="img" aria-label="Indonesia"></i>A. Product overview</h2>
         <p class="sub">Please write everything in English. Changes are saved automatically.</p>
+        <div class="targets" aria-label="Target cost from Japan">
+          <div><span><i class="flag jp" role="img" aria-label="日本"></i>TARGET RAW MATERIAL COST / UNIT</span><b id="tg-raw">—</b></div>
+          <div><span><i class="flag jp" role="img" aria-label="日本"></i>TARGET FINISHED PRODUCT COST / UNIT</span><b id="tg-fin">—</b></div>
+          <div><span><i class="flag jp" role="img" aria-label="日本"></i>PLANNED RETAIL PRICE</span><b id="tg-price">—</b></div>
+        </div>
         <div class="grid2">
           <div class="field"><label for="d-pname">Product name (working title)</label><input id="d-pname" data-doc="supplier" data-path="product.name"></div>
           <div class="field"><label for="d-appear">Appearance / texture</label><input id="d-appear" data-doc="supplier" data-path="product.appearance"></div>
@@ -317,7 +339,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
         </div>
         <div class="field"><label for="d-stab">Stability test summary</label><textarea id="d-stab" data-doc="supplier" data-path="product.stability"></textarea></div>
         <div class="grid3">
-          <div class="field"><label for="d-cost">Raw material cost per unit</label><input id="d-cost" data-doc="supplier" data-path="product.cost"></div>
+          <div class="field"><label for="d-cost">Your quote: raw material cost per unit</label><input id="d-cost" data-doc="supplier" data-path="product.cost"></div>
           <div class="field"><label for="d-moq">MOQ (raw materials)</label><input id="d-moq" data-doc="supplier" data-path="product.moq"></div>
           <div class="field"><label for="d-lead">Lead time</label><input id="d-lead" data-doc="supplier" data-path="product.leadTime"></div>
         </div>
@@ -326,7 +348,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
       <div class="card">
         <div class="head">
-          <div><h2>B. Base formula (% w/w)</h2><p class="sub" style="margin:0">Enter the Indonesian label name (Nama bahan) and %. The Japanese label name (日本語表示名称) is filled in by the button below.</p></div>
+          <div><h2><i class="flag id" role="img" aria-label="Indonesia"></i>B. Base formula (% w/w)</h2><p class="sub" style="margin:0">Enter the Indonesian label name (Nama bahan) and %. The Japanese label name (日本語表示名称) is filled in by the button below.</p></div>
           <div class="row">
             <button class="btn ghost" id="to-ja">日本語表示名称に変換 / Convert to Japanese names</button>
           </div>
@@ -337,21 +359,21 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <h2>C. Raw material highlights</h2>
+        <h2><i class="flag id" role="img" aria-label="Indonesia"></i>C. Raw material highlights</h2>
         <p class="sub">Features of key raw materials and the supplier's data (efficacy, mechanism, recommended dosage). Attach graphs and documents in section E.</p>
         <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost" data-addrow="materials">＋ Add row</button></div>
       </div>
 
       <div class="card">
-        <h2>D. Third-party test data</h2>
+        <h2><i class="flag id" role="img" aria-label="Indonesia"></i>D. Third-party test data</h2>
         <p class="sub">Tests performed by independent laboratories (e.g. patch test, SPF, efficacy, stability, microbiology). Attach the report in section E.</p>
         <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div>
         <div class="row" style="margin-top:8px"><button class="btn ghost" data-addrow="tests">＋ Add row</button></div>
       </div>
 
       <div class="card">
-        <h2>E. Attachments</h2>
+        <h2><i class="flag id" role="img" aria-label="Indonesia"></i>E. Attachments</h2>
         <p class="sub">Data sheets, graphs, specifications, sales materials, third-party reports, SDS, COA. PDF, images, videos and text files up to 20 MB each.</p>
         <div class="files" id="files"></div>
         <div class="upl" id="upl">
@@ -367,7 +389,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <h2>Submit to Japan</h2>
+        <h2><i class="flag id" role="img" aria-label="Indonesia"></i>Submit to Japan</h2>
         <p class="sub">When the sample is ready and sections A–E are complete, press Submit. Japan will be notified on this page.</p>
         <div class="row">
           <button class="btn saff big" id="submit-dev">Submit to Japan</button>
@@ -382,10 +404,11 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 3 完成処方 ================= -->
   <section id="view-fin" role="tabpanel" hidden>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が入力する画面<small>インドネシア側の提出内容（<i class="flag id" role="img" aria-label="Indonesia"></i>）をもとに完成させます</small></div>
     <div class="stack">
       <div class="card">
         <div class="head">
-          <div><h2>インドネシア側の提出内容（日本語訳）</h2><p class="sub" style="margin:0">英語で入力された製品特徴・原料データ・第三者試験を日本語に訳して表示します。</p></div>
+          <div><h2><i class="flag id" role="img" aria-label="Indonesia"></i>インドネシア側の提出内容（日本語訳）</h2><p class="sub" style="margin:0">英語で入力された製品特徴・原料データ・第三者試験を日本語に訳して表示します。</p></div>
           <button class="btn ghost" id="tr-sup">日本語に翻訳</button>
         </div>
         <div class="brief-out ja" id="sup-ja"></div>
@@ -393,7 +416,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <h2>当社で追記する原料</h2>
+        <h2><i class="flag jp" role="img" aria-label="日本"></i>当社で追記する原料</h2>
         <p class="sub">ベース処方に当社が加える原料です。「水で100%に調整」を押すと、ベース処方の水の量を自動で合わせます。</p>
         <div class="tbl-wrap"><table class="edit" id="t-add"></table></div>
         <div class="row" style="margin-top:8px">
@@ -404,7 +427,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <div class="head"><h2>完成処方</h2><span id="fin-total"></span></div>
+        <div class="head"><h2><i class="flag jp" role="img" aria-label="日本"></i>完成処方</h2><span id="fin-total"></span></div>
         <div class="tbl-wrap"><table class="view" id="t-final"></table></div>
         <h3>全成分表示（自動作成・配合量の多い順）</h3>
         <div class="fulllist" id="fulllist"></div>
@@ -413,14 +436,15 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
 
       <div class="card">
-        <h2>商品計画</h2>
+        <h2><i class="flag jp" role="img" aria-label="日本"></i>商品計画</h2>
         <p class="sub">企画書の「価格・販売チャネル・収益」の根拠になります。わかる範囲で記入してください。</p>
+        <div class="targets" id="fin-targets"></div>
         <div class="grid2">
           <div class="field"><label for="p-name">商品名</label><input id="p-name" data-doc="final" data-path="plan.productName"></div>
           <div class="field"><label for="p-brand">ブランド名</label><input id="p-brand" data-doc="final" data-path="plan.brand"></div>
           <div class="field"><label for="p-target">ターゲット顧客</label><input id="p-target" data-doc="final" data-path="plan.target"></div>
           <div class="field"><label for="p-price">販売価格（税込）</label><input id="p-price" data-doc="final" data-path="plan.price"></div>
-          <div class="field"><label for="p-cost">製造原価（1本）</label><input id="p-cost" data-doc="final" data-path="plan.cost"></div>
+          <div class="field"><label for="p-cost">完成品コスト（1本・確定値）</label><input id="p-cost" data-doc="final" data-path="plan.cost"></div>
           <div class="field"><label for="p-channel">販売チャネル</label><input id="p-channel" data-doc="final" data-path="plan.channel"></div>
           <div class="field"><label for="p-launch">発売時期</label><input id="p-launch" data-doc="final" data-path="plan.launch"></div>
           <div class="field"><label for="p-goal">初年度の販売目標</label><input id="p-goal" data-doc="final" data-path="plan.goal"></div>
@@ -432,15 +456,16 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   <!-- ================= STEP 4 企画書 ================= -->
   <section id="view-plan" role="tabpanel" hidden>
+    <div class="who jp"><i class="flag jp" role="img" aria-label="日本"></i>日本側が操作する画面</div>
     <div class="stack">
       <div class="cols">
         <div class="card">
-          <h2>出来上がり前のチェック</h2>
+          <h2><i class="flag jp" role="img" aria-label="日本"></i>出来上がり前のチェック</h2>
           <p class="sub">不足があっても作成できますが、その部分は企画書に【要確認】と表示されます。</p>
           <ul class="checklist" id="checklist"></ul>
         </div>
         <div class="card">
-          <h2>企画書を作る</h2>
+          <h2><i class="flag jp" role="img" aria-label="日本"></i>企画書を作る</h2>
           <p class="sub">市場動向・競合情報は、出典を確認した調査データだけを使います。数字は作りません。完成処方の配合%は社外秘として企画書には載せません。</p>
           <div class="row">
             <button class="btn big" id="go-plan">出来上がり（企画書を作成）</button>
@@ -481,13 +506,13 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
       </div>
       <div class="panes">
         <div class="pane id">
-          <div class="pane-head"><span class="lang"><span class="code">ID</span>Bahasa Indonesia</span><span class="role" id="role-id">翻訳結果</span></div>
+          <div class="pane-head"><span class="lang"><i class="flag id" role="img" aria-label="Indonesia"></i>Bahasa Indonesia</span><span class="role" id="role-id">翻訳結果</span></div>
           <textarea id="txt-id" readonly aria-label="インドネシア語">Terima kasih atas waktu Anda hari ini. Kami akan mengirimkan daftar komposisi dan sampel fisik produk acuan (benchmark) dari Jepang. Mohon kembangkan formula dengan sensasi pemakaian yang setara, namun dengan biaya yang lebih efisien.</textarea>
           <div class="back" id="back-wrap"><b>逆翻訳（意味の確認用）</b><span id="back-txt">本日はお時間をいただきありがとうございました。日本からベンチマーク品の成分表と現物サンプルをお送りします。同等の使用感で、よりコストを抑えた処方を開発してください。</span></div>
           <div class="pane-foot"><span class="hint" id="id-hint"><span class="tag-ex">例</span> 入力例の翻訳です</span><button class="btn ghost" data-copy="txt-id">コピー</button></div>
         </div>
         <div class="pane ja">
-          <div class="pane-head"><span class="lang"><span class="code">JA</span>日本語</span><span class="role" id="role-ja">ここに入力</span></div>
+          <div class="pane-head"><span class="lang"><i class="flag jp" role="img" aria-label="日本"></i>日本語</span><span class="role" id="role-ja">ここに入力</span></div>
           <textarea id="txt-ja" aria-label="日本語">本日はありがとうございました。当社が希望するベンチマーク品の成分表と現物サンプルを日本から送ります。同等の使用感で、価格を抑えた処方の開発をお願いします。</textarea>
           <div class="pane-foot"><span class="hint">Ctrl / ⌘ + Enter でも翻訳できます</span>
             <div class="row"><button class="btn ghost" id="clear-text">クリア</button><button class="btn" id="go-text">翻訳する</button></div></div>
@@ -603,7 +628,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
 
   const blankProject = () => ({
     name: "新規案件", status: "draft", createdAt: Date.now(), updatedAt: Date.now(),
-    request: { cat: "", vol: "", bench: "", feel: "", claim: "", avoid: "", cost: "", date: "", note: "", markets: ["jp"] },
+    request: { cat: "", vol: "", bench: "", feel: "", claim: "", avoid: "", costRaw: "", costFin: "", price: "", date: "", note: "", markets: ["jp"] },
     brief: { en: "", id: "", ja: "" },
   });
   const blankSupplier = () => ({ product: {}, formula: [], materials: [], tests: [], files: [] });
@@ -762,7 +787,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
   document.querySelectorAll("[data-bout]").forEach((x) => x.addEventListener("click", () => { bout = x.dataset.bout; renderBrief(); }));
   $("copy-brief").addEventListener("click", (e) => copy((S.docs.project.brief || {})[bout] || "", e.currentTarget));
 
-  const REQ_LABELS = [["cat", "製品カテゴリ"], ["vol", "容量"], ["bench", "ベンチマーク品"], ["feel", "目標とする使用感"], ["claim", "訴求成分・効果"], ["avoid", "使いたくない成分"], ["cost", "目標原価"], ["date", "試作サンプル希望日"], ["note", "その他"]];
+  const REQ_LABELS = [["cat", "製品カテゴリ"], ["vol", "容量"], ["bench", "ベンチマーク品"], ["feel", "目標とする使用感"], ["claim", "訴求成分・効果"], ["avoid", "使いたくない成分"], ["costRaw", "希望原料費（1本あたり）"], ["costFin", "希望完成品コスト（1本あたり・原料＋容器＋充填/製造）"], ["price", "想定販売価格（税込）"], ["date", "試作サンプル希望日"], ["note", "その他"]];
   const MK = { jp: "日本国内", id: "インドネシア", asia: "その他アジア" };
   function requestText() {
     const r = S.docs.project.request || {};
@@ -776,7 +801,7 @@ footer{margin-top:28px;font-size:12px;color:var(--ink-3);line-height:1.7;max-wid
     const r = await sample.json(`あなたは日本の化粧品メーカーの開発担当者です。インドネシアの化粧品原料メーカーの処方開発担当者に送る「処方開発依頼書」を作ります。
 下の日本語メモをもとに、見出し付きの簡潔な依頼書を作成してください。
 - 内容を創作しない。メモにない数値や条件は書かない。記入のない項目は省く。
-- 金額は円なら「JPY」表記。日付は誤解のない形で。
+- 金額は円なら「JPY」表記。希望原料費（中身の原料代）と希望完成品コスト（原料＋容器＋充填・製造）は別物として明確に書き分け、原料メーカーには原料費の見積もりを依頼する。日付は誤解のない形で。
 - 相手は処方技術者なので、使用感は技術用語（粘度感、伸び、仕上がり等）で明確に。
 - 最後に「開発後に提出してほしいもの」として次を必ず列挙: 製品の特徴、処方（% w/w・INCI名・インドネシアの原料表示名称）、主要原料の特徴とメーカーデータ・グラフ、規格書・SDS・COA、営業資料、第三者機関の試験データ。すべて英語で。
 - 出力は3言語: en=英語, id=インドネシア語（丁寧なビジネス文）, ja=日本語（内容確認用の訳）。
@@ -1155,14 +1180,25 @@ ${JSON.stringify(input)}`, { signal, modelTier: "complex" });
   function renderDoc(doc) {
     fillForms(doc);
     if (doc === "project") {
+      const rq = S.docs.project.request || {};
+      if (rq.cost && !rq.costRaw) rq.costRaw = rq.cost; // older projects had one cost field
+      $("tg-raw").textContent = rq.costRaw || "—"; $("tg-fin").textContent = rq.costFin || "—"; $("tg-price").textContent = rq.price || "—";
+      if (!$("r-costRaw").matches(":focus")) $("r-costRaw").value = rq.costRaw || "";
+      renderFinTargets();
       const mk = S.docs.project.request?.markets || [];
       $("r-markets").querySelectorAll("input").forEach((i) => (i.checked = mk.includes(i.value)));
       renderBrief(); renderDevBrief(); renderStatus(); renderProjectLabel();
     }
-    if (doc === "supplier") { ["formula", "materials", "tests"].forEach(renderTable); renderFiles(); renderFinal(); }
+    if (doc === "supplier") { renderFinTargets(); ["formula", "materials", "tests"].forEach(renderTable); renderFiles(); renderFinal(); }
     if (doc === "final") { renderTable("additions"); renderFinal(); $("sup-ja").textContent = S.docs.final.supJa || "「日本語に翻訳」を押すと、インドネシア側の英語の入力内容を日本語で表示します。"; }
     if (doc === "plans") renderPlan();
     if (!$("view-plan").hidden) renderChecklist();
+  }
+  function renderFinTargets() {
+    const rq = S.docs.project.request || {}, q = S.docs.supplier.product?.cost;
+    $("fin-targets").innerHTML = `<div><span>依頼時の希望 原料費</span><b>${esc(rq.costRaw || "—")}</b></div>
+      <div><span>依頼時の希望 完成品コスト</span><b>${esc(rq.costFin || "—")}</b></div>
+      <div><span>${'<i class="flag id" role="img" aria-label="Indonesia"></i>'} 原料見積（インドネシア側）</span><b>${esc(q || "—")}</b></div>`;
   }
   const renderAll = () => ["project", "supplier", "final", "plans"].forEach(renderDoc);
   renderAll();
