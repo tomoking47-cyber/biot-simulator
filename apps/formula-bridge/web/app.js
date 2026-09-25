@@ -634,13 +634,19 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   }
 
   /* ================= ADMIN (Japan) ================= */
-  async function loadCompanies() { const { data } = await sb.from("companies").select("*").order("created_at"); S.companies = data || []; return S.companies; }
+  async function loadCompanies() {
+    const [{ data }, { data: people }] = await Promise.all([sb.from("companies").select("*").order("created_at"), sb.from("profiles").select("full_name, email, company_id, role")]);
+    S.companies = data || []; S.people = (people || []).filter((x) => x.company_id && x.role !== "admin"); return S.companies;
+  }
   // Full company details, so the right manufacturer is chosen.
   function coCard(c, a) {
+    // Company, contact person and login users are always shown (「未登録」 when empty) so the right maker is chosen.
+    const must = (label, v) => `<div><span class="k">${label}</span>${v ? esc(v) : '<span class="unset">未登録</span>'}</div>`;
     const line = (label, v) => (v ? `<div><span class="k">${label}</span>${esc(v)}</div>` : "");
-    return `<div class="co-card"><div class="co-head">${FLAG_ID}<b>${esc(c.name)}</b>${a ? chip(a.status) : ""}</div>
-      <div class="co-grid">${line("担当者", c.contact_name)}${line("メール", c.contact_email)}${line("電話", c.phone)}${line("WhatsApp", c.whatsapp)}
-        ${line("所在地", c.address)}${line("取扱原料", c.materials)}${line("NIB", c.nib)}${line("ハラール", c.halal)}${line("ホームページ", c.website)}</div></div>`;
+    const users = (S.people || []).filter((x) => x.company_id === c.id).map((x) => x.full_name ? `${x.full_name}（${x.email}）` : x.email).join("、");
+    return `<div class="co-card"><div class="co-head">${FLAG_ID}<span class="co-lbl">会社名</span></div><div class="co-name">${esc(c.name)}</div>${a ? `<div class="co-st">${chip(a.status)}</div>` : ""}
+      <div class="co-grid">${must("担当者名", c.contact_name)}${must("ログイン者", users)}${must("メール", c.contact_email)}${must("電話", c.phone || c.whatsapp)}
+        ${line("所在地", c.address)}${line("取扱原料", c.materials)}${line("NIB", c.nib)}${line("ハラール", c.halal)}</div></div>`;
   }
   const needsFeedback = (a) => (a.status === "submitted" || a.shipped_at) && !a.feedback_at;
   const coName = (id) => S.companies.find((c) => c.id === id)?.name || "(company)";
@@ -819,7 +825,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         <div class="brief-out" id="brief"></div>
         <div class="row" style="margin-top:10px"><button class="btn" id="go-brief">依頼書を作成（英語・インドネシア語）</button><button class="btn ghost" id="copy-brief">コピー</button></div><div class="status" id="st-brief"></div></div>
       <div class="card"><h2>${FLAG_JP}依頼先を選んで送る</h2><p class="sub">選んだ会社の登録メールアドレスに、入力用リンクが自動で送られます。</p>
-        <div class="pick" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label class="co-pick"><input type="checkbox" value="${c.id}" ${a && a.status !== "draft" ? "checked" : ""}>${coCard(c, a)}</label>`; }).join("") || '<div class="muted">登録企業がありません。「登録企業」の画面から仕入先を登録してください。</div>'}</div>
+        <div class="pick co-tiles" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label class="co-pick"><input type="checkbox" value="${c.id}" ${a && a.status !== "draft" ? "checked" : ""}><span class="co-tick" aria-hidden="true">選択</span>${coCard(c, a)}</label>`; }).join("") || '<div class="muted">登録企業がありません。「登録企業」の画面から仕入先を登録してください。</div>'}</div>
         <div class="row" style="margin-top:10px"><button class="btn saff big" id="send">依頼先を確認する</button></div><div class="status" id="st-send"></div><div id="send-confirm"></div></div>
     </div></div>`;
     const save = saver(async () => { const { error } = await sb.from("projects").update({ name: p.name, request: r, brief }).eq("id", p.id); if (error) throw error; }, $("saved"));
