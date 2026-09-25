@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ error: "not_configured", message: "ANTHROPIC_API_KEY is not set" }, 503);
 
-  let body: { prompt?: string; effort?: string; image?: { media_type?: string; data?: string } };
+  let body: { prompt?: string; effort?: string; image?: { media_type?: string; data?: string }; document?: { media_type?: string; data?: string } };
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
   const prompt = String(body.prompt ?? "");
   if (!prompt || prompt.length > 200_000) return json({ error: "bad_request", message: "prompt missing or too long" }, 400);
@@ -42,6 +42,10 @@ Deno.serve(async (req) => {
   const content: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (body.image?.data && IMAGE_TYPES.has(String(body.image.media_type))) {
     content.push({ type: "image", source: { type: "base64", media_type: body.image.media_type as "image/png", data: body.image.data } });
+  }
+  if (body.document?.data && body.document.media_type === "application/pdf") {
+    if (body.document.data.length > 14_000_000) return json({ error: "bad_request", message: "PDF too large" }, 400);
+    content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: body.document.data } } as any);
   }
   content.push({ type: "text", text: prompt });
 

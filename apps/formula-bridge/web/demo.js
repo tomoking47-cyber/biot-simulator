@@ -142,7 +142,14 @@
       updateUser: async () => ({ error: { message: "demo" } }),
     },
     functions: {
-      invoke: async (name) => name === "notify" || name === "invite"
+      invoke: async (name, opts) => /Extract the cosmetic formula/.test(opts?.body?.prompt || "")
+        ? { data: { text: JSON.stringify({ unit: "g", notes: "(Demo) Sample result — the real file is not read in the demo.", items: [
+            { phase: "A", trade: "", idName: "Air", inci: "Water", maker: "", amt: "800", fn: "Solvent" },
+            { phase: "A", trade: "Glycerin 99.5%", idName: "Gliserin", inci: "Glycerin", maker: "Demo Chem", amt: "50", fn: "Humectant" },
+            { phase: "A", trade: "", idName: "Butilen glikol", inci: "Butylene Glycol", maker: "Demo Chem", amt: "60", fn: "Humectant" },
+            { phase: "B", trade: "", idName: "Niasinamida", inci: "Niacinamide", maker: "Demo Chem", amt: "30", fn: "Skin conditioning" },
+            { phase: "C", trade: "", idName: "Fenoksietanol", inci: "Phenoxyethanol", maker: "Demo Chem", amt: "5", fn: "Preservative" }] }) }, error: null }
+        : name === "notify" || name === "invite"
         ? { data: { sent: false, reason: "demo" }, error: null }
         : { data: null, error: { context: { json: async () => ({ error: "demo" }) } } },
     },
