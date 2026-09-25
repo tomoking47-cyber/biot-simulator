@@ -74,7 +74,8 @@ async function openai(prompt: string, effort: string) {
   // Models without reasoning settings reject reasoning_effort: retry once without it.
   if (r.status === 400) { const t = await r.text(); if (/reasoning/i.test(t)) r = await call(false); else return json({ error: "bad_request", message: t.slice(0, 500) }, 400); }
   if (r.status === 401) return json({ error: "not_configured", message: "invalid OpenAI API key" }, 503);
-  if (r.status === 429) return json({ error: "rate_limited" }, 429);
+  // 429 is either a real rate limit or "insufficient_quota" (no credit on the OpenAI account).
+  if (r.status === 429) { const t = await r.text(); return json(/insufficient_quota/.test(t) ? { error: "no_credit", message: "OpenAI account has no credit (Billing)" } : { error: "rate_limited", message: t.slice(0, 300) }, 429); }
   if (!r.ok) return json({ error: "upstream", message: (await r.text()).slice(0, 500) }, 502);
   const j = await r.json();
   const text = String(j.choices?.[0]?.message?.content ?? "");
@@ -85,7 +86,7 @@ async function openai(prompt: string, effort: string) {
 async function gemini(prompt: string, search: boolean) {
   const key = Deno.env.get("GEMINI_API_KEY");
   if (!key) return json({ error: "not_configured", message: "GEMINI_API_KEY is not set" }, 503);
-  const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-pro";
+  const model = Deno.env.get("GEMINI_MODEL") || "gemini-3.1-pro-preview";
   const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
     headers: { "x-goog-api-key": key, "Content-Type": "application/json" },
@@ -93,7 +94,7 @@ async function gemini(prompt: string, search: boolean) {
   });
   if (r.status === 400 || r.status === 404) return json({ error: "bad_request", message: (await r.text()).slice(0, 500) }, 400);
   if (r.status === 401 || r.status === 403) return json({ error: "not_configured", message: "invalid Gemini API key" }, 503);
-  if (r.status === 429) return json({ error: "rate_limited" }, 429);
+  if (r.status === 429) { const t = await r.text(); return json(/RESOURCE_EXHAUSTED|quota|billing/i.test(t) && !/per minute/i.test(t) ? { error: "no_credit", message: t.slice(0, 300) } : { error: "rate_limited", message: t.slice(0, 300) }, 429); }
   if (!r.ok) return json({ error: "upstream", message: (await r.text()).slice(0, 500) }, 502);
   const j = await r.json();
   const cand = j.candidates?.[0];
@@ -133,7 +134,7 @@ Deno.serve(async (req) => {
   if (provider === "status") {
     if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
     const has = { claude: !!Deno.env.get("ANTHROPIC_API_KEY"), openai: !!Deno.env.get("OPENAI_API_KEY"), gemini: !!Deno.env.get("GEMINI_API_KEY") };
-    const models = { claude: "claude-opus-5", openai: Deno.env.get("OPENAI_MODEL") || "gpt-5", gemini: Deno.env.get("GEMINI_MODEL") || "gemini-2.5-pro" };
+    const models = { claude: "claude-opus-5", openai: Deno.env.get("OPENAI_MODEL") || "gpt-5", gemini: Deno.env.get("GEMINI_MODEL") || "gemini-3.1-pro-preview" };
     const out: Record<string, unknown> = {};
     const ping = "Reply with the single word OK.";
     const check = async (k: "claude" | "openai" | "gemini", fn: () => Promise<Response>) => {
