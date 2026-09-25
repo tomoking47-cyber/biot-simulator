@@ -21,7 +21,7 @@
   const LOGO = `<img src="logo.png" alt="BIOT" class="logo" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'logo-text',textContent:'BIOT'}))">`;
   document.querySelector(".topbar .brand").insertAdjacentHTML("afterbegin", LOGO);
 
-  /* Agreements shown at registration (NDA, BIOT's purchase declaration, ownership of adopted formulas). */
+  /* Agreements shown at registration (NDA, Artisans Production's purchase declaration, ownership of adopted formulas). */
   const DOC_ORDER = ["nda", "purchase", "ip"];
   async function loadTerms() {
     const { data } = await sb.from("terms").select("*").eq("current", true);
@@ -153,6 +153,7 @@
     $("topbar").hidden = true;
     app.innerHTML = `<div class="auth card en">
       <h1>${FLAG_ID} Supplier registration</h1>
+      <p class="lang-note">${FLAG_JP} Artisans Production Co., Ltd. (Japan)</p>
       <p class="lang-note">Pendaftaran pemasok · 仕入先の企業登録. After registering, requests from Japan will appear on your page and be emailed to you.</p>
       <form id="f-reg">
         ${REG_FIELDS.map(([k, l, req, type]) => `<div class="field"><label for="g-${k}">${esc(l)}${req ? " *" : ""}</label>${k === "company.materials" || k === "company.address"
@@ -666,7 +667,7 @@ ${body}`, { effort: "medium" });
       $("fb-send").onclick = (e) => busy(e.currentTarget, $("st-fb"), "翻訳して送っています…", async () => {
         const ja = $("fb-ja").value.trim(), dec = FB_DECISIONS.find(([x]) => x === $("fb-dec").value);
         if (!ja) throw { userMsg: "コメントを入力してください。" };
-        const r = await ai(`次は日本の化粧品メーカー（BIOT）から、インドネシアの原料メーカーの開発担当者へのサンプル評価フィードバックです。丁寧で具体的なビジネス文として、英語(en)とインドネシア語(id)に正確に翻訳してください。意味を足さず、数値・成分名はそのまま残すこと。
+        const r = await ai(`次は日本の化粧品メーカー（株式会社Artisans Production）から、インドネシアの原料メーカーの開発担当者へのサンプル評価フィードバックです。丁寧で具体的なビジネス文として、英語(en)とインドネシア語(id)に正確に翻訳してください。意味を足さず、数値・成分名はそのまま残すこと。
 ${GLOSSARY}
 JSONのみで返答: {"en": string, "id": string}
 
@@ -694,7 +695,7 @@ ${ja}`, { effort: "low" });
     draw();
   }
 
-  const FB_DECISIONS = [["採用候補", "Candidate for adoption"], ["再試作を依頼", "Please revise and send a new sample"], ["不採用", "Not adopted this time"], ["採用（本処方はBIOTに帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to BIOT"]];
+  const FB_DECISIONS = [["採用候補", "Candidate for adoption"], ["再試作を依頼", "Please revise and send a new sample"], ["不採用", "Not adopted this time"], ["採用（本処方は当社に帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to Artisans Production Co., Ltd."]];
   function isWater(r) { return /^(water|aqua)\b/i.test(String(r.inci || "").trim()) || /^(水|精製水)$/.test(String(r.ja || "").trim()) || /^air$/i.test(String(r.idName || "").trim()); }
   function finalRows(fin) {
     const base = (fin.base_formula || []).map((r) => ({ src: "base", ja: r.ja || "", jaNote: r.jaNote || "", inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));

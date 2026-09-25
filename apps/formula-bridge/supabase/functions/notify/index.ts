@@ -37,7 +37,7 @@ Deno.serve(async (req) => {
   const { data: settings } = await service.from("settings").select("key, value");
   const conf = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
   const appUrl = String(conf.app_url || Deno.env.get("APP_URL") || "").replace(/\/$/, "");
-  const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Formula Bridge <onboarding@resend.dev>");
+  const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Artisans Production Formula Bridge <onboarding@resend.dev>");
 
   let to: string[] = [], subject = "", html = "";
   if (body.event === "request") {
@@ -48,7 +48,7 @@ Deno.serve(async (req) => {
     const brief = String((a.request_snapshot as any)?.brief?.en ?? "");
     subject = `[Formula Bridge] New development request from Japan: ${pj?.name ?? ""}`;
     html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p>
-      <p>You have received a new formula development request from Japan.<br>Anda menerima permintaan pengembangan formula baru dari Jepang.</p>
+      <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Jepang.</p>
       <p><a href="${esc(link)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open the request / Buka permintaan</a></p>
       <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(brief.slice(0, 4000))}</pre>
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
     to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
     const fb = a.feedback as Record<string, string>;
     subject = `[Formula Bridge] Feedback from Japan: ${pj?.name ?? ""}`;
-    html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p><p>Japan has sent feedback on your sample. / Jepang telah mengirim umpan balik atas sampel Anda.</p>
+    html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p><p>Artisans Production Co., Ltd. (Japan) has sent feedback on your sample. / Jepang telah mengirim umpan balik atas sampel Anda.</p>
       <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id || "")}</pre>
