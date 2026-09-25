@@ -221,7 +221,8 @@
     formula: [
       { k: "phase", l: "Phase", w: 60 }, { k: "trade", l: "Trade name", w: 150 }, { k: "idName", l: "Nama bahan (Indonesian label name)", w: 190 },
       { k: "inci", l: "INCI name", w: 190 }, { k: "maker", l: "Supplier / maker", w: 130 }, { k: "pct", l: "% w/w", w: 80, num: true },
-      { k: "fn", l: "Function", w: 120 }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 } ],
+      { k: "fn", l: "Function", w: 120 }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 },
+      { k: "jaNote", l: "確認事項（AI）", jn: true, ro: true, w: 280 } ],
     materials: [{ k: "material", l: "Raw material", w: 180 }, { k: "feature", l: "Key feature", w: 280 }, { k: "data", l: "Supporting data (supplier / literature)", w: 360 }],
     tests: [{ k: "lab", l: "Laboratory", w: 160 }, { k: "item", l: "Test item", w: 170 }, { k: "method", l: "Method / n", w: 170 }, { k: "result", l: "Result", w: 260 }, { k: "date", l: "Date", w: 100 }],
     additions: [{ k: "ja", l: "日本語表示名称", w: 200 }, { k: "inci", l: "INCI", w: 200 }, { k: "pct", l: "配合量 %", w: 90, num: true }, { k: "purpose", l: "配合目的", w: 160 }, { k: "note", l: "備考（仕入先など）", w: 200 }],
@@ -234,7 +235,7 @@
       const tot = rows.reduce((a, r) => a + num(r[tk]), 0), pi = cols.findIndex((c) => c.k === tk);
       el.innerHTML = `<thead><tr><th>No.</th>${cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}${readOnly ? "" : "<th></th>"}</tr></thead>
         <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || c.ro || readOnly
-          ? `<td class="${c.ja ? "ja" : c.num ? "num" : ""}" style="padding:8px">${esc(r[c.k] ?? "")}${c.ja && r.jaNote ? `<span class="nt">${esc(r.jaNote)}</span>` : ""}</td>`
+          ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${esc(r[c.k] ?? "")}</td>`
           : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>
         ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
@@ -943,7 +944,7 @@ ${ja}`, { effort: "low" });
     const render = () => {
       const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0);
       $("tot").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
-      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換: ${esc(r.label)}）</span>`}${r.jaNote ? `<div class="hint" style="color:var(--warn)">${esc(r.jaNote)}</div>` : ""}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
+      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換: ${esc(r.label)}）</span>`}</td><td class="jnote">${esc(r.jaNote)}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
       const list = fullList(rows); $("full").textContent = list.length ? list.map((x) => x.n + (x.mix ? "※" : "")).join("、") : "—";
     };
     const tA = editTable($("t-add"), COLS.additions, fin.additions, () => { save.soon(); render(); });
