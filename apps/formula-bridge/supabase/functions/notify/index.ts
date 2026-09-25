@@ -1,6 +1,8 @@
 // Formula Bridge — email notifications.
 //   event "request": Japan (admin) sent a request → email the supplier company its private link.
 //   event "submit":  a supplier submitted → email Japan's development address.
+//   event "shipped": a supplier shipped the sample → email Japan's development address with the tracking number.
+//   event "feedback": Japan sent feedback → email the supplier company.
 // Sends through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -28,7 +30,7 @@ Deno.serve(async (req) => {
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
 
   const { data: me } = await service.from("profiles").select("role, company_id, full_name, email").eq("id", who.user.id).single();
-  const { data: a } = await service.from("assignments").select("id, status, company_id, project_id, request_snapshot").eq("id", body.assignment_id ?? "").single();
+  const { data: a } = await service.from("assignments").select("id, status, company_id, project_id, request_snapshot, shipment, shipped_at, feedback").eq("id", body.assignment_id ?? "").single();
   if (!me || !a) return json({ error: "not_found" }, 404);
   const { data: co } = await service.from("companies").select("name, contact_name, contact_email").eq("id", a.company_id).single();
   const { data: pj } = await service.from("projects").select("name").eq("id", a.project_id).single();
@@ -59,6 +61,30 @@ Deno.serve(async (req) => {
     subject = `[処方ブリッジ] ${co?.name ?? ""} から開発内容の提出がありました：${pj?.name ?? ""}`;
     html = `<p>インドネシアの ${esc(co?.name)}（担当：${esc(me.full_name || me.email)}）から、案件「${esc(pj?.name)}」の開発内容が提出されました。</p>
       <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
+  } else if (body.event === "shipped") {
+    if (me.role !== "admin" && me.company_id !== a.company_id) return json({ error: "forbidden" }, 403);
+    if (!a.shipped_at) return json({ error: "not_shipped" }, 409);
+    const dev = String(conf.dev_email || Deno.env.get("DEV_EMAIL") || "");
+    if (!dev) return json({ sent: false, reason: "no_dev_email" });
+    to = dev.split(/[,\s]+/).filter(Boolean);
+    const sh = (a.shipment ?? {}) as Record<string, string>;
+    subject = `[処方ブリッジ] サンプル発送完了：${co?.name ?? ""}／${pj?.name ?? ""}（追跡番号 ${sh.tracking ?? ""}）`;
+    const row = (k: string, v: unknown) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${k}</td><td style="padding:4px 0"><b>${esc(v || "—")}</b></td></tr>`;
+    html = `<p>インドネシアの ${esc(co?.name)} から、案件「${esc(pj?.name)}」のサンプル発送完了の連絡がありました。</p>
+      <table style="border-collapse:collapse;font-family:Arial,sans-serif">${row("運送会社", sh.carrier)}${row("追跡番号（トラッキング番号）", sh.tracking)}${row("発送日", sh.date)}${row("サンプル数量", sh.qty)}${row("備考", sh.note)}${row("連絡者", me.full_name || me.email)}</table>
+      <p>サンプル到着後は、処方ブリッジの STEP 2 から必ずフィードバックを送ってください。</p>
+      <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}/dev" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
+  } else if (body.event === "feedback") {
+    if (me.role !== "admin" || !a.feedback || !(a.feedback as any).en) return json({ error: "forbidden" }, 403);
+    const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
+    to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
+    const fb = a.feedback as Record<string, string>;
+    subject = `[Formula Bridge] Feedback from Japan: ${pj?.name ?? ""}`;
+    html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p><p>Japan has sent feedback on your sample. / Jepang telah mengirim umpan balik atas sampel Anda.</p>
+      <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}</p>
+      <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
+      <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id || "")}</pre>
+      <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open in Formula Bridge</a></p>`;
   } else {
     return json({ error: "bad_request" }, 400);
   }
