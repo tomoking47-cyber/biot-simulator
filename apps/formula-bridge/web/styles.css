@@ -406,3 +406,8 @@ td.miss{background:#FFF6D6}
 .mirror .field label{font-size:13px;font-weight:700;color:var(--ink)}
 table.edit.mirror tbody td:not(.no):not(.ja):not(.jnote){padding:4px 6px!important}
 table.edit.mirror tbody td:not(.no):not(.ja):not(.jnote)>.cellbox{display:block;border:1.5px solid #B8C6D3;border-radius:6px;padding:7px 8px;min-height:36px;background:var(--paper)}
+a.kpi-link{text-decoration:none;color:inherit;cursor:pointer;transition:border-color .15s,box-shadow .15s}
+a.kpi-link:hover,a.kpi-link:focus-visible{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.kpi-go{margin-left:auto;font-size:12px;font-weight:500;color:var(--accent);white-space:nowrap}
+.co-detail .co-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+@media (max-width:560px){.co-detail .co-grid{grid-template-columns:1fr}}
