@@ -38,6 +38,10 @@ Supabase（データベース・会員管理）と、公開用のサイトで動
 ### 3. AI の鍵（APIキー）を登録する
 1. https://console.anthropic.com →「API Keys」→「Create Key」で鍵を作ります（`sk-ant-…` で始まる文字列）。
 2. Supabase の左メニュー「Edge Functions」→「Secrets」で、名前 `ANTHROPIC_API_KEY`、値に鍵を入れて保存します。
+3. 企画書（STEP 4）は Gemini（市場調査）と GPT（査読）も使います。同じ「Secrets」に次を登録します（無いときはその工程を省略して作成します）。
+   - `GEMINI_API_KEY`：Google AI Studio の鍵。**課金を有効にしたプロジェクトの鍵を使うこと**（無料枠は送信内容が学習に使われる場合があるため、機密資料には使わない）。
+   - `OPENAI_API_KEY`：OpenAI の鍵（`sk-…`）。
+   - 任意：`GEMINI_MODEL`（既定 `gemini-2.5-pro`）、`OPENAI_MODEL`（既定 `gpt-5`）。新しいモデルに変えるときは、ここにモデル名を入れるだけで切り替わります。
 
 ### 4. メール送信の設定（Resend）※送信元アドレスが決まってから
 1. https://resend.com に登録し、「Domains」で会社のドメインを追加します。
