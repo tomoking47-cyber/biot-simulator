@@ -204,8 +204,8 @@
       $("st-reset").textContent = error ? "Could not send: " + error.message : "If the address is registered, a reset link has been sent. / 登録済みなら再設定メールを送りました。";
     };
   }
-  function viewUpdatePassword() {
-    $("topbar").hidden = true;
+  function viewUpdatePassword(inApp) {
+    $("topbar").hidden = !inApp;
     app.innerHTML = `<div class="auth card"><h1>New password / 新しいパスワード</h1>
       <form id="f-up"><div class="field"><label for="u-pass">New password (min. 8)</label><input id="u-pass" type="password" minlength="8" required autocomplete="new-password"></div>
       <button class="btn" type="submit">Save</button><div class="status" id="st-up"></div></form></div>`;
@@ -960,7 +960,8 @@ ${src}`, { effort: "low" });
     $("me-name").textContent = (S.profile.full_name || S.profile.email || "") + (S.company ? ` — ${S.company.name}` : "");
     const parts = h.slice(2).split("/");
     if (S.isAdmin) {
-      nav([["#/", "マスター画面"], ["#/companies", "登録企業"], ["#/translate", "翻訳ツール"], ["#/settings", "設定"]]);
+      nav([["#/", "マスター画面"], ["#/companies", "登録企業"], ["#/translate", "翻訳ツール"], ["#/settings", "設定"], ["#/password", "パスワード変更"]]);
+      if (parts[0] === "password") return viewUpdatePassword(true);
       if (parts[0] === "p" && parts[1]) return adminProject(parts[1], parts[2]);
       if (parts[0] === "companies") return adminCompanies();
       if (parts[0] === "settings") return adminSettings();
@@ -968,7 +969,8 @@ ${src}`, { effort: "low" });
       return adminHome();
     }
     if (!(await agreementsOk())) return viewAgreementGate();
-    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahan"]]);
+    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahan"], ["#/password", "Password"]]);
+    if (parts[0] === "password") return viewUpdatePassword(true);
     if (parts[0] === "a" && parts[1]) return supplierAssignment(parts[1]);
     if (parts[0] === "company") return supplierCompany();
     if (parts[0] === "translate") return viewTranslate();
