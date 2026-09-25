@@ -86,7 +86,7 @@
 防腐剤=preservative / pengawet, 増粘剤=thickener / pengental, 保湿剤=humectant / humektan, 乳化剤=emulsifier / pengemulsi,
 安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期=lead time,
 化粧品基準=Japanese Standards for Cosmetics, 医薬部外品=quasi-drug, ハラール=halal, BPOM.`;
-  const AI_ERR = { demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。", not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。", rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。", refused: "この内容は処理できませんでした。表現を変えてお試しください。", unauthorized: "ログインし直してください。" };
+  const AI_ERR = { demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。", not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。", rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。", no_credit: "AIの利用残高（クレジット）が不足しています。各社の管理画面の Billing をご確認ください。", refused: "この内容は処理できませんでした。表現を変えてお試しください。", unauthorized: "ログインし直してください。" };
   function parseJSON(text) {
     const t = String(text).trim();
     try { return JSON.parse(t); } catch {}
@@ -911,7 +911,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const L = { claude: "Claude（Anthropic）", openai: "GPT（OpenAI）", gemini: "Gemini（Google）" }, K = { claude: "ANTHROPIC_API_KEY", openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" };
       $("st-ai").className = "status";
       $("st-ai").innerHTML = `<table class="ai-st">${Object.keys(L).map((k) => { const x = r[k] || {};
-        return `<tr><td><b>${L[k]}</b></td><td>${!x.key ? `<span class="chip draft">鍵が未登録</span> <span class="muted">Secrets に <code>${K[k]}</code> を登録してください</span>` : x.ok ? `<span class="chip done">接続OK ✓</span> <span class="muted">${esc(x.model)}</span>` : `<span class="chip" style="border-color:var(--warn);color:var(--warn)">鍵はあるが接続できない</span> <span class="muted">${esc(x.error || "")} ${esc(x.message || "")}</span>`}</td></tr>`; }).join("")}</table>`;
+        return `<tr><td><b>${L[k]}</b></td><td>${!x.key ? `<span class="chip draft">鍵が未登録</span> <span class="muted">Secrets に <code>${K[k]}</code> を登録してください</span>` : x.ok ? `<span class="chip done">接続OK ✓</span> <span class="muted">${esc(x.model)}</span>` : `<span class="chip" style="border-color:var(--warn);color:var(--warn)">鍵はあるが接続できない</span> <span class="muted">${esc({ no_credit: "利用残高（クレジット）不足 — Billing で入金・支払い設定が必要", rate_limited: "混雑・利用上限（少し待って再確認）", not_configured: "鍵が正しくない（入れ直してください）", bad_request: "設定エラー" }[x.error] || x.error || "")}　${esc(x.message || "")}</span>`}</td></tr>`; }).join("")}</table>`;
     });
     $("mail-test").onclick = (e) => busy(e.currentTarget, $("st-set"), "テストメールを送っています…", async () => {
       const { data, error } = await sb.functions.invoke("notify", { body: { event: "test" } });
