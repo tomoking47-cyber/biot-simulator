@@ -23,6 +23,12 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const { data: who } = await service.auth.getUser(jwt);
   if (!who?.user) return json({ error: "unauthorized" }, 401);
+  // AI costs money: only Japan-side admins and suppliers that have actually received a request may use it.
+  const { data: me } = await service.from("profiles").select("role, company_id").eq("id", who.user.id).single();
+  if (me?.role !== "admin") {
+    const { count } = await service.from("assignments").select("id", { count: "exact", head: true }).eq("company_id", me?.company_id ?? "").neq("status", "draft");
+    if (!count) return json({ error: "forbidden", message: "AI is available after a request has been received." }, 403);
+  }
 
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!apiKey) return json({ error: "not_configured", message: "ANTHROPIC_API_KEY is not set" }, 503);
