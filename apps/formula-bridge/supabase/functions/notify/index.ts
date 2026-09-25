@@ -3,9 +3,30 @@
 //   event "submit":  a supplier submitted → email Japan's development address.
 //   event "shipped": a supplier shipped the sample → email Japan's development address with the tracking number.
 //   event "feedback": Japan sent feedback → email the supplier company.
-// Sends through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
+// Sends through the company's own mail server when SMTP_HOST is set (port 465, SSL),
+// otherwise through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+
+async function sendMail(from: string, to: string[], subject: string, html: string): Promise<{ ok: boolean; detail: string } | null> {
+  const host = Deno.env.get("SMTP_HOST");
+  if (host) {
+    const client = new SMTPClient({ connection: { hostname: host, port: Number(Deno.env.get("SMTP_PORT") || 465), tls: true,
+      auth: { username: Deno.env.get("SMTP_USER") ?? "", password: Deno.env.get("SMTP_PASS") ?? "" } } });
+    try { await client.send({ from, to, subject, html, content: "auto" }); return { ok: true, detail: "smtp" }; }
+    catch (e) { return { ok: false, detail: "smtp: " + String(e) }; }
+    finally { try { await client.close(); } catch { /* already closed */ } }
+  }
+  const key = Deno.env.get("RESEND_API_KEY");
+  if (!key) return null;
+  const r = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ from, to, subject, html }),
+  });
+  return { ok: r.ok, detail: (await r.text()).slice(0, 500) };
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -90,17 +111,13 @@ Deno.serve(async (req) => {
   }
   if (!to.length) return json({ sent: false, reason: "no_recipient" });
 
-  const key = Deno.env.get("RESEND_API_KEY");
-  if (!key) {
-    await service.from("mail_log").insert({ kind: body.event, to_email: to.join(","), subject, ok: false, detail: "RESEND_API_KEY not set" });
+  // With the company's own server the sender must be an address on that server (SMTP_FROM).
+  const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
+  const res = await sendMail(sender, to, subject, html);
+  if (!res) {
+    await service.from("mail_log").insert({ kind: body.event, to_email: to.join(","), subject, ok: false, detail: "mail server not configured" });
     return json({ sent: false, reason: "not_configured", to });
   }
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to, subject, html }),
-  });
-  const detail = await r.text();
-  await service.from("mail_log").insert({ kind: body.event, to_email: to.join(","), subject, ok: r.ok, detail: detail.slice(0, 500) });
-  return json(r.ok ? { sent: true, to } : { sent: false, reason: "send_failed", to });
+  await service.from("mail_log").insert({ kind: body.event, to_email: to.join(","), subject, ok: res.ok, detail: res.detail });
+  return json(res.ok ? { sent: true, to } : { sent: false, reason: "send_failed", to });
 });
