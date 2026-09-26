@@ -535,7 +535,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   /* ================= SUPPLIER (Indonesia) ================= */
   async function supplierHome() {
     const { data: rows, error } = await sb.from("assignments").select("id, status, request_snapshot, requested_at, submitted_at, shipped_at, feedback_at, updated_at").order("requested_at", { ascending: false });
-    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG). Jepang menggunakannya untuk membedakan pemasok. <a href="#/company">Company profile / Profil perusahaan →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these. / Hanya perusahaan Anda yang dapat melihatnya.</small></div>
+    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG or PNG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG atau PNG). Jepang menggunakannya untuk membedakan pemasok. <a href="#/company">Company profile / Profil perusahaan →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these. / Hanya perusahaan Anda yang dapat melihatnya.</small></div>
       <div class="card en"><h2>Requests / Permintaan</h2>
       ${error ? `<p class="status err">${esc(error.message)}</p>` : (rows || []).length ? `<div class="tbl-wrap"><table class="view master"><thead><tr><th>Project / Proyek</th><th>Received / Diterima</th><th>Status</th><th>Submitted / Diajukan</th><th>Sample shipped / Sampel dikirim</th><th>Feedback / Umpan balik</th><th></th></tr></thead><tbody>
       ${rows.map((a) => `<tr><td>${esc(a.request_snapshot?.name || "(project)")}</td><td>${d(a.requested_at)}</td><td>${chip(a.status, true)}</td><td>${d(a.submitted_at)}</td><td>${a.shipped_at ? '<span class="chip done">Shipped / Terkirim ✓</span>' : "—"}</td><td>${a.feedback_at ? '<span class="chip done">Received / Diterima ✓</span>' : "—"}</td><td><a href="#/a/${a.id}">Open / Buka →</a></td></tr>`).join("")}
@@ -1364,7 +1364,7 @@ ${body}`, { effort: "medium" });
       pv.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => { cur = sent.find((a) => a.id === b.dataset.a); draw(); }));
       pv.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openFile(sp.files[+b.dataset.open].path)));
       if ($("copy-trk")) $("copy-trk").onclick = (e) => copy(cur.shipment?.tracking || "", e.currentTarget);
-      $("fb-send").onclick = (e) => busy(e.currentTarget, $("st-fb"), "翻訳して送っています…", async () => {
+      $("fb-send").onclick = (e) => busy(e.currentTarget, $("st-fb"), "翻訳して送っています…", async () => { const a = cur;
         const ja = $("fb-ja").value.trim(), dec = FB_DECISIONS.find(([x]) => x === $("fb-dec").value);
         if (!ja) throw { userMsg: "コメントを入力してください。" };
         $("st-fb").textContent = "翻訳しています…（送る前に確認画面が出ます）";
@@ -1379,16 +1379,16 @@ ${ja}`, { effort: "medium" });
         $("st-fb").textContent = "翻訳を別のAIで確認しています…";
         const ck = await checkTranslation(ja, "ja", { en: String(r.en), id: String(r.id || "") }, `これはサンプル評価のコメントです（判定「${dec[0]}」は定型の訳で別に送るので、コメントの訳だけを確認すること）。`);
         r.en = ck.fixed.en; r.id = ck.fixed.id;
-        await ask({ title: `${coName(cur.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
+        await ask({ title: `${coName(a.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
           body: `<p class="sub">相手には英語とインドネシア語で届きます。訳文を確認してください。</p>${kvHtml([["判定", `${dec[0]}（${dec[1]}）`]])}
             ${checkHtml(ck)}<h3>日本語（原文）</h3><div class="brief-out ja">${esc(ja)}</div><h3>English</h3><div class="brief-out">${esc(r.en)}</div>${ck.back.en ? `<details><summary class="sub">英語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.en)}</div></details>` : ""}<h3>Bahasa Indonesia</h3><div class="brief-out">${esc(r.id || "")}</div>${ck.back.id ? `<details><summary class="sub">インドネシア語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.id)}</div></details>` : ""}` });
-        const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(cur.feedback?.history || []), ...(cur.feedback?.ja ? [{ at: cur.feedback_at, decision: cur.feedback.decision, ja: cur.feedback.ja }] : [])] };
-        const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", cur.id).select("*").single();
+        const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(a.feedback?.history || []), ...(a.feedback?.ja ? [{ at: a.feedback_at, decision: a.feedback.decision, ja: a.feedback.ja }] : [])] };
+        const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", a.id).select("*").single();
         if (error) throw error;
-        Object.assign(cur, up);
-        const { data: n } = await sb.functions.invoke("notify", { body: { event: "feedback", assignment_id: cur.id } });
-        draw(); $("st-fb").textContent = "✓ 完了：フィードバックを送りました" + (n?.sent ? "（メール送信済み）" : n?.reason === "not_configured" ? "（メール未設定のため画面のみ）" : "（メールは未送信・画面には反映済み）");
-        toast("完了：フィードバックを送りました", `${coName(cur.company_id)} に英語・インドネシア語で届きます。`);
+        Object.assign(a, up);
+        const { data: n } = await sb.functions.invoke("notify", { body: { event: "feedback", assignment_id: a.id } });
+        if (cur === a) { draw(); $("st-fb").textContent = "✓ 完了：フィードバックを送りました" + (n?.sent ? "（メール送信済み）" : n?.reason === "not_configured" ? "（メール未設定のため画面のみ）" : "（メールは未送信・画面には反映済み）"); }
+        toast("完了：フィードバックを送りました", `${coName(a.company_id)} に英語・インドネシア語で届きます。`);
       });
       const fcols = sp.formulaUnit && sp.formulaUnit !== "%" ? COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) per batch / Jumlah (${sp.formulaUnit}) per batch`, w: 110, num: true, total: true }, { k: "pct", l: "% w/w (auto) / % b/b (otomatis)", w: 90, num: true }] : [c]) : COLS.formula;
       editTable($("t-f"), fcols, sp.formula, () => {}, { totalCheck: true, readOnly: true });
@@ -1397,16 +1397,17 @@ ${ja}`, { effort: "medium" });
       $("a-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "PDFを作成しています…", async () => { if (!sp.formula.length) throw { userMsg: "処方がまだありません。" }; download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".pdf", await formulaPdf(am())); $("st-toja").textContent = "✓ PDFを保存しました"; });
       editTable($("t-m"), COLS.materials, sp.materials, () => {}, { readOnly: true });
       editTable($("t-t"), COLS.tests, sp.tests, () => {}, { readOnly: true });
-      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "日本語表示名称を調べています…（公式リストと出典ページで確認するため1〜3分かかります）", async () => {
+      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "日本語表示名称を調べています…（公式リストと出典ページで確認するため1〜3分かかります）", async () => { const a = cur;
         // Convert on the latest data and write back only the Japanese-name fields, so the supplier's newer edits survive.
-        const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle(); if (e1) throw e1;
+        const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", a.id).maybeSingle(); if (e1) throw e1;
         const latest = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, fresh?.supplier || {});
-        const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
-        const { data: again } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle();
+        const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { if (cur === a) $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
+        const { data: again } = await sb.from("assignments").select("supplier").eq("id", a.id).maybeSingle();
         const merged = Object.assign({}, again?.supplier || latest);
         merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") && (c.inci || "") === (r.inci || c.inci || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, jaLevel: c.jaLevel, jaSrc: c.jaSrc, inci: r.inci || c.inci } : r; });
-        const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", cur.id); if (error) throw error;
-        cur.supplier = merged;
+        const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", a.id); if (error) throw error;
+        a.supplier = merged;
+        if (cur !== a) { toast("完了：日本語表示名称に変換しました", `${coName(a.company_id)}：${n}行`); return; }
         draw(); $("st-toja").textContent = `✓ ${n}行を変換しました。` + (unsure ? `うち${unsure}行は出典で確認できず「要確認」です（確認事項の欄をご覧ください）。` : failed ? "" : "すべて出典で確認できました。") + (failed ? `　${failed}行は調べられませんでした。もう一度押してください。` : "");
       });
     };
