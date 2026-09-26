@@ -173,7 +173,7 @@
     const bar = document.createElement("div");
     bar.className = "notice info";
     bar.style.margin = "12px 0 0";
-    bar.innerHTML = `<b>デモ画面 / Demo / Demo</b>（サンプルデータ。サーバーへの保存・メール送信は行われず、AIは見本の結果だけを返します。編集内容はこのタブの中だけに残ります。 / Sample data only — nothing is saved or sent. / Hanya data contoh — tidak ada yang disimpan atau dikirim.）
+    bar.innerHTML = `<b>デモ画面 / Demo / Demo</b>（サンプルデータ。サーバーへの保存・メール送信は行われず、AIは処方ファイルの読み取りだけ見本の結果を返し、翻訳・変換・企画書作成は動きません。編集内容はこのタブの中だけに残ります。 / Sample data only — nothing is saved or sent. / Hanya data contoh — tidak ada yang disimpan atau dikirim.）
       <a href="?demo=admin#/">日本側（管理）画面を見る / Japan side</a>　／　<a href="?demo=supplier#/">インドネシア側（PT Demo Bahan Nusantara）の画面を見る / Supplier side / Sisi pemasok</a>　／
       <button class="linkbtn" id="demo-reset" type="button">サンプルを初期状態に戻す / Reset / Atur ulang</button>`;
     document.querySelector(".wrap").prepend(bar);

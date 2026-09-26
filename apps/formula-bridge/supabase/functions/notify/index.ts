@@ -85,8 +85,9 @@ Deno.serve(async (req) => {
   const { data: pj } = await service.from("projects").select("name").eq("id", a.project_id).single();
   const { data: settings } = await service.from("settings").select("key, value");
   const conf = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
-  // Links in the mail need the site address: the setting, else the page the request came from.
-  const appUrl = String(conf.app_url || Deno.env.get("APP_URL") || req.headers.get("origin") || "").replace(/\/$/, "");
+  // Links in the mail need the site address: the setting, else the APP_URL secret, else the published site.
+  // (Never the request's Origin header: a caller could otherwise point the links at another site.)
+  const appUrl = String(conf.app_url || Deno.env.get("APP_URL") || "https://formula-bridge-eight.vercel.app").replace(/\/$/, "");
   if (!/^https?:\/\//.test(appUrl)) return json({ sent: false, reason: "no_app_url" });
   const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Artisans Production Formula Bridge <onboarding@resend.dev>");
 

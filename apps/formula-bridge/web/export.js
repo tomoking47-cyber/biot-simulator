@@ -78,7 +78,7 @@
         while (maxRows < Math.min(10, t.rows.length) && used + rh(t.rows[maxRows]) <= h - 0.5) used += rh(t.rows[maxRows++]);
         const head = t.headers.map((x) => ({ text: str(x), options: { bold: true, color: "FFFFFF", fill: { color: NAVY } } }));
         const rows = t.rows.slice(0, maxRows).map((r, ri) => r.map((x) => ({ text: clip(x, 40), options: { fill: { color: ri % 2 ? "FFFFFF" : LIGHT } } })));
-        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, h: used, autoPage: false, fontFace: FONT, fontSize: 9, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
+        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, h: used, rowH: [rh(t.headers), ...t.rows.slice(0, maxRows).map(rh)], autoPage: false, fontFace: FONT, fontSize: 9, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
         const cap = [t.caption, t.rows.length > maxRows ? `ほか${t.rows.length - maxRows}行は省略（Word版に全件記載）` : ""].filter(Boolean).join("　");
         if (cap) slide.addText(cap, { x: sx, y: bottom - 0.4, w: sw, h: 0.35, fontFace: FONT, fontSize: 8.5, color: GREY });
       } else if (s.image && s.image.data) {
