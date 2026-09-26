@@ -20,7 +20,7 @@ async function sendMail(from: string, to: string[], subject: string, html: strin
   const host = Deno.env.get("SMTP_HOST");
   if (host) {
     const port = Number(Deno.env.get("SMTP_PORT") || 465);
-    const tx = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user: Deno.env.get("SMTP_USER") ?? "", pass: Deno.env.get("SMTP_PASS") ?? "" } });
+    const tx = nodemailer.createTransport({ host, port, secure: port === 465, connectionTimeout: 15_000, greetingTimeout: 15_000, socketTimeout: 30_000, auth: { user: Deno.env.get("SMTP_USER") ?? "", pass: Deno.env.get("SMTP_PASS") ?? "" } });
     try {
       await tx.sendMail({ from, to: to.join(", "), subject, html, attachments: atts.map((a) => ({ filename: a.filename, content: Buffer.from(a.content), contentType: a.contentType })) });
       return { ok: true, detail: "smtp" + (atts.length ? ` (+${atts.length} files)` : "") };
@@ -30,11 +30,14 @@ async function sendMail(from: string, to: string[], subject: string, html: strin
   }
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return null;
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
+  let r: Response;
+  try {
+    r = await fetch("https://api.resend.com/emails", {
+    method: "POST", signal: AbortSignal.timeout(20_000),
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({ from, to, subject, html, ...(atts.length ? { attachments: atts.map((a) => ({ filename: a.filename, content: b64(a.content) })) } : {}) }),
   });
+  } catch (e) { return { ok: false, detail: "resend: " + String(e) }; }
   return { ok: r.ok, detail: (await r.text()).slice(0, 500) };
 }
 
@@ -65,9 +68,9 @@ Deno.serve(async (req) => {
     if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
     const { data: settings } = await service.from("settings").select("key, value");
     const conf = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
-    const to = String(conf.dev_email || "").split(/[,\s]+/).filter(Boolean);
+    const to = String(conf.dev_email || Deno.env.get("DEV_EMAIL") || "").split(/[,\s]+/).filter(Boolean);
     if (!to.length) return json({ sent: false, reason: "no_dev_email" });
-    const from = String(conf.from_email || "Artisans Production Formula Bridge <onboarding@resend.dev>");
+    const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Artisans Production Formula Bridge <onboarding@resend.dev>");
     const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
     const subject = "[処方ブリッジ] テストメール（送信設定の確認）";
     const res = await sendMail(sender, to, subject, `<p>処方ブリッジからのテストメールです。このメールが届いていれば、メール送信の設定は完了しています。</p><p>送信元：${esc(sender)}<br>送信日時：${esc(new Date().toISOString())}</p>`);
@@ -82,7 +85,9 @@ Deno.serve(async (req) => {
   const { data: pj } = await service.from("projects").select("name").eq("id", a.project_id).single();
   const { data: settings } = await service.from("settings").select("key, value");
   const conf = Object.fromEntries((settings ?? []).map((r) => [r.key, r.value]));
-  const appUrl = String(conf.app_url || Deno.env.get("APP_URL") || "").replace(/\/$/, "");
+  // Links in the mail need the site address: the setting, else the page the request came from.
+  const appUrl = String(conf.app_url || Deno.env.get("APP_URL") || req.headers.get("origin") || "").replace(/\/$/, "");
+  if (!/^https?:\/\//.test(appUrl)) return json({ sent: false, reason: "no_app_url" });
   const from = String(conf.from_email || Deno.env.get("FROM_EMAIL") || "Artisans Production Formula Bridge <onboarding@resend.dev>");
 
   let to: string[] = [], subject = "", html = "";
@@ -129,14 +134,15 @@ Deno.serve(async (req) => {
     if (!dev) return json({ sent: false, reason: "no_dev_email" });
     to = dev.split(/[,\s]+/).filter(Boolean);
     const sh = (a.shipment ?? {}) as Record<string, string>;
-    subject = `[処方ブリッジ] サンプル発送完了：${co?.name ?? ""}／${pj?.name ?? ""}（追跡番号 ${sh.tracking ?? ""}）`;
+    subject = `[処方ブリッジ] サンプル発送完了：${co?.name ?? ""}／${pj?.name ?? ""}${sh.tracking ? `（追跡番号 ${sh.tracking}）` : ""}`;
     const row = (k: string, v: unknown) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${k}</td><td style="padding:4px 0"><b>${esc(v || "—")}</b></td></tr>`;
     html = `<p>インドネシアの ${esc(co?.name)} から、案件「${esc(pj?.name)}」のサンプル発送完了の連絡がありました。</p>
       <table style="border-collapse:collapse;font-family:Arial,sans-serif">${row("運送会社", sh.carrier)}${row("追跡番号", sh.tracking)}${row("発送日", sh.date)}${row("サンプル数量", sh.qty)}${row("備考", sh.note)}${row("連絡者", me.full_name || me.email)}</table>
       <p>サンプル到着後は、処方ブリッジの STEP 2 から必ずフィードバックを送ってください。</p>
       <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}/dev" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">処方ブリッジで確認する</a></p>`;
   } else if (body.event === "feedback") {
-    if (me.role !== "admin" || !a.feedback || !(a.feedback as any).en) return json({ error: "forbidden" }, 403);
+    if (me.role !== "admin") return json({ error: "forbidden" }, 403);
+    if (!(a.feedback as any)?.en) return json({ error: "no_feedback" }, 409);
     const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
     to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
     const fb = a.feedback as Record<string, string>;
@@ -145,7 +151,7 @@ Deno.serve(async (req) => {
     html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p><p>Artisans Production Co., Ltd. (Japan) has sent feedback on your sample.<br>Artisans Production Co., Ltd. (Jepang) telah mengirimkan umpan balik atas sampel Anda.</p>
       <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}${decId ? ` / ${esc(decId)}` : ""}</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
-      <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id || "")}</pre>
+      ${fb.id ? `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id)}</pre>` : ""}
       <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">Open in Formula Bridge / Buka di Formula Bridge</a></p>`;
   } else {
     return json({ error: "bad_request" }, 400);

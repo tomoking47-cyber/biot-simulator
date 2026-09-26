@@ -23,7 +23,7 @@
     const pptx = new PptxGenJS();
     pptx.layout = "LAYOUT_WIDE"; // 13.33 x 7.5 in
     pptx.title = str(plan.title);
-    pptx.company = str(plan.footer);
+    pptx.company = str(plan.footer); pptx.author = str(plan.footer); pptx.subject = str(plan.subtitle || plan.title);
     const W = 13.33, M = 0.6;
 
     (plan.slides || []).forEach((s, i) => {
@@ -47,7 +47,8 @@
       slide.addShape(pptx.ShapeType.line, { x: M, y: 1.0, w: W - 2 * M, h: 0, line: { color: LINE, width: 1 } });
       if (s.lead) slide.addText(str(s.lead), { x: M, y: 1.08, w: W - 2 * M, h: 0.62, fontFace: FONT, fontSize: 13, color: GREY, valign: "top" });
 
-      const hasSide = !!(s.chart || s.table || s.image);
+      // Only real content takes the right half (an empty chart / table / image leaves the bullets full width).
+      const hasSide = !!(((s.chart?.values || []).length) || ((s.table?.rows || []).length) || s.image?.data);
       const top = 1.8, bottom = 6.75, h = bottom - top;
       const bw = hasSide ? 5.4 : W - 2 * M;
 
@@ -69,11 +70,11 @@
         });
         if (c.source) slide.addText("出典：" + str(c.source), { x: sx, y: bottom - 0.45, w: sw, h: 0.4, fontFace: FONT, fontSize: 8, color: GREY });
       } else if (s.table && (s.table.rows || []).length) {
-        const t = s.table, maxRows = 14;
+        const t = s.table, maxRows = 10; // header + 10 short rows fit the slide; the Word version lists every row
         const head = t.headers.map((x) => ({ text: str(x), options: { bold: true, color: "FFFFFF", fill: { color: NAVY } } }));
-        const rows = t.rows.slice(0, maxRows).map((r, ri) => r.map((x) => ({ text: clip(x, 80), options: { fill: { color: ri % 2 ? "FFFFFF" : LIGHT } } })));
-        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, fontFace: FONT, fontSize: 9.5, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
-        const cap = [t.caption, t.rows.length > maxRows ? `ほか${t.rows.length - maxRows}行は別添` : ""].filter(Boolean).join("　");
+        const rows = t.rows.slice(0, maxRows).map((r, ri) => r.map((x) => ({ text: clip(x, 40), options: { fill: { color: ri % 2 ? "FFFFFF" : LIGHT } } })));
+        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, h: Math.min(h - 0.5, 0.36 * (rows.length + 1)), rowH: 0.34, autoPage: false, fontFace: FONT, fontSize: 9, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
+        const cap = [t.caption, t.rows.length > maxRows ? `ほか${t.rows.length - maxRows}行は省略（Word版に全件記載）` : ""].filter(Boolean).join("　");
         if (cap) slide.addText(cap, { x: sx, y: bottom - 0.4, w: sw, h: 0.35, fontFace: FONT, fontSize: 8.5, color: GREY });
       } else if (s.image && s.image.data) {
         const im = s.image, boxH = h - 0.5;
@@ -109,8 +110,8 @@
       ],
     });
 
-    const children = [];
-    (plan.slides || []).forEach((s, i) => {
+    const children = []; let no = 0; // the cover is not numbered
+    (plan.slides || []).forEach((s) => {
       if (s.key === "cover") {
         children.push(new Paragraph({ spacing: { before: 2400, after: 240 }, children: [run(plan.title, { bold: true, size: 56, color: NAVY })] }));
         children.push(para(plan.subtitle, {}, { size: 28, color: GREY }));
@@ -119,7 +120,7 @@
         return;
       }
       children.push(new Paragraph({ children: [new PageBreak()] }));
-      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 160 }, children: [run(`${i + 1}. ${str(s.title)}`, { bold: true, size: 32, color: NAVY })] }));
+      children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { after: 160 }, children: [run(`${++no}. ${str(s.title)}`, { bold: true, size: 32, color: NAVY })] }));
       if (s.lead) children.push(para(s.lead, { spacing: { after: 200 } }, { size: 23, color: GREY, italics: true }));
       (s.bullets || []).filter(Boolean).forEach((b) => children.push(new Paragraph({ bullet: { level: 0 }, spacing: { after: 80 }, children: [run(b, { size: 22 })] })));
 
@@ -144,7 +145,7 @@
     });
 
     return new Document({
-      creator: str(plan.footer), title: str(plan.title),
+      creator: str(plan.footer), lastModifiedBy: str(plan.footer), title: str(plan.title), subject: str(plan.subtitle || ""),
       styles: { default: { document: { run: { font: FONT } } } },
       sections: [{ properties: { page: { margin: { top: 1134, bottom: 1134, left: 1134, right: 1134 } } }, children }],
     });
