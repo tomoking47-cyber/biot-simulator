@@ -1,12 +1,14 @@
 // Formula Bridge — AI proxy. Signed-in users only (verify_jwt). The API keys never leave the server.
 //   provider "claude" (default): Anthropic — everything in the app; accepts PDFs / images.
 //   provider "gemini": Google — market research with Google Search grounding (returns the web sources).
-//   provider "openai": OpenAI — independent review of the plan draft.
+//   provider "openai": OpenAI — independent review of the plan draft and of translations.
+//   provider "labels": Japanese label names (成分表示名称) looked up on the web and checked against the source page.
 // Gemini and OpenAI are used only by the Japan-side plan builder, so they are admin-only.
 // Models can be changed without a code change through the secrets OPENAI_MODEL and GEMINI_MODEL.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { labelNames } from "./labels.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +38,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp
 const MAX_FILES_CHARS = 20_000_000;
 
 type File64 = { media_type?: string; data?: string };
-type Body = { provider?: string; prompt?: string; effort?: string; search?: boolean; image?: File64; document?: File64; images?: File64[]; documents?: File64[] };
+type Body = { rows?: { i: number; trade?: string; idName?: string; inci?: string }[]; provider?: string; prompt?: string; effort?: string; search?: boolean; image?: File64; document?: File64; images?: File64[]; documents?: File64[] };
 
 async function claude(prompt: string, effort: string, body: Body) {
   const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
@@ -133,14 +135,14 @@ Deno.serve(async (req) => {
   let body: Body;
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
   const prompt = String(body.prompt ?? "");
-  if (!prompt || prompt.length > 400_000) return json({ error: "bad_request", message: "prompt missing or too long" }, 400);
-  const effort = EFFORTS.has(String(body.effort)) ? String(body.effort) : "medium";
   const provider = String(body.provider || "claude");
+  if (provider !== "labels" && (!prompt || prompt.length > 400_000)) return json({ error: "bad_request", message: "prompt missing or too long" }, 400);
+  const effort = EFFORTS.has(String(body.effort)) ? String(body.effort) : "medium";
 
   // AI costs money: only Japan-side admins and suppliers that have actually received a request may use it.
   const { data: me } = await service.from("profiles").select("role, company_id").eq("id", who.user.id).single();
   if (me?.role !== "admin") {
-    if (provider !== "claude") return json({ error: "forbidden" }, 403);
+    if (provider !== "claude" && provider !== "labels") return json({ error: "forbidden" }, 403);
     const { count } = await service.from("assignments").select("id", { count: "exact", head: true }).eq("company_id", me?.company_id ?? "").neq("status", "draft");
     if (!count) return json({ error: "forbidden", message: "AI is available after a request has been received." }, 403);
   }
@@ -163,6 +165,21 @@ Deno.serve(async (req) => {
       check("gemini", () => gemini(ping, false)),
     ]);
     return json(out);
+  }
+  if (provider === "labels") {
+    const key = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!key) return json({ error: "not_configured", message: "ANTHROPIC_API_KEY is not set" }, 503);
+    const rows = (Array.isArray(body.rows) ? body.rows : []).slice(0, 12).map((r) => ({ i: Number(r?.i), trade: String(r?.trade ?? "").slice(0, 200), idName: String(r?.idName ?? "").slice(0, 200), inci: String(r?.inci ?? "").slice(0, 500) }));
+    if (!rows.length) return json({ error: "bad_request", message: "rows missing" }, 400);
+    return keepAlive((async () => {
+      try { return json({ items: await labelNames(service, key, rows) }); }
+      catch (e) {
+        if (e instanceof Anthropic.RateLimitError) return json({ error: "rate_limited" }, 429);
+        if (e instanceof Anthropic.AuthenticationError) return json({ error: "not_configured" }, 503);
+        if (e instanceof Anthropic.BadRequestError) return json({ error: /credit balance/i.test(e.message) ? "no_credit" : "bad_request", message: e.message }, 400);
+        return json({ error: "upstream", message: String((e as any)?.message ?? e) }, 502);
+      }
+    })());
   }
   if (provider === "openai") return keepAlive(openai(prompt, effort));
   if (provider === "gemini") return keepAlive(gemini(prompt, body.search !== false));
