@@ -566,7 +566,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       <div class="card"><h2>${FLAG_ID}A. Product overview / Ringkasan produk</h2><p class="sub">Changes are saved automatically. / Perubahan tersimpan otomatis. <span class="saved" id="saved"></span></p>
         <div class="targets"><div><span>${FLAG_JP}Target raw material cost / unit · Target biaya bahan baku / unit</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}Target finished product cost / unit · Target biaya produk jadi / unit</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}Planned retail price (incl. tax) · Rencana harga jual (termasuk pajak)</span><b>${esc(rq.price || "—")}</b></div></div>
         <div id="prod-fields"></div></div>
-      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula / Formula dasar</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian ingredient name (Nama bahan) and the amount. Then press “Convert to Japanese names” to fill in the Japanese names. / Satu baris per bahan baku. Isi Nama bahan dan jumlahnya, lalu tekan “Konversi ke nama Jepang” untuk mengisi nama Jepang secara otomatis.</p></div>
+      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula / Formula dasar</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian ingredient name (Nama bahan) and the amount. Then press “Convert to Japanese names” to fill in the Japanese names automatically. / Satu baris per bahan baku. Isi Nama bahan dan jumlahnya, lalu tekan “Konversi ke nama Jepang” untuk mengisi nama Jepang secara otomatis.</p></div>
         <div class="to-ja-wrap"><span class="next-tag" id="to-ja-tag" hidden>Next step / Langkah berikutnya</span><button class="btn ghost" id="to-ja">Convert to Japanese names / Konversi ke nama Jepang / 日本語表示名称に変換</button></div></div>
         <div class="tpl-box"><div><b>① Download our formula template (Excel), fill in every cell, then ② drop it in the box below.</b>
           <span>A PDF in your lab's own format is also OK — any empty cells must then be filled in here. / Unduh template formula kami (Excel), isi semua sel, lalu letakkan file di kotak di bawah. PDF dengan format lab Anda sendiri juga boleh — sel yang kosong harus diisi di sini.</span></div>
@@ -691,7 +691,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
     const drop = $("f-drop"), dropSt = $("st-drop");
     const fMeta = () => ({ project: snap.name, company: S.company?.name, logo: logoUrls[S.company?.logo_path], unit: sp.formulaUnit, rows: sp.formula.filter((r) => r.trade || r.idName || r.inci), requester: rq.requester });
-    $("f-xlsx").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the Excel… / Membuat Excel…", async () => { download(fileBase(snap.name, "formula") + ".xlsx", await formulaXlsx(fMeta())); $("st-toja").textContent = "✓ Excel saved / Excel tersimpan"; });
+    $("f-xlsx").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the Excel… / Membuat Excel…", async () => { if (!fMeta().rows.length) throw { userMsg: "The formula is empty. / Formula masih kosong." }; download(fileBase(snap.name, "formula") + ".xlsx", await formulaXlsx(fMeta())); $("st-toja").textContent = "✓ Excel saved / Excel tersimpan"; });
     $("f-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the PDF… / Membuat PDF…", async () => {
       if (!fMeta().rows.length) throw { userMsg: "The formula is empty. / Formula masih kosong." };
       download(fileBase(snap.name, "formula") + ".pdf", await formulaPdf(fMeta())); $("st-toja").textContent = "✓ PDF saved / PDF tersimpan";
@@ -802,7 +802,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       if (r) {
         const f0 = sp.files[+r.dataset.rm];
         if (!(await confirmModal({ title: "Delete this file? / Hapus file ini?", body: `<p>${esc(f0?.name || "")}</p><p class="sub">This cannot be undone. / Tindakan ini tidak dapat dibatalkan.</p>`, ok: "Delete / Hapus", tone: "danger" }))) return;
-        const f = sp.files.splice(+r.dataset.rm, 1)[0]; renderFiles(); save.soon(); if (f) await sb.storage.from("attachments").remove([f.path]);
+        const i = sp.files.indexOf(f0); if (i < 0) return; // the list may have changed while the dialog was open
+        const f = sp.files.splice(i, 1)[0]; renderFiles(); save.soon(); if (f) await sb.storage.from("attachments").remove([f.path]);
       }
     };
     renderFiles();
@@ -1467,6 +1468,7 @@ ${GLOSSARY}
 JSONのみで返答: {"ja": string}
 
 ${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
+      if (!String(res.ja || "").trim()) throw { userMsg: "翻訳に失敗しました。もう一度押してください。" };
       $("st-tr").textContent = "訳を別のAIで確認しています…";
       const ck = await checkTranslation(supplierEnglish(adopted.supplier || {}), "en", { ja: String(res.ja || "") });
       fin.sup_ja = ck.fixed.ja; $("sup-ja").textContent = fin.sup_ja; save.soon(); await save.now(); $("st-tr").innerHTML = checkHtml(ck);
@@ -1630,19 +1632,20 @@ JSONのみで返答: {"asOf":"YYYY-MM","markets":{"<jp|id|asia>":{"summary":"","
 - 各ページ: title（20字以内）、lead（結論を1文、60字以内）、bullets（3〜6項目、各60字以内）、sources（[{label,url}]）。
 - ページ構成は次の key の順で必ず10ページ: ${SLIDE_KEYS.map(([k, t]) => `${k}=${t}`).join(", ")}。
 - cover の bullets には案件名・カテゴリ・販売市場・作成日(${today()})を入れる。summary は何を・なぜ今・いくらで・いつまでに。roadmap にはリスク（規制・原料調達・為替・品質）と対策、次のアクション。`;
-      const draftPrompt = `あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
-次のJSONデータと、添付されたメーカー提出資料（PDF・画像）だけを根拠に書くこと。
+      // Built when sent: the retry without attachments must not mention the files any more.
+      const draftPrompt = () => `あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
+${files.names.length ? "次のJSONデータと、添付されたメーカー提出資料（PDF・画像）だけを根拠に書くこと。" : "次のJSONデータだけを根拠に書くこと（メーカー提出資料のファイルは添付されていないので、出典に挙げないこと）。"}
 ${RULES}
 JSONのみで返答: {"title": string, "subtitle": string, "slides":[{"key":"cover","title":"","lead":"","bullets":[],"sources":[]}]}
 
 データ:
 ${JSON.stringify(input)}`;
       let dr;
-      try { dr = await aiRaw(draftPrompt, { effort: "high", documents: files.documents, images: files.images }); }
+      try { dr = await aiRaw(draftPrompt(), { effort: "high", documents: files.documents, images: files.images }); }
       catch (err) {
         if (!files.names.length || err?.code === "demo") throw err;
         log.push("添付資料を含めると処理できなかったため、添付なしで作成しました"); files.names.length = 0; input.supplier_attachments = [];
-        dr = await aiRaw(draftPrompt, { effort: "high" });
+        dr = await aiRaw(draftPrompt(), { effort: "high" });
       }
       const draft = parseJSON(dr.text);
       if (!Array.isArray(draft?.slides)) throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
@@ -1741,6 +1744,7 @@ JSONのみで返答: {"translation": string${dir === "ja2id" ? ', "back": string
 
 原文:
 ${src}`, { effort: "medium" });
+      if (!String(r.translation || "").trim()) throw { userMsg: "翻訳に失敗しました。もう一度押してください。 / Terjemahan gagal. Silakan coba lagi." };
       $("st-t").textContent = "別のAIで訳を確認しています… / Memeriksa terjemahan…";
       const from = dir === "ja2id" ? "ja" : "id", to = dir === "ja2id" ? "id" : "ja";
       const ck = await checkTranslation(src, from, { [to]: String(r.translation || "") });
