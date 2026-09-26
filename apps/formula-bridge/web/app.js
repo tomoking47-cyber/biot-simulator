@@ -318,12 +318,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     // No rows: the blank fill-in template (with example and instructions). With rows: the formula itself (still
     // readable by the import, since the marker and header row stay the same).
     const tpl = !rows.length;
-    const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = tpl ? 40 : rows.length, extra = tpl ? [] : ["% w/w", "日本語表示名称 (Japanese label name)", "確認事項（AI）"];
+    const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = tpl ? 40 : rows.length, extra = tpl ? [] : ["% w/w", "日本語表示名称 (Japanese label name)", ...(S.isAdmin ? ["確認事項（AI）"] : [])]; // the notes are for Japan
     const head = TPL_HEAD.map((h) => h + (h === "No." || !tpl ? "" : " *")).concat(extra);
     const cell = (v) => (v === "" || v == null ? "" : /^\s*-?[\d.,]+\s*$/.test(String(v)) ? num(v) : String(v)); // "0,5" is a number too
     const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], [tpl ? "Fill in EVERY cell in English (Nama bahan: in Indonesian). Do not change the header row (row 7). / Isi SEMUA sel dalam bahasa Inggris (Nama bahan: dalam bahasa Indonesia). Jangan ubah baris judul kolom (baris 7)." : "Formula (this file can be dropped into Formula Bridge again) / Formula (file ini dapat diunggah kembali ke Formula Bridge)"],
       ["Project / Proyek", project || ""], ["Company / Perusahaan", company || ""], ["Amount unit (write %, g or mL) / Satuan jumlah (tulis %, g, atau mL) *", unit || "%"], [],
-      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", [S.isAdmin ? jaStatusText(r) : "", r.jaNote || ""].filter(Boolean).join(" ")] : [i + 1, "", "", "", "", "", "", ""]; }),
+      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", ...(S.isAdmin ? [[jaStatusText(r), r.jaNote || ""].filter(Boolean).join(" ")] : [])] : [i + 1, "", "", "", "", "", "", ""]; }),
       ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
     ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
     ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
@@ -356,8 +356,8 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
         const part = rows.slice(pg * per, pg * per + per);
         host.innerHTML = `<div class="pdf-page"><div class="pdf-head">${logoData ? `<img src="${logoData}" alt="">` : ""}<div><div class="pdf-t">Formula / 処方表</div><div class="pdf-m">Project: <b>${esc(project || "")}</b>　Company: <b>${esc(company || "")}</b>${requester ? `　Requested by: ${esc(requester)}` : ""}</div>
           <div class="pdf-m">Unit: ${unit === "%" ? "% w/w" : esc(unit) + " per batch (% calculated)"}　Date: ${today()}　Page ${pg + 1}/${pages}</div></div><div class="pdf-brand">BIOT<br><span>Artisans Production Co., Ltd.</span></div></div>
-          <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>日本語表示名称</th></tr></thead><tbody>
-          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}${jaUnsure(r) ? " ［要確認］" : ""}</td></tr>`).join("")}
+          <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>${S.isAdmin ? "日本語表示名称" : "Japanese label name / 日本語表示名称"}</th></tr></thead><tbody>
+          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}${S.isAdmin && jaUnsure(r) ? " ［要確認］" : ""}</td></tr>`).join("")}
           ${pg === pages - 1 ? `<tr class="tot"><td colspan="6" style="text-align:right">Total</td>${unit === "%" ? "" : `<td class="n">${fmt(tot)}</td>`}<td class="n">${fmt(rows.reduce((a, r) => a + num(r.pct), 0))}</td><td colspan="2"></td></tr>` : ""}</tbody></table>
           <div class="pdf-foot">Confidential — Formula Bridge / Artisans Production Co., Ltd.</div></div>`;
         const cv = await h2c(host.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
