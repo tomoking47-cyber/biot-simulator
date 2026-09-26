@@ -10,8 +10,8 @@
  * }
  */
 (function (root) {
-  const NAVY = "1F3F66", INK = "1B2420", GREY = "5B6762", LIGHT = "EEF2F6", SAFFRON = "B36A12", LINE = "D6DDE4";
-  const FONT = "Meiryo";
+  const NAVY = "1E1C19", INK = "1E1C19", GREY = "57524A", LIGHT = "F6F2EA", SAFFRON = "A4854B", LINE = "E2DACB"; // BIOT house palette: ink, ivory, antique gold
+  const FONT = "Yu Gothic";
 
   const str = (v) => (v == null ? "" : String(v));
   const clip = (s, n) => { s = str(s); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
@@ -34,10 +34,10 @@
         slide.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: W, h: 7.5, fill: { color: NAVY } });
         slide.addShape(pptx.ShapeType.rect, { x: M, y: 4.55, w: 1.2, h: 0.06, fill: { color: SAFFRON }, line: { color: SAFFRON } });
         slide.addText(str(plan.title), { x: M, y: 2.2, w: W - 2 * M, h: 1.4, fontFace: FONT, fontSize: 36, bold: true, color: "FFFFFF", valign: "bottom" });
-        slide.addText(str(plan.subtitle), { x: M, y: 3.7, w: W - 2 * M, h: 0.7, fontFace: FONT, fontSize: 16, color: "D9E3EE" });
+        slide.addText(str(plan.subtitle), { x: M, y: 3.7, w: W - 2 * M, h: 0.7, fontFace: FONT, fontSize: 16, color: "E9DFC8" });
         const lines = [s.lead, ...(s.bullets || [])].filter(Boolean).map(str).join("\n");
-        slide.addText(lines, { x: M, y: 4.8, w: W - 2 * M, h: 1.4, fontFace: FONT, fontSize: 12, color: "D9E3EE", valign: "top" });
-        slide.addText(str(plan.date) + "　" + str(plan.footer), { x: M, y: 6.7, w: W - 2 * M, h: 0.4, fontFace: FONT, fontSize: 10, color: "AFC2D6" });
+        slide.addText(lines, { x: M, y: 4.8, w: W - 2 * M, h: 1.4, fontFace: FONT, fontSize: 12, color: "E9DFC8", valign: "top" });
+        slide.addText(str(plan.date) + "　" + str(plan.footer), { x: M, y: 6.7, w: W - 2 * M, h: 0.4, fontFace: FONT, fontSize: 10, color: "C9B68D" });
         return;
       }
 
@@ -65,7 +65,7 @@
           x: sx, y: top + 0.3, w: sw, h: h - 0.8, barDir: "col", chartColors: [NAVY],
           showValue: true, dataLabelFontSize: 10, dataLabelColor: INK, dataLabelFontFace: FONT,
           catAxisLabelFontSize: 10, catAxisLabelFontFace: FONT, valAxisLabelFontSize: 9, valAxisLabelFontFace: FONT,
-          valGridLine: { color: "E6EAEE", size: 0.5 }, showLegend: false,
+          valGridLine: { color: "EEE8DC", size: 0.5 }, showLegend: false,
         });
         if (c.source) slide.addText("出典: " + str(c.source), { x: sx, y: bottom - 0.45, w: sw, h: 0.4, fontFace: FONT, fontSize: 8, color: GREY });
       } else if (s.table && (s.table.rows || []).length) {

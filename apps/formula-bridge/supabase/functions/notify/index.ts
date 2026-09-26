@@ -96,7 +96,7 @@ Deno.serve(async (req) => {
     subject = `[Formula Bridge] New development request from Japan / Permintaan pengembangan baru dari Jepang: ${pj?.name ?? ""}`;
     html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p>
       <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Artisans Production Co., Ltd. (Jepang).</p>
-      <p><a href="${esc(link)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open the request / Buka permintaan</a></p>
+      <p><a href="${esc(link)}" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">Open the request / Buka permintaan</a></p>
       ${(a.request_snapshot as any)?.request?.requester ? `<p>Requested by / Diminta oleh: <b>${esc((a.request_snapshot as any).request.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}
       <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.<br>Silakan masuk dengan email dan kata sandi terdaftar Anda, lalu isi halaman pengembangan dalam bahasa Inggris.</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(brief.slice(0, 4000))}</pre>
@@ -121,7 +121,7 @@ Deno.serve(async (req) => {
     }
     html = `<p>インドネシアの ${esc(co?.name)}（担当：${esc(me.full_name || me.email)}）から、案件「${esc(pj?.name)}」の開発内容が提出されました。</p>
       ${atts.length ? `<p>処方表（Excel・PDF）を添付しています：${atts.map((x) => esc(x.filename)).join("、")}</p>` : ""}
-      <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
+      <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">処方ブリッジで確認する</a></p>`;
   } else if (body.event === "shipped") {
     if (me.role !== "admin" && me.company_id !== a.company_id) return json({ error: "forbidden" }, 403);
     if (!a.shipped_at) return json({ error: "not_shipped" }, 409);
@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     html = `<p>インドネシアの ${esc(co?.name)} から、案件「${esc(pj?.name)}」のサンプル発送完了の連絡がありました。</p>
       <table style="border-collapse:collapse;font-family:Arial,sans-serif">${row("運送会社", sh.carrier)}${row("追跡番号", sh.tracking)}${row("発送日", sh.date)}${row("サンプル数量", sh.qty)}${row("備考", sh.note)}${row("連絡者", me.full_name || me.email)}</table>
       <p>サンプル到着後は、処方ブリッジの STEP 2 から必ずフィードバックを送ってください。</p>
-      <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}/dev" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
+      <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}/dev" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">処方ブリッジで確認する</a></p>`;
   } else if (body.event === "feedback") {
     if (me.role !== "admin" || !a.feedback || !(a.feedback as any).en) return json({ error: "forbidden" }, 403);
     const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
       <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}${decId ? ` / ${esc(decId)}` : ""}</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id || "")}</pre>
-      <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open in Formula Bridge / Buka di Formula Bridge</a></p>`;
+      <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">Open in Formula Bridge / Buka di Formula Bridge</a></p>`;
   } else {
     return json({ error: "bad_request" }, 400);
   }
