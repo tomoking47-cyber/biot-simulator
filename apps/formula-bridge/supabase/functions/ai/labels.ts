@@ -4,10 +4,11 @@
 // 3. This function then opens the cited page itself and accepts a name only when the INCI name and the Japanese
 //    name appear close together on that page: level "official" (jcia.org, the JCIA label name list) or "web"
 //    (another page). Anything else is returned with level "none" (shown as 要確認 in the app).
+// Names that Japan-side staff confirmed by eye are stored with level "manual" and reused the same way.
 import Anthropic from "npm:@anthropic-ai/sdk";
 
 type Row = { i: number; trade?: string; idName?: string; inci?: string };
-type Comp = { inci: string; ja: string; level: "official" | "web" | "none"; url: string; note: string };
+type Comp = { inci: string; ja: string; level: "official" | "web" | "manual" | "none"; url: string; note: string };
 
 export const normInci = (s: string) => s.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
 // "Water (and) Glycerin" / "Water, Glycerin" → components. Slashes stay: they are part of many single INCI names
@@ -148,7 +149,7 @@ export async function labelNames(service: any, apiKey: string, rows: Row[]) {
     const names = rowComps[n].length ? rowComps[n] : inf?.comps.length ? inf.comps : inf?.inci ? splitInci(inf.inci) : [];
     const comps: Comp[] = names.map((c) => found.get(normInci(c)) ?? { inci: c, ja: "", level: "none", url: "", note: "調べられませんでした" });
     const levels = comps.map((c) => c.level);
-    const level = !comps.length || levels.includes("none") ? "none" : levels.includes("web") ? "web" : "official";
+    const level = !comps.length || levels.includes("none") ? "none" : levels.includes("web") ? "web" : levels.includes("manual") ? "manual" : "official";
     const notes = [
       ...(inf ? ["INCI名は未記入のため、AIが調べた推定です（要確認）" + (inf.note ? "：" + inf.note : "")] : []),
       ...comps.filter((c) => c.level === "none" || c.note).map((c) => (comps.length > 1 ? c.inci + "：" : "") + (c.note || "要確認")),

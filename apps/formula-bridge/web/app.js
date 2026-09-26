@@ -424,7 +424,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       try {
         const res = await aiRaw("", { provider: "labels", rows: ch });
         (res.items || []).forEach((x) => { const r = rows[+x.i]; if (!r) return;
-          r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); r.jaLevel = ["official", "web"].includes(x.level) ? x.level : "none";
+          r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); r.jaLevel = ["official", "web", "manual"].includes(x.level) ? x.level : "none";
           r.jaSrc = (x.sources || []).filter((s) => /^https:\/\//i.test(s?.url || "")).map((s) => ({ inci: String(s.inci || ""), ja: String(s.ja || ""), level: String(s.level || ""), url: String(s.url) }));
           if (!r.inci && x.inci) r.inci = String(x.inci); n++; });
       } catch (e) { lastErr = e; }
@@ -440,11 +440,26 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   function jaBadge(r) {
     if (!r.ja) return "";
     const links = [...new Map((r.jaSrc || []).map((x) => [x.url, x])).values()].map((x) => `<a class="jsrc" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.url))}</a>`).join(" ");
-    return (r.jaLevel === "official" ? '<span class="jchk ok">✓ 粧工連リストで確認</span>' : r.jaLevel === "web" ? '<span class="jchk web">✓ Web出典で確認</span>'
+    return (r.jaLevel === "official" ? '<span class="jchk ok">✓ 粧工連リストで確認</span>' : r.jaLevel === "manual" ? '<span class="jchk ok">✓ 当社で確認</span>' : r.jaLevel === "web" ? '<span class="jchk web">✓ Web出典で確認</span>'
       : '<span class="jchk warn">要確認</span>') + (links ? " " + links : "") + " ";
   }
-  const jaStatusText = (r) => !r.ja ? "" : r.jaLevel === "official" ? "[粧工連リストで確認]" : r.jaLevel === "web" ? `[Web出典で確認: ${(r.jaSrc || []).map((x) => hostOf(x.url)).filter(Boolean).join(", ")}]` : "[要確認]";
-  const jaUnsure = (r) => !!r.ja && r.jaLevel !== "official" && r.jaLevel !== "web";
+  const jaStatusText = (r) => !r.ja ? "" : r.jaLevel === "official" ? "[粧工連リストで確認]" : r.jaLevel === "manual" ? "[当社で確認]" : r.jaLevel === "web" ? `[Web出典で確認: ${(r.jaSrc || []).map((x) => hostOf(x.url)).filter(Boolean).join(", ")}]` : "[要確認]";
+  const jaUnsure = (r) => !!r.ja && !["official", "web", "manual"].includes(r.jaLevel);
+  const normInci = (s) => String(s).normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  const splitInci = (s) => String(s).split(/\s*\(and\)\s*|,\s+|;\s*/i).map((x) => x.trim()).filter(Boolean);
+  // Japan-side staff confirmed a name by eye: store it in the label-name dictionary so it is reused next time.
+  async function confirmJa(r) {
+    const incis = splitInci(r.inci || ""), jas = String(r.ja || "").split(/[、,，]/).map((x) => x.trim()).filter(Boolean);
+    const src = (r.jaSrc || []).find((x) => x.url)?.url || "";
+    const pairs = incis.length === jas.length ? incis.map((c, k) => [c, jas[k]]) : incis.length ? [[incis.join(" (and) "), jas.join("、")]] : [];
+    const who = S.profile?.full_name || S.profile?.email || "";
+    if (pairs.length) {
+      const { error } = await sb.from("label_names").upsert(pairs.map(([inci, ja]) => ({ inci_key: normInci(inci), inci, ja, level: "manual", source_url: (r.jaSrc || []).find((x) => normInci(x.inci) === normInci(inci))?.url || src, confirmed_by: who, checked_at: new Date().toISOString() })), { onConflict: "inci_key" });
+      if (error) throw { userMsg: "辞書に保存できませんでした：" + error.message };
+    }
+    r.jaLevel = "manual"; r.jaNote = `当社で確認（${who}・${new Date().toLocaleDateString("ja-JP")}）`;
+    return pairs.length;
+  }
 
   const UNIT_FIELDS = {
     viscosity: ["mPa·s", "cP", "Pa·s"], shelfLife: ["months", "years"],
@@ -1077,6 +1092,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         <div class="row"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" id="mail-test">テストメールを送る</button></div><div class="status" id="st-set"></div></form>
       <div class="card"><h2>AIの接続確認</h2><p class="sub">企画書は Claude・GPT・Gemini の3社のAIを使います。鍵（APIキー）が登録されているか、実際につながるかを確認します（鍵の中身は表示しません）。</p>
         <button class="btn ghost" type="button" id="ai-test">3社のAIの接続を確認する</button><div class="status" id="st-ai"></div></div>
+      <div class="card"><h2>表示名称の辞書</h2><p class="sub">出典ページで確認できた名称と、当社で確認した名称が保存され、次回の変換で自動的に使われます。誤りがあれば削除してください（次回は改めて調べ直します）。</p>
+        <div class="field"><label for="dic-q">絞り込み（INCI名・表示名称）</label><input id="dic-q" placeholder="例: Glycerin / グリセリン"></div>
+        <div class="tbl-wrap"><table class="view" id="dic"></table></div><div class="status" id="st-dic"></div></div>
       <div class="card"><h2>管理者（日本側）のメールアドレス</h2><p class="sub">ここにあるアドレスで新規登録した人は、日本側の管理者になります。</p>
         <div class="tbl-wrap"><table class="view"><thead><tr><th>メールアドレス</th><th>状態</th><th></th></tr></thead><tbody>
         ${(admins || []).map((a) => { const r = regd(a.email); return `<tr><td class="mono">${esc(a.email)}</td><td>${r?.role === "admin" ? '<span class="chip done">利用中</span>' : r ? '<span class="chip requested">確認待ち</span>' : '<span class="chip draft">未登録</span>'}</td>
@@ -1091,6 +1109,23 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const up = [["dev_email", $("s-dev").value.trim()], ["from_email", $("s-from").value.trim()], ["app_url", $("s-url").value.trim()]].map(([key, value]) => ({ key, value }));
       const { error } = await sb.from("settings").upsert(up);
       $("st-set").textContent = error ? "保存できませんでした: " + error.message : "保存しました ✓";
+    };
+    const { data: dic } = await sb.from("label_names").select("*").order("checked_at", { ascending: false }).limit(2000);
+    const LV = { official: '<span class="jchk ok">粧工連リスト</span>', web: '<span class="jchk web">Web出典</span>', manual: '<span class="jchk ok">当社で確認</span>' };
+    const drawDic = () => {
+      const q = $("dic-q").value.trim().toLowerCase(), rows = (dic || []).filter((x) => !q || x.inci.toLowerCase().includes(q) || x.ja.includes(q));
+      $("dic").innerHTML = `<thead><tr><th>INCI</th><th>日本語表示名称</th><th>確認方法</th><th>出典</th><th>確認日</th><th></th></tr></thead><tbody>${rows.slice(0, 300).map((x) => `<tr><td>${esc(x.inci)}</td><td>${esc(x.ja)}</td><td>${LV[x.level] || esc(x.level)}${x.confirmed_by ? `<div class="muted" style="font-size:11px">${esc(x.confirmed_by)}</div>` : ""}</td>
+        <td>${/^https:\/\//.test(x.source_url || "") ? `<a class="jsrc" href="${esc(x.source_url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.source_url))}</a>` : "—"}</td><td>${d(x.checked_at)}</td><td><button type="button" class="linkbtn" data-deldic="${esc(x.inci_key)}">削除</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">まだ登録がありません。「日本語表示名称に変換」を使うと、確認できた名称がここに保存されます。</td></tr>'}</tbody>`;
+      $("st-dic").textContent = rows.length > 300 ? `${rows.length}件中300件を表示しています。絞り込んでください。` : `${rows.length}件`;
+    };
+    $("dic-q").oninput = drawDic; drawDic();
+    $("dic").onclick = async (e) => {
+      const b = e.target.closest("[data-deldic]"); if (!b) return;
+      const row = (dic || []).find((x) => x.inci_key === b.dataset.deldic); if (!row) return;
+      if (!(await confirmModal({ title: "辞書から削除しますか？", ok: "削除する", tone: "danger", body: kvHtml([["INCI", row.inci], ["日本語表示名称", row.ja]]) + '<p class="sub">次にこの原料を変換するときは、改めて調べ直します。</p>' }))) return;
+      const { error } = await sb.from("label_names").delete().eq("inci_key", row.inci_key);
+      if (error) { toast("削除できませんでした", error.message, "info"); return; }
+      dic.splice(dic.indexOf(row), 1); drawDic(); toast("完了：辞書から削除しました", row.inci);
     };
     $("ai-test").onclick = (e) => busy(e.currentTarget, $("st-ai"), "3社のAIに接続を確認しています…（〜30秒）", async () => {
       const r = await aiRaw("status", { provider: "status" });
@@ -1328,7 +1363,7 @@ ${ja}`, { effort: "medium" });
     ["採用（本処方は当社に帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to Artisans Production Co., Ltd.", "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd."]];
   function isWater(r) { return /^(water|aqua)\b/i.test(String(r.inci || "").trim()) || /^(水|精製水)$/.test(String(r.ja || "").trim()) || /^air$/i.test(String(r.idName || "").trim()); }
   function finalRows(fin) {
-    const ev = (r) => ({ jaNote: r.jaNote || "", jaLevel: r.jaLevel, jaSrc: r.jaSrc });
+    const ev = (r) => ({ jaNote: r.jaNote || "", jaLevel: r.jaLevel, jaSrc: r.jaSrc, ref: r });
     const base = (fin.base_formula || []).map((r) => ({ src: "base", ja: r.ja || "", ...ev(r), inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));
     const add = (fin.additions || []).map((r) => ({ src: "add", ja: r.ja || "", ...ev(r), inci: r.inci || "", label: r.ja || r.inci || "", pct: num(r.pct), fn: r.purpose || "" }));
     return [...base, ...add].filter((r) => r.label || r.pct);
@@ -1365,7 +1400,7 @@ ${ja}`, { effort: "medium" });
     const render = () => {
       const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0);
       $("tot").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
-      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換：${esc(r.label)}）</span>`}</td><td class="jnote">${jaBadge(r)}${esc(r.jaNote)}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
+      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換：${esc(r.label)}）</span>`}</td><td class="jnote">${jaBadge(r)}${esc(r.jaNote)}${jaUnsure(r) ? ` <button type="button" class="linkbtn" style="font-size:12px" data-okja="${i}">確認済みにする</button>` : ""}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
       const nu = rows.filter(jaUnsure).length;
       $("ja-warn").innerHTML = nu ? `<div class="notice off" style="margin:10px 0 0"><b>日本語表示名称に「要確認」が${nu}件あります。</b>確認事項の欄の出典リンクを開き、名称が正しいか目で確認してください（このままでも確定はできます）。</div>` : "";
       const list = fullList(rows); $("full").textContent = list.length ? list.map((x) => x.n + (x.mix ? "※" : "")).join("、") : "—";
@@ -1388,6 +1423,15 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
       const ck = await checkTranslation(supplierEnglish(adopted.supplier || {}), "en", { ja: String(res.ja || "") });
       fin.sup_ja = ck.fixed.ja; $("sup-ja").textContent = fin.sup_ja; save.soon(); await save.now(); $("st-tr").innerHTML = checkHtml(ck);
     });
+    $("t-final").onclick = async (e) => {
+      const b = e.target.closest("[data-okja]"); if (!b) return;
+      const r = finalRows(fin)[+b.dataset.okja]; if (!r) return;
+      const links = [...new Set((r.jaSrc || []).map((x) => x.url))].map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`).join("<br>");
+      if (!(await confirmModal({ title: "この表示名称を「確認済み」にしますか？", ok: "確認済みにする", body: kvHtml([["日本語表示名称", r.ja], ["INCI", r.inci || "（未記入）"]])
+        + `<p class="sub">出典や粧工連の成分表示名称リストで、名称が正しいことを目で確認してから押してください。確認者としてあなたの名前が記録され、次回からこの名称が自動で使われます。</p>${links ? `<p class="sub">出典：<br>${links}</p>` : ""}` }))) return;
+      try { await confirmJa(r.ref); save.soon(); await save.now(); render(); toast("完了：確認済みにしました", r.ja); }
+      catch (err) { toast("保存できませんでした", err?.userMsg || String(err?.message || err), "info"); }
+    };
     // All rows: the adopted base formula is checked again (it was copied when adopted), and Japan's own rows are
     // checked against the sources by INCI name (a typed name that differs from the source is flagged).
     $("chk-add").onclick = (e) => busy(e.currentTarget, $("st-qs"), "表示名称を調べています…（1〜3分）", async () => {
