@@ -67,7 +67,7 @@
           catAxisLabelFontSize: 10, catAxisLabelFontFace: FONT, valAxisLabelFontSize: 9, valAxisLabelFontFace: FONT,
           valGridLine: { color: "EEE8DC", size: 0.5 }, showLegend: false,
         });
-        if (c.source) slide.addText("出典: " + str(c.source), { x: sx, y: bottom - 0.45, w: sw, h: 0.4, fontFace: FONT, fontSize: 8, color: GREY });
+        if (c.source) slide.addText("出典：" + str(c.source), { x: sx, y: bottom - 0.45, w: sw, h: 0.4, fontFace: FONT, fontSize: 8, color: GREY });
       } else if (s.table && (s.table.rows || []).length) {
         const t = s.table, maxRows = 14;
         const head = t.headers.map((x) => ({ text: str(x), options: { bold: true, color: "FFFFFF", fill: { color: NAVY } } }));
@@ -83,7 +83,7 @@
       }
 
       const src = srcLine(s.sources);
-      if (src) slide.addText("出典: " + clip(src, 260), { x: M, y: 6.85, w: W - 2 * M - 1, h: 0.45, fontFace: FONT, fontSize: 7.5, color: GREY, valign: "top" });
+      if (src) slide.addText("出典：" + clip(src, 260), { x: M, y: 6.85, w: W - 2 * M - 1, h: 0.45, fontFace: FONT, fontSize: 7.5, color: GREY, valign: "top" });
       slide.addText(`${i + 1} / ${plan.slides.length}`, { x: W - M - 1, y: 6.95, w: 1, h: 0.3, fontFace: FONT, fontSize: 9, color: GREY, align: "right" });
     });
     return pptx;
@@ -127,7 +127,7 @@
         const c = s.chart;
         children.push(para(str(c.title) + (c.unit ? "（" + c.unit + "）" : ""), { spacing: { before: 240, after: 80 } }, { bold: true, size: 21 }));
         children.push(table(["年", "値"], c.labels.map((l, k) => [str(l), str(c.values[k])])));
-        if (c.source) children.push(para("出典: " + c.source, { spacing: { before: 60 } }, { size: 16, color: GREY }));
+        if (c.source) children.push(para("出典：" + c.source, { spacing: { before: 60 } }, { size: 16, color: GREY }));
       }
       if (s.table && (s.table.rows || []).length) {
         children.push(new Paragraph({ spacing: { before: 200 }, children: [] }));
@@ -140,7 +140,7 @@
         if (im.caption) children.push(para(im.caption, { alignment: AlignmentType.CENTER }, { size: 16, color: GREY }));
       }
       const src = srcLine(s.sources);
-      if (src) children.push(para("出典: " + src, { spacing: { before: 240 } }, { size: 16, color: GREY }));
+      if (src) children.push(para("出典：" + src, { spacing: { before: 240 } }, { size: 16, color: GREY }));
     });
 
     return new Document({

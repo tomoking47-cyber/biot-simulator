@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
     const from = String(conf.from_email || "Artisans Production Formula Bridge <onboarding@resend.dev>");
     const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
     const subject = "[処方ブリッジ] テストメール（送信設定の確認）";
-    const res = await sendMail(sender, to, subject, `<p>処方ブリッジからのテストメールです。このメールが届いていれば、メール送信の設定は完了しています。</p><p>送信元: ${esc(sender)}<br>送信日時: ${esc(new Date().toISOString())}</p>`);
+    const res = await sendMail(sender, to, subject, `<p>処方ブリッジからのテストメールです。このメールが届いていれば、メール送信の設定は完了しています。</p><p>送信元：${esc(sender)}<br>送信日時：${esc(new Date().toISOString())}</p>`);
     await service.from("mail_log").insert({ kind: "test", to_email: to.join(","), subject, ok: !!res?.ok, detail: res ? res.detail : "mail server not configured" });
     return json(res ? (res.ok ? { sent: true, to } : { sent: false, reason: "send_failed", detail: res.detail }) : { sent: false, reason: "not_configured" });
   }
@@ -95,7 +95,7 @@ Deno.serve(async (req) => {
     const brief = String((a.request_snapshot as any)?.brief?.en ?? ""), briefId = String((a.request_snapshot as any)?.brief?.id ?? "");
     subject = `[Formula Bridge] New development request from Japan / Permintaan pengembangan baru dari Jepang: ${pj?.name ?? ""}`;
     html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p>
-      <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Artisans Production Co., Ltd. (Jepang).</p>
+      <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda telah menerima permintaan pengembangan formula baru dari Artisans Production Co., Ltd. (Jepang).</p>
       <p><a href="${esc(link)}" style="display:inline-block;background:#1E1C19;color:#fff;padding:11px 22px;border-radius:2px;letter-spacing:.08em;text-decoration:none">Open the request / Buka permintaan</a></p>
       ${(a.request_snapshot as any)?.request?.requester ? `<p>Requested by / Diminta oleh: <b>${esc((a.request_snapshot as any).request.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}
       <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.<br>Silakan masuk dengan email dan kata sandi terdaftar Anda, lalu isi halaman pengembangan dalam bahasa Inggris.</p>
@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
     to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
     const fb = a.feedback as Record<string, string>;
     subject = `[Formula Bridge] Feedback from Japan / Umpan balik dari Jepang: ${pj?.name ?? ""}`;
-    const decId = fb.decision_id || ({ "採用候補": "Kandidat untuk diadopsi", "再試作を依頼": "Mohon revisi dan kirim sampel baru", "不採用": "Tidak diadopsi kali ini", "採用（本処方は当社に帰属）": "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd." } as Record<string, string>)[fb.decision] || "";
+    const decId = fb.decision_id || ({ "採用候補": "Kandidat untuk diadopsi", "再試作を依頼": "Mohon lakukan revisi dan kirimkan sampel baru", "不採用": "Tidak diadopsi kali ini", "採用（本処方は当社に帰属）": "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd." } as Record<string, string>)[fb.decision] || "";
     html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p><p>Artisans Production Co., Ltd. (Japan) has sent feedback on your sample.<br>Artisans Production Co., Ltd. (Jepang) telah mengirimkan umpan balik atas sampel Anda.</p>
       <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}${decId ? ` / ${esc(decId)}` : ""}</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
