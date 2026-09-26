@@ -318,12 +318,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     // No rows: the blank fill-in template (with example and instructions). With rows: the formula itself (still
     // readable by the import, since the marker and header row stay the same).
     const tpl = !rows.length;
-    const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = tpl ? 40 : rows.length, extra = tpl ? [] : ["% w/w", "日本語表示名称 (Japanese label name)", "確認事項（AI）"];
+    const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = tpl ? 40 : rows.length, extra = tpl ? [] : ["% w/w", "日本語表示名称 (Japanese label name)", ...(S.isAdmin ? ["確認事項（AI）"] : [])]; // the notes are for Japan
     const head = TPL_HEAD.map((h) => h + (h === "No." || !tpl ? "" : " *")).concat(extra);
     const cell = (v) => (v === "" || v == null ? "" : /^\s*-?[\d.,]+\s*$/.test(String(v)) ? num(v) : String(v)); // "0,5" is a number too
     const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], [tpl ? "Fill in EVERY cell in English (Nama bahan: in Indonesian). Do not change the header row (row 7). / Isi SEMUA sel dalam bahasa Inggris (Nama bahan: dalam bahasa Indonesia). Jangan ubah baris judul kolom (baris 7)." : "Formula (this file can be dropped into Formula Bridge again) / Formula (file ini dapat diunggah kembali ke Formula Bridge)"],
       ["Project / Proyek", project || ""], ["Company / Perusahaan", company || ""], ["Amount unit (write %, g or mL) / Satuan jumlah (tulis %, g, atau mL) *", unit || "%"], [],
-      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", [S.isAdmin ? jaStatusText(r) : "", r.jaNote || ""].filter(Boolean).join(" ")] : [i + 1, "", "", "", "", "", "", ""]; }),
+      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", ...(S.isAdmin ? [[jaStatusText(r), r.jaNote || ""].filter(Boolean).join(" ")] : [])] : [i + 1, "", "", "", "", "", "", ""]; }),
       ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
     ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
     ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
@@ -356,8 +356,8 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
         const part = rows.slice(pg * per, pg * per + per);
         host.innerHTML = `<div class="pdf-page"><div class="pdf-head">${logoData ? `<img src="${logoData}" alt="">` : ""}<div><div class="pdf-t">Formula / 処方表</div><div class="pdf-m">Project: <b>${esc(project || "")}</b>　Company: <b>${esc(company || "")}</b>${requester ? `　Requested by: ${esc(requester)}` : ""}</div>
           <div class="pdf-m">Unit: ${unit === "%" ? "% w/w" : esc(unit) + " per batch (% calculated)"}　Date: ${today()}　Page ${pg + 1}/${pages}</div></div><div class="pdf-brand">BIOT<br><span>Artisans Production Co., Ltd.</span></div></div>
-          <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>日本語表示名称</th></tr></thead><tbody>
-          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}${jaUnsure(r) ? " ［要確認］" : ""}</td></tr>`).join("")}
+          <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>${S.isAdmin ? "日本語表示名称" : "Japanese label name / 日本語表示名称"}</th></tr></thead><tbody>
+          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}${S.isAdmin && jaUnsure(r) ? " ［要確認］" : ""}</td></tr>`).join("")}
           ${pg === pages - 1 ? `<tr class="tot"><td colspan="6" style="text-align:right">Total</td>${unit === "%" ? "" : `<td class="n">${fmt(tot)}</td>`}<td class="n">${fmt(rows.reduce((a, r) => a + num(r.pct), 0))}</td><td colspan="2"></td></tr>` : ""}</tbody></table>
           <div class="pdf-foot">Confidential — Formula Bridge / Artisans Production Co., Ltd.</div></div>`;
         const cv = await h2c(host.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
@@ -566,7 +566,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       <div class="card"><h2>${FLAG_ID}A. Product overview / Ringkasan produk</h2><p class="sub">Changes are saved automatically. / Perubahan tersimpan otomatis. <span class="saved" id="saved"></span></p>
         <div class="targets"><div><span>${FLAG_JP}Target raw material cost / unit · Target biaya bahan baku / unit</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}Target finished product cost / unit · Target biaya produk jadi / unit</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}Planned retail price (incl. tax) · Rencana harga jual (termasuk pajak)</span><b>${esc(rq.price || "—")}</b></div></div>
         <div id="prod-fields"></div></div>
-      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula / Formula dasar</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian ingredient name (Nama bahan) and the amount. Then press “Convert to Japanese names” to fill in the Japanese names. / Satu baris per bahan baku. Isi Nama bahan dan jumlahnya, lalu tekan “Konversi ke nama Jepang” untuk mengisi nama Jepang secara otomatis.</p></div>
+      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula / Formula dasar</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian ingredient name (Nama bahan) and the amount. Then press “Convert to Japanese names” to fill in the Japanese names automatically. / Satu baris per bahan baku. Isi Nama bahan dan jumlahnya, lalu tekan “Konversi ke nama Jepang” untuk mengisi nama Jepang secara otomatis.</p></div>
         <div class="to-ja-wrap"><span class="next-tag" id="to-ja-tag" hidden>Next step / Langkah berikutnya</span><button class="btn ghost" id="to-ja">Convert to Japanese names / Konversi ke nama Jepang / 日本語表示名称に変換</button></div></div>
         <div class="tpl-box"><div><b>① Download our formula template (Excel), fill in every cell, then ② drop it in the box below.</b>
           <span>A PDF in your lab's own format is also OK — any empty cells must then be filled in here. / Unduh template formula kami (Excel), isi semua sel, lalu letakkan file di kotak di bawah. PDF dengan format lab Anda sendiri juga boleh — sel yang kosong harus diisi di sini.</span></div>
@@ -691,7 +691,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     const readB64 = (file) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(file); });
     const drop = $("f-drop"), dropSt = $("st-drop");
     const fMeta = () => ({ project: snap.name, company: S.company?.name, logo: logoUrls[S.company?.logo_path], unit: sp.formulaUnit, rows: sp.formula.filter((r) => r.trade || r.idName || r.inci), requester: rq.requester });
-    $("f-xlsx").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the Excel… / Membuat Excel…", async () => { download(fileBase(snap.name, "formula") + ".xlsx", await formulaXlsx(fMeta())); $("st-toja").textContent = "✓ Excel saved / Excel tersimpan"; });
+    $("f-xlsx").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the Excel… / Membuat Excel…", async () => { if (!fMeta().rows.length) throw { userMsg: "The formula is empty. / Formula masih kosong." }; download(fileBase(snap.name, "formula") + ".xlsx", await formulaXlsx(fMeta())); $("st-toja").textContent = "✓ Excel saved / Excel tersimpan"; });
     $("f-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Making the PDF… / Membuat PDF…", async () => {
       if (!fMeta().rows.length) throw { userMsg: "The formula is empty. / Formula masih kosong." };
       download(fileBase(snap.name, "formula") + ".pdf", await formulaPdf(fMeta())); $("st-toja").textContent = "✓ PDF saved / PDF tersimpan";
@@ -765,7 +765,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
           const rows = items.map((x) => ({ phase: String(x.phase || ""), trade: String(x.trade || ""), idName: String(x.idName || ""), inci: String(x.inci || ""), maker: String(x.maker || ""), fn: String(x.fn || ""), ...(unit === "%" ? { pct: String(x.amt || "") } : { amt: String(x.amt || "") }) }));
           if (replace) { sp.formula.splice(0, sp.formula.length, ...rows); sp.formulaUnit = unit; }
           else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead. / Satuan file berbeda dengan tabel — ganti tabel.`; return; } sp.formula.push(...rows); }
-          $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
+          dropSt.className = "status"; $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
           $("drop-preview").innerHTML = ""; const nb = blanks().length;
           dropSt.textContent = nb ? `✓ ${rows.length} rows added. Next, fill in the empty (yellow) cells, then press "Convert to Japanese names" (top right). / ✓ ${rows.length} baris ditambahkan. Isi sel kosong (kuning), lalu tekan "Konversi ke nama Jepang" (kanan atas).` : `✓ ${rows.length} rows added. Next, press "Convert to Japanese names" (top right, highlighted). / ✓ ${rows.length} baris ditambahkan. Selanjutnya tekan "Konversi ke nama Jepang" (kanan atas, disorot).`;
           $("to-ja").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -802,7 +802,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       if (r) {
         const f0 = sp.files[+r.dataset.rm];
         if (!(await confirmModal({ title: "Delete this file? / Hapus file ini?", body: `<p>${esc(f0?.name || "")}</p><p class="sub">This cannot be undone. / Tindakan ini tidak dapat dibatalkan.</p>`, ok: "Delete / Hapus", tone: "danger" }))) return;
-        const f = sp.files.splice(+r.dataset.rm, 1)[0]; renderFiles(); save.soon(); if (f) await sb.storage.from("attachments").remove([f.path]);
+        const i = sp.files.indexOf(f0); if (i < 0) return; // the list may have changed while the dialog was open
+        const f = sp.files.splice(i, 1)[0]; renderFiles(); save.soon(); if (f) await sb.storage.from("attachments").remove([f.path]);
       }
     };
     renderFiles();
@@ -873,7 +874,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const { data: r } = await sb.functions.invoke("notify", { body: { event: "submit", assignment_id: aid } });
       $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan. / Selesai: diajukan ke Jepang." + (r?.sent ? (fileNote ? " Japan has been emailed. / Jepang telah menerima email." : " Japan has been emailed (with the formula Excel + PDF). / Jepang telah menerima email (dengan Excel + PDF formula).") : "") + fileNote;
       shipState(); $("ship-card").scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Done: submitted to Japan ✓ / Selesai: diajukan ke Jepang ✓", r?.sent ? "Japan's development team has been notified by email. / Tim pengembangan Jepang telah diberi tahu melalui email. Terima kasih!" : "Japan will see it in Formula Bridge. / Jepang akan melihatnya di Formula Bridge. Terima kasih!");
+      toast("Done: submitted to Japan ✓ / Selesai: diajukan ke Jepang ✓", r?.sent ? "Japan's development team has been notified by email. Thank you! / Tim pengembangan Jepang telah diberi tahu melalui email. Terima kasih!" : "Japan will see it in Formula Bridge. Thank you! / Jepang akan melihatnya di Formula Bridge. Terima kasih!");
       document.querySelector(".who").classList.add("is-done"); document.querySelector(".who .state").textContent = "Done / Selesai ✓";
     });
 
@@ -1157,15 +1158,20 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const { error } = await sb.from("settings").upsert(up);
       $("st-set").className = error ? "status err" : "status"; $("st-set").textContent = error ? "保存できませんでした：" + error.message : "保存しました ✓";
     };
-    const { data: dic } = await sb.from("label_names").select("*").order("checked_at", { ascending: false }).limit(2000);
+    let dic = null; // loaded in the background, so that the other buttons work at once
     const LV = { official: '<span class="jchk ok">粧工連リスト</span>', web: '<span class="jchk web">Web出典</span>', manual: '<span class="jchk ok">当社で確認</span>' };
     const drawDic = () => {
+      if (!$("dic")) return; // the page was left
+      if (!dic) { $("dic").innerHTML = ""; $("st-dic").textContent = "読み込んでいます…"; return; }
       const q = $("dic-q").value.trim().toLowerCase(), rows = (dic || []).filter((x) => !q || x.inci.toLowerCase().includes(q) || x.ja.includes(q));
       $("dic").innerHTML = `<thead><tr><th>INCI</th><th>日本語表示名称</th><th>確認方法</th><th>出典</th><th>確認日</th><th></th></tr></thead><tbody>${rows.slice(0, 300).map((x) => `<tr><td>${esc(x.inci)}</td><td>${esc(x.ja)}</td><td>${LV[x.level] || esc(x.level)}${x.confirmed_by ? `<div class="muted" style="font-size:11px">${esc(x.confirmed_by)}</div>` : ""}</td>
         <td>${/^https:\/\//.test(x.source_url || "") ? `<a class="jsrc" href="${esc(x.source_url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.source_url))}</a>` : "—"}</td><td>${d(x.checked_at)}</td><td><button type="button" class="linkbtn" data-deldic="${esc(x.inci_key)}">削除</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">まだ登録がありません。「日本語表示名称に変換」を使うと、確認できた名称がここに保存されます。</td></tr>'}</tbody>`;
       $("st-dic").textContent = rows.length > 300 ? `${rows.length}件中300件を表示しています。絞り込んでください。` : `${rows.length}件`;
     };
     $("dic-q").oninput = drawDic; drawDic();
+    sb.from("label_names").select("*").order("checked_at", { ascending: false }).limit(2000).then(({ data, error }) => {
+      dic = data || []; drawDic(); if (error && $("st-dic")) $("st-dic").textContent = "辞書を読み込めませんでした：" + error.message;
+    });
     $("dic").onclick = async (e) => {
       const b = e.target.closest("[data-deldic]"); if (!b) return;
       const row = (dic || []).find((x) => x.inci_key === b.dataset.deldic); if (!row) return;
@@ -1467,6 +1473,7 @@ ${GLOSSARY}
 JSONのみで返答: {"ja": string}
 
 ${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
+      if (!String(res.ja || "").trim()) throw { userMsg: "翻訳に失敗しました。もう一度押してください。" };
       $("st-tr").textContent = "訳を別のAIで確認しています…";
       const ck = await checkTranslation(supplierEnglish(adopted.supplier || {}), "en", { ja: String(res.ja || "") });
       fin.sup_ja = ck.fixed.ja; $("sup-ja").textContent = fin.sup_ja; save.soon(); await save.now(); $("st-tr").innerHTML = checkHtml(ck);
@@ -1630,19 +1637,20 @@ JSONのみで返答: {"asOf":"YYYY-MM","markets":{"<jp|id|asia>":{"summary":"","
 - 各ページ: title（20字以内）、lead（結論を1文、60字以内）、bullets（3〜6項目、各60字以内）、sources（[{label,url}]）。
 - ページ構成は次の key の順で必ず10ページ: ${SLIDE_KEYS.map(([k, t]) => `${k}=${t}`).join(", ")}。
 - cover の bullets には案件名・カテゴリ・販売市場・作成日(${today()})を入れる。summary は何を・なぜ今・いくらで・いつまでに。roadmap にはリスク（規制・原料調達・為替・品質）と対策、次のアクション。`;
-      const draftPrompt = `あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
-次のJSONデータと、添付されたメーカー提出資料（PDF・画像）だけを根拠に書くこと。
+      // Built when sent: the retry without attachments must not mention the files any more.
+      const draftPrompt = () => `あなたは上場化粧品メーカーの経営企画室長です。取締役会に出す新商品の企画書（10ページ）を日本語で作ります。
+${files.names.length ? "次のJSONデータと、添付されたメーカー提出資料（PDF・画像）だけを根拠に書くこと。" : "次のJSONデータだけを根拠に書くこと（メーカー提出資料のファイルは添付されていないので、出典に挙げないこと）。"}
 ${RULES}
 JSONのみで返答: {"title": string, "subtitle": string, "slides":[{"key":"cover","title":"","lead":"","bullets":[],"sources":[]}]}
 
 データ:
 ${JSON.stringify(input)}`;
       let dr;
-      try { dr = await aiRaw(draftPrompt, { effort: "high", documents: files.documents, images: files.images }); }
+      try { dr = await aiRaw(draftPrompt(), { effort: "high", documents: files.documents, images: files.images }); }
       catch (err) {
         if (!files.names.length || err?.code === "demo") throw err;
         log.push("添付資料を含めると処理できなかったため、添付なしで作成しました"); files.names.length = 0; input.supplier_attachments = [];
-        dr = await aiRaw(draftPrompt, { effort: "high" });
+        dr = await aiRaw(draftPrompt(), { effort: "high" });
       }
       const draft = parseJSON(dr.text);
       if (!Array.isArray(draft?.slides)) throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
@@ -1741,6 +1749,7 @@ JSONのみで返答: {"translation": string${dir === "ja2id" ? ', "back": string
 
 原文:
 ${src}`, { effort: "medium" });
+      if (!String(r.translation || "").trim()) throw { userMsg: "翻訳に失敗しました。もう一度押してください。 / Terjemahan gagal. Silakan coba lagi." };
       $("st-t").textContent = "別のAIで訳を確認しています… / Memeriksa terjemahan…";
       const from = dir === "ja2id" ? "ja" : "id", to = dir === "ja2id" ? "id" : "ja";
       const ck = await checkTranslation(src, from, { [to]: String(r.translation || "") });

@@ -70,10 +70,15 @@
         });
         if (c.source) slide.addText("出典：" + str(c.source), { x: sx, y: bottom - 0.45, w: sw, h: 0.4, fontFace: FONT, fontSize: 8, color: GREY });
       } else if (s.table && (s.table.rows || []).length) {
-        const t = s.table, maxRows = 10; // header + 10 short rows fit the slide; the Word version lists every row
+        // As many rows as fit: each row's height is estimated from its longest cell (text wraps in narrow columns).
+        // The Word version always lists every row.
+        const t = s.table, cpl = Math.max(6, Math.floor((sw / Math.max(1, t.headers.length) - 0.08) / 0.13));
+        const rh = (r) => Math.max(0.34, 0.08 + 0.16 * Math.max(1, ...r.map((x) => Math.ceil(clip(x, 40).length / cpl))));
+        let used = rh(t.headers), maxRows = 0;
+        while (maxRows < Math.min(10, t.rows.length) && used + rh(t.rows[maxRows]) <= h - 0.5) used += rh(t.rows[maxRows++]);
         const head = t.headers.map((x) => ({ text: str(x), options: { bold: true, color: "FFFFFF", fill: { color: NAVY } } }));
         const rows = t.rows.slice(0, maxRows).map((r, ri) => r.map((x) => ({ text: clip(x, 40), options: { fill: { color: ri % 2 ? "FFFFFF" : LIGHT } } })));
-        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, h: Math.min(h - 0.5, 0.36 * (rows.length + 1)), rowH: 0.34, autoPage: false, fontFace: FONT, fontSize: 9, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
+        slide.addTable([head, ...rows], { x: sx, y: top, w: sw, h: used, autoPage: false, fontFace: FONT, fontSize: 9, color: INK, border: { type: "solid", color: LINE, pt: 0.5 }, valign: "middle", margin: 0.04 });
         const cap = [t.caption, t.rows.length > maxRows ? `ほか${t.rows.length - maxRows}行は省略（Word版に全件記載）` : ""].filter(Boolean).join("　");
         if (cap) slide.addText(cap, { x: sx, y: bottom - 0.4, w: sw, h: 0.35, fontFace: FONT, fontSize: 8.5, color: GREY });
       } else if (s.image && s.image.data) {

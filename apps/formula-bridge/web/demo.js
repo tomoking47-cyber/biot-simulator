@@ -8,7 +8,7 @@
   const role = q.get("demo") === "supplier" ? "supplier" : "admin";
   const svgLogo = (bg, t) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='${bg}'/><text x='50' y='62' font-family='Arial' font-weight='700' font-size='34' fill='#fff' text-anchor='middle'>${t}</text></svg>`);
   const DEMO_LOGOS = { "demo/logo-a.jpg": svgLogo("#1F6F5C", "BN"), "demo/logo-c.jpg": svgLogo("#8A3B8F", "SK") };
-  const KEY = "fb-demo-db-v5";
+  const KEY = "fb-demo-db-v6";
   const now = Date.now(), ago = (h) => new Date(now - h * 3600e3).toISOString();
 
   const CA = "c-demo-a", CB = "c-demo-b", CC = "c-demo-c", P1 = "p-demo-1", ADMIN = "u-demo-admin", SUP = "u-demo-sup";
@@ -53,11 +53,13 @@
         ["market_asia", "市場動向（インドネシア・アジア）", "インドネシアの化粧品市場は成長が続き、EC比率が上昇。", ["出典付きの調査データから作成（デモでは省略）"]],
         ["competitors", "競合分析", "ドラッグストアの保湿化粧水は大手と新興ブランドが競合。", ["価格帯1,500〜2,500円に競合が集中", "差別化軸：成分の見える化と国内製造"]],
         ["concept", "製品コンセプトとターゲット", "とろみがあるのにさっぱり、毎日のバリアケア。", ["ターゲット：30〜40代・乾燥とハリ不足", "無香料・パラベンフリー・エタノールフリー"]],
-        ["formula", "処方と訴求成分", "セラミドNPとナイアシンアミドを訴求成分とする。", ["全成分は別表", "配合量は社外秘のため別紙"]],
+        ["formula", "処方と訴求成分", "セラミドNPとナイアシンアミドを訴求成分とする。", ["訴求成分：セラミドNP・ナイアシンアミド", "当社追記：アセチルヒアルロン酸Na（保湿）"]],
         ["evidence", "エビデンス", "原料メーカーのデータと第三者試験で訴求を裏付ける。", ["パッチテスト（デモ・実在しないデータ）"]],
         ["business", "価格・販売チャネル・収益計画", "販売価格1,980円、完成品コスト240円。", ["チャネル：ドラッグストア・EC", "初年度販売目標：【要確認】"]],
         ["roadmap", "スケジュール・リスク・次のアクション", "10月末試作→評価→2027年春発売。", ["リスク：原料供給・為替・品質（COAで管理）", "次のアクション：試作評価とフィードバック"]]]
-        .map(([key, title, lead, bullets]) => ({ key, title, lead, bullets, sources: [] })) } }],
+        .map(([key, title, lead, bullets]) => ({ key, title, lead, bullets, sources: [], ...(key === "formula" ? { table: { headers: ["No.", "日本語表示名称", "配合目的", "区分"],
+          rows: [["1", "水", "溶剤", "ベース"], ["2", "ＢＧ", "保湿剤", "ベース"], ["3", "グリセリン", "保湿剤", "ベース"], ["4", "ナイアシンアミド", "肌コンディショニング", "ベース"], ["5", "セラミドＮＰ", "肌コンディショニング", "ベース"], ["6", "アセチルヒアルロン酸Ｎａ", "保湿剤", "当社追記"]],
+          caption: "（デモ）主な成分のみ。配合量は社外秘のため別紙" } } : {}) })) } }],
     market: [], mail_log: [], label_names: [], admin_emails: [{ email: "demo-admin@example.com" }],
     settings: [{ key: "dev_email", value: "dev@example.co.jp" }, { key: "app_url", value: location.origin }],
     terms: [["nda", "Confidentiality Agreement (NDA)", "Perjanjian Kerahasiaan (NDA)", "秘密保持契約（NDA）"], ["purchase", "Declaration of Raw Material Purchase by Artisans Production", "Pernyataan Pembelian Bahan Baku oleh Artisans Production", "原料購入に関する当社宣言書"], ["ip", "Ownership of Adopted Formulas", "Kepemilikan Formula yang Diadopsi", "採用処方の帰属に関する合意"]]
@@ -157,7 +159,7 @@
         : { data: null, error: { context: { json: async () => ({ error: "demo" }) } } },
     },
     storage: { from: () => ({
-      upload: async () => ({ error: { message: "デモではアップロードできません / Uploading is disabled in the demo." } }),
+      upload: async () => ({ error: { message: "デモではアップロードできません / Uploading is disabled in the demo. / Pengunggahan dinonaktifkan dalam demo." } }),
       remove: async () => ({ error: null }),
       createSignedUrl: async () => ({ error: { message: "demo" } }),
       createSignedUrls: async (paths) => ({ data: paths.map((x) => ({ path: x, signedUrl: DEMO_LOGOS[x] || null })), error: null }),
