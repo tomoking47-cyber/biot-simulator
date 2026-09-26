@@ -262,14 +262,14 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     $("f-login").onsubmit = async (e) => {
       e.preventDefault();
       const st = $("st-login"), btn = e.submitter || $("f-login").querySelector("button[type=submit]");
-      if (btn.disabled) return; btn.disabled = true; st.className = "status"; st.textContent = "Signing in… / Masuk…";
+      if (btn.disabled) return; btn.disabled = true; st.className = "status"; st.textContent = "Signing in… / Sedang masuk… / ログインしています…";
       let error; signingIn = true;
       try { ({ error } = await sb.auth.signInWithPassword({ email: $("l-email").value.trim(), password: $("l-pass").value })); }
       catch (x) { error = { message: String(x?.message || x) }; }
       finally { btn.disabled = false; }
       if (error) signingIn = false;
       if (error) { st.className = "status err"; st.textContent = /confirm/i.test(error.message) ? "Please confirm your email first (check your inbox). / Harap konfirmasi email Anda terlebih dahulu. / 確認メールのリンクを先に開いてください。" : /invalid login credentials/i.test(error.message) ? "Email or password is incorrect. / Email atau kata sandi salah. / メールアドレスかパスワードが違います。"
-        : "Could not sign in: " + error.message + " / Gagal masuk. Silakan coba lagi. / ログインできませんでした。もう一度お試しください。"; return; }
+        : "Could not sign in. Please try again. / Gagal masuk. Silakan coba lagi. / ログインできませんでした。もう一度お試しください。 (" + error.message + ")"; return; }
       try { await afterSignIn(); } finally { signingIn = false; }
     };
   }
@@ -278,12 +278,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     $("topbar").hidden = true;
     app.innerHTML = `<div class="auth card"><h1>Reset password / Atur ulang kata sandi / パスワード再設定</h1>
       <form id="f-reset"><div class="field"><label for="r-email">Email</label><input id="r-email" type="email" required></div>
-      <div class="row"><button class="btn" type="submit">Send reset link / Kirim tautan</button><a href="#/login" class="linkbtn">Back / Kembali</a></div>
+      <div class="row"><button class="btn" type="submit">Send reset link / Kirim tautan atur ulang / 再設定メールを送る</button><a href="#/login" class="linkbtn">Back / Kembali / 戻る</a></div>
       <div class="status" id="st-reset"></div></form></div>`;
     $("f-reset").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-reset").querySelector("button"), $("st-reset"), "Sending… / Mengirim… / 送信しています…", async () => {
       const { error } = await sb.auth.resetPasswordForEmail($("r-email").value.trim(), { redirectTo: location.origin + location.pathname + "#/update-password" });
       if (error) throw { userMsg: "Could not send / Gagal mengirim / 送信できませんでした: " + error.message };
-      $("st-reset").className = "status"; $("st-reset").textContent = "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みなら再設定メールを送りました。";
+      $("st-reset").className = "status"; $("st-reset").textContent = "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みのアドレスであれば、再設定用のメールをお送りしました。";
     }); };
   }
   function viewUpdatePassword(inApp) {
@@ -409,12 +409,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     // itself keeps going for the next save.
     let last = Promise.resolve(); const me = {};
     const run = () => { pending = false;
-      last = chain.then(fn).then(() => { if (!pending) unsaved.delete(me); autosave("ok"); if (st) st.textContent = "Saved / Tersimpan / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
-        (e) => { pending = true; autosave("error"); console.error(e);
+      const p = last = chain.then(fn).then(() => { if (last !== p) return; if (!pending) unsaved.delete(me); autosave("ok"); if (st) st.textContent = "Saved / Tersimpan / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
+        (e) => { if (last === p) { pending = true; autosave("error"); } console.error(e);
           const why = /adopted formula is locked/.test(e?.message || "") ? "This formula has been adopted by Japan and can no longer be changed. / Formula ini telah diadopsi oleh Jepang dan tidak dapat diubah lagi. / 採用・確定済みのため変更できません。" : (e?.message || e?.userMsg || "");
-          if (st) st.textContent = "Could not save / Gagal menyimpan / 保存できませんでした";
+          if (st && last === p) st.textContent = "Could not save / Gagal menyimpan / 保存できませんでした";
           throw { userMsg: "Could not save / Gagal menyimpan / 保存できませんでした: " + why }; });
-      chain = last.catch(() => {}); return last; };
+      chain = p.catch(() => {}); return p; };
     // Save now (used before signing out so the last edit is not lost).
     me.flush = () => { clearTimeout(t); return pending ? run().catch(() => {}) : last.catch(() => {}); };
     return { soon() { pending = true; unsaved.add(me); autosave("saving"); if (st) st.textContent = "Saving… / Menyimpan… / 保存中…"; clearTimeout(t); t = setTimeout(() => run().catch(() => {}), 1000); }, now() { clearTimeout(t); return pending ? run() : last; } };
@@ -535,7 +535,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   /* ================= SUPPLIER (Indonesia) ================= */
   async function supplierHome() {
     const { data: rows, error } = await sb.from("assignments").select("id, status, request_snapshot, requested_at, submitted_at, shipped_at, feedback_at, updated_at").order("requested_at", { ascending: false });
-    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG). Jepang menggunakannya untuk membedakan pemasok. <a href="#/company">Company profile / Profil perusahaan →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these. / Hanya perusahaan Anda yang dapat melihatnya.</small></div>
+    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG or PNG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG atau PNG). Jepang menggunakannya untuk membedakan pemasok. <a href="#/company">Company profile / Profil perusahaan →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these. / Hanya perusahaan Anda yang dapat melihatnya.</small></div>
       <div class="card en"><h2>Requests / Permintaan</h2>
       ${error ? `<p class="status err">${esc(error.message)}</p>` : (rows || []).length ? `<div class="tbl-wrap"><table class="view master"><thead><tr><th>Project / Proyek</th><th>Received / Diterima</th><th>Status</th><th>Submitted / Diajukan</th><th>Sample shipped / Sampel dikirim</th><th>Feedback / Umpan balik</th><th></th></tr></thead><tbody>
       ${rows.map((a) => `<tr><td>${esc(a.request_snapshot?.name || "(project)")}</td><td>${d(a.requested_at)}</td><td>${chip(a.status, true)}</td><td>${d(a.submitted_at)}</td><td>${a.shipped_at ? '<span class="chip done">Shipped / Terkirim ✓</span>' : "—"}</td><td>${a.feedback_at ? '<span class="chip done">Received / Diterima ✓</span>' : "—"}</td><td><a href="#/a/${a.id}">Open / Buka →</a></td></tr>`).join("")}
@@ -1364,7 +1364,7 @@ ${body}`, { effort: "medium" });
       pv.querySelectorAll("[data-a]").forEach((b) => (b.onclick = () => { cur = sent.find((a) => a.id === b.dataset.a); draw(); }));
       pv.querySelectorAll("[data-open]").forEach((b) => (b.onclick = () => openFile(sp.files[+b.dataset.open].path)));
       if ($("copy-trk")) $("copy-trk").onclick = (e) => copy(cur.shipment?.tracking || "", e.currentTarget);
-      $("fb-send").onclick = (e) => busy(e.currentTarget, $("st-fb"), "翻訳して送っています…", async () => {
+      $("fb-send").onclick = (e) => busy(e.currentTarget, $("st-fb"), "翻訳して送っています…", async () => { const a = cur;
         const ja = $("fb-ja").value.trim(), dec = FB_DECISIONS.find(([x]) => x === $("fb-dec").value);
         if (!ja) throw { userMsg: "コメントを入力してください。" };
         $("st-fb").textContent = "翻訳しています…（送る前に確認画面が出ます）";
@@ -1379,16 +1379,16 @@ ${ja}`, { effort: "medium" });
         $("st-fb").textContent = "翻訳を別のAIで確認しています…";
         const ck = await checkTranslation(ja, "ja", { en: String(r.en), id: String(r.id || "") }, `これはサンプル評価のコメントです（判定「${dec[0]}」は定型の訳で別に送るので、コメントの訳だけを確認すること）。`);
         r.en = ck.fixed.en; r.id = ck.fixed.id;
-        await ask({ title: `${coName(cur.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
+        await ask({ title: `${coName(a.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
           body: `<p class="sub">相手には英語とインドネシア語で届きます。訳文を確認してください。</p>${kvHtml([["判定", `${dec[0]}（${dec[1]}）`]])}
             ${checkHtml(ck)}<h3>日本語（原文）</h3><div class="brief-out ja">${esc(ja)}</div><h3>English</h3><div class="brief-out">${esc(r.en)}</div>${ck.back.en ? `<details><summary class="sub">英語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.en)}</div></details>` : ""}<h3>Bahasa Indonesia</h3><div class="brief-out">${esc(r.id || "")}</div>${ck.back.id ? `<details><summary class="sub">インドネシア語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.id)}</div></details>` : ""}` });
-        const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(cur.feedback?.history || []), ...(cur.feedback?.ja ? [{ at: cur.feedback_at, decision: cur.feedback.decision, ja: cur.feedback.ja }] : [])] };
-        const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", cur.id).select("*").single();
+        const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(a.feedback?.history || []), ...(a.feedback?.ja ? [{ at: a.feedback_at, decision: a.feedback.decision, ja: a.feedback.ja }] : [])] };
+        const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", a.id).select("*").single();
         if (error) throw error;
-        Object.assign(cur, up);
-        const { data: n } = await sb.functions.invoke("notify", { body: { event: "feedback", assignment_id: cur.id } });
-        draw(); $("st-fb").textContent = "✓ 完了：フィードバックを送りました" + (n?.sent ? "（メール送信済み）" : n?.reason === "not_configured" ? "（メール未設定のため画面のみ）" : "（メールは未送信・画面には反映済み）");
-        toast("完了：フィードバックを送りました", `${coName(cur.company_id)} に英語・インドネシア語で届きます。`);
+        Object.assign(a, up);
+        const { data: n } = await sb.functions.invoke("notify", { body: { event: "feedback", assignment_id: a.id } });
+        if (cur === a) { draw(); $("st-fb").textContent = "✓ 完了：フィードバックを送りました" + (n?.sent ? "（メール送信済み）" : n?.reason === "not_configured" ? "（メール未設定のため画面のみ）" : "（メールは未送信・画面には反映済み）"); }
+        toast("完了：フィードバックを送りました", `${coName(a.company_id)} に英語・インドネシア語で届きます。`);
       });
       const fcols = sp.formulaUnit && sp.formulaUnit !== "%" ? COLS.formula.flatMap((c) => c.k === "pct" ? [{ k: "amt", l: `Amount (${sp.formulaUnit}) per batch / Jumlah (${sp.formulaUnit}) per batch`, w: 110, num: true, total: true }, { k: "pct", l: "% w/w (auto) / % b/b (otomatis)", w: 90, num: true }] : [c]) : COLS.formula;
       editTable($("t-f"), fcols, sp.formula, () => {}, { totalCheck: true, readOnly: true });
@@ -1397,16 +1397,17 @@ ${ja}`, { effort: "medium" });
       $("a-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "PDFを作成しています…", async () => { if (!sp.formula.length) throw { userMsg: "処方がまだありません。" }; download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".pdf", await formulaPdf(am())); $("st-toja").textContent = "✓ PDFを保存しました"; });
       editTable($("t-m"), COLS.materials, sp.materials, () => {}, { readOnly: true });
       editTable($("t-t"), COLS.tests, sp.tests, () => {}, { readOnly: true });
-      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "日本語表示名称を調べています…（公式リストと出典ページで確認するため1〜3分かかります）", async () => {
+      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "日本語表示名称を調べています…（公式リストと出典ページで確認するため1〜3分かかります）", async () => { const a = cur;
         // Convert on the latest data and write back only the Japanese-name fields, so the supplier's newer edits survive.
-        const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle(); if (e1) throw e1;
+        const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", a.id).maybeSingle(); if (e1) throw e1;
         const latest = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, fresh?.supplier || {});
-        const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
-        const { data: again } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle();
+        const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { if (cur === a) $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
+        const { data: again } = await sb.from("assignments").select("supplier").eq("id", a.id).maybeSingle();
         const merged = Object.assign({}, again?.supplier || latest);
         merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") && (c.inci || "") === (r.inci || c.inci || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, jaLevel: c.jaLevel, jaSrc: c.jaSrc, inci: r.inci || c.inci } : r; });
-        const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", cur.id); if (error) throw error;
-        cur.supplier = merged;
+        const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", a.id); if (error) throw error;
+        a.supplier = merged;
+        if (cur !== a) { toast("完了：日本語表示名称に変換しました", `${coName(a.company_id)}：${n}行`); return; }
         draw(); $("st-toja").textContent = `✓ ${n}行を変換しました。` + (unsure ? `うち${unsure}行は出典で確認できず「要確認」です（確認事項の欄をご覧ください）。` : failed ? "" : "すべて出典で確認できました。") + (failed ? `　${failed}行は調べられませんでした。もう一度押してください。` : "");
       });
     };
@@ -1702,7 +1703,7 @@ ${JSON.stringify(critique)}`, { effort: "high" }));
       const tests = sp.tests || [], img = (sp.files || []).find((f) => /^image\/(png|jpe?g|gif)/.test(f.type || ""));
       if (tests.length) sl("evidence").table = { headers: ["試験機関", "試験項目", "方法", "結果", "日付"], rows: tests.map((t) => [t.lab, t.item, t.method, t.result, t.date].map((x) => String(x || ""))) };
       else if (img) { sl("evidence").imagePath = img.path; sl("evidence").imageCaption = img.desc || img.name; }
-      if (research) { const rc = Object.entries(pick(research.competitors)).flatMap(([m, arr]) => (arr || []).slice(0, 4).map((c) => [MK[m] || m, c.name + (c.price ? `（${c.price}）` : ""), (c.verified ? "" : "【要確認】") + (c.note || "") + ` ［${c.source || ""}］`])); if (rc.length && !compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要・出典"], rows: rc, caption: `Gemini による Google 検索（${research.asOf || today()}時点）` }; }
+      if (research) { const rc = Object.entries(pick(research.competitors)).flatMap(([m, arr]) => (arr || []).slice(0, 4).map((c) => [MK[m] || m, String(c.name || "【要確認】") + (c.price ? `（${c.price}）` : ""), (c.verified ? "" : "【要確認】") + (c.note || "") + ` ［${c.source || ""}］`])); if (rc.length && !compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要・出典"], rows: rc, caption: `Gemini による Google 検索（${research.asOf || today()}時点）` }; }
       P.plan = { title: String(plan.title || p.name), subtitle: String(plan.subtitle || ""), date: today(), slides,
         council: { at: new Date().toISOString(), log, attachments: files.names,
           research: research ? { model: research.model, asOf: research.asOf, queries: research.queries.slice(0, 8), sources: research.sources.slice(0, 20), verified: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].filter((x) => x.verified).length, items: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].length } : null,
