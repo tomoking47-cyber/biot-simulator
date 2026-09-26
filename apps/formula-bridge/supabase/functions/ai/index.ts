@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
     const rows = (Array.isArray(body.rows) ? body.rows : []).slice(0, 12).map((r) => ({ i: Number(r?.i), trade: String(r?.trade ?? "").slice(0, 200), idName: String(r?.idName ?? "").slice(0, 200), inci: String(r?.inci ?? "").slice(0, 500) }));
     if (!rows.length) return json({ error: "bad_request", message: "rows missing" }, 400);
     return keepAlive((async () => {
-      try { return json({ items: await labelNames(service, key, rows) }); }
+      try { return json({ items: await labelNames(service, key, rows, { isAdmin: me?.role === "admin" }) }); }
       catch (e) {
         if (e instanceof Anthropic.RateLimitError) return json({ error: "rate_limited" }, 429);
         if (e instanceof Anthropic.AuthenticationError) return json({ error: "not_configured" }, 503);
