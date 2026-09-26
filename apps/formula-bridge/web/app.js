@@ -123,7 +123,54 @@
 全成分=full ingredient list (INCI) / daftar bahan lengkap, 原料=raw material / bahan baku, 規格書=specification / spesifikasi, SDS, COA,
 防腐剤=preservative / pengawet, 増粘剤=thickener / pengental, 保湿剤=humectant / humektan, 乳化剤=emulsifier / pengemulsi,
 安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test / uji efektivitas pengawet, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期（リードタイム）=lead time / waktu tunggu, 原料費=raw material cost / biaya bahan baku, 完成品コスト=finished product cost / biaya produk jadi,
-化粧品基準=Japanese Standards for Cosmetics / Standar Kosmetik Jepang, 医薬部外品=quasi-drug / quasi-drug (produk kuasi-obat Jepang), ハラール=halal, BPOM.`;
+化粧品基準=Japanese Standards for Cosmetics / Standar Kosmetik Jepang, 医薬部外品=quasi-drug / quasi-drug (produk kuasi-obat Jepang), ハラール=halal, BPOM,
+配合量=content (% w/w) / kadar (% b/b), 配合禁止成分=prohibited ingredient / bahan yang dilarang, 配合制限成分=restricted ingredient / bahan yang dibatasi,
+表示名称（成分表示名称）=Japanese ingredient label name (JCIA) / nama label bahan Jepang (JCIA), 薬機法=Japanese Pharmaceutical and Medical Device Act (PMD Act) / Undang-Undang PMD Jepang, 効能効果=efficacy claims / klaim khasiat,
+化粧水=lotion (toner) / toner, 乳液=emulsion / emulsi, 美容液=serum / serum, クリーム=cream / krim, 日焼け止め=sunscreen / tabir surya, 香料=fragrance / pewangi, 無香料=fragrance-free / tanpa pewangi,
+敏感肌=sensitive skin / kulit sensitif, パッチテスト=patch test / uji tempel (patch test), 粘度=viscosity / viskositas, 容器=packaging / kemasan, 充填=filling / pengisian, 見積もり=quotation / penawaran harga.
+数字・単位・INCI名・商品名・会社名・人名は原文のまま正確に残すこと。インドネシア語は丁寧なビジネス文（Anda・Bapak/Ibu）で書くこと。`;
+  // Independent check of a translation. A second AI (GPT when it is available to this user, otherwise a separate
+  // Claude call that did not write the translation) compares each translation with the original, corrects it when
+  // needed and translates it back. Numbers are also compared mechanically. Returns the corrected texts.
+  const LANG_NAME = { ja: "日本語", en: "英語", id: "インドネシア語" };
+  const digitsIn = (t) => (String(t).normalize("NFKC").match(/\d[\d.,]*\d|\d/g) || []).map((x) => x.replace(/[.,]/g, ""));
+  async function checkTranslation(src, srcLang, outs, context = "") {
+    const langs = Object.keys(outs).filter((k) => String(outs[k] || "").trim());
+    const prompt = `あなたは化粧品業界に詳しい翻訳チェッカーです。翻訳者とは別の立場で、次の訳文を原文と一文ずつ照合してください。
+${context}
+各訳文について:
+1. 意味の欠落・追加・誤訳、数値・単位・日付・成分名（INCI名）・商品名・会社名の相違、用語の不統一、ビジネス文として失礼・不自然な表現を探す。
+2. 問題があれば直した訳文を fixed に入れる（問題がなければ訳文をそのまま fixed に入れる）。直すのは問題点だけにする。
+3. fixed を${LANG_NAME[srcLang]}に訳し戻した文を back に入れる（意味の確認用・直訳でよい）。
+4. issues には見つけた問題点を${S.isAdmin ? "日本語" : "英語とインドネシア語の併記（例: \"Missing number / Angka hilang\"）"}で短く書く（なければ空の配列）。
+${GLOSSARY}
+JSONのみで返答: {"results":{${langs.map((k) => `"${k}":{"issues":[],"fixed":"","back":""}`).join(",")}}}
+
+原文（${LANG_NAME[srcLang]}）:
+${src}
+
+${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n")}`;
+    let res, by;
+    try { res = parseJSON((await aiRaw(prompt, { provider: "openai", effort: "medium" })).text); by = "GPT"; }
+    catch {
+      try { res = await ai(prompt, { effort: "medium" }); by = "Claude・確認専用"; }
+      catch { return { by: "—", issues: [S.isAdmin ? "翻訳チェックを実行できませんでした。訳文は未確認です（もう一度押すと再確認します）。" : "The translation could not be checked. / Terjemahan tidak dapat diperiksa."], fixed: { ...outs }, back: {} }; }
+    }
+    const out = { by, issues: [], fixed: {}, back: {} };
+    for (const k of langs) {
+      const r = res?.results?.[k] || {};
+      out.fixed[k] = String(r.fixed || "").trim() || outs[k];
+      out.back[k] = String(r.back || "");
+      const L = S.isAdmin ? LANG_NAME[k] : { ja: "Japanese / Jepang", en: "English / Inggris", id: "Indonesian / Indonesia" }[k];
+      (Array.isArray(r.issues) ? r.issues : []).filter(Boolean).forEach((x) => out.issues.push(`${L}：${x}${S.isAdmin ? "（修正済み）" : " (fixed / diperbaiki)"}`));
+      const have = new Set(digitsIn(out.fixed[k]));
+      const lost = [...new Set(digitsIn(src))].filter((d) => d.length >= 2 && !have.has(d));
+      if (lost.length) out.issues.push(S.isAdmin ? `${L}：原文の数字 ${lost.join("、")} が訳文に見当たりません（日付や表記の違いでないか確認してください）`
+        : `${L}: number(s) ${lost.join(", ")} from the original are not in the translation — please check. / Angka ${lost.join(", ")} dari teks asli tidak ada di terjemahan — mohon diperiksa.`);
+    }
+    return out;
+  }
+  const checkHtml = (c) => `<div class="notice ${c.issues.length ? "off" : "info"}" style="margin:8px 0"><b>${S.isAdmin ? "翻訳チェック" : "Translation check / Pemeriksaan terjemahan"}（${esc(c.by)}）：</b>${c.issues.length ? `${S.isAdmin ? `${c.issues.length}件の指摘があります。` : `${c.issues.length} point(s) / poin:`}<ul style="margin:6px 0 0 18px">${c.issues.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : S.isAdmin ? "問題は見つかりませんでした ✓" : "No problems found ✓ / Tidak ada masalah ✓"}</div>`;
   const AI_ERR = {
     demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。 / AI is not available in the demo. / AI tidak tersedia dalam demo.",
     not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。 / AI is not set up yet. / AI belum diatur.",
@@ -145,8 +192,8 @@
     throw { userMsg: "結果の形式が崩れました。もう一度押してください。 / Unexpected result — please try again. / Hasil tidak sesuai — coba lagi." };
   }
   // provider: "claude" (default) | "gemini" (Google Search research) | "openai" (review). aiRaw keeps the model name and web sources.
-  async function aiRaw(prompt, { effort = "medium", image, document, images, documents, provider, search } = {}) {
-    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document, images, documents, provider, search } });
+  async function aiRaw(prompt, { effort = "medium", image, document, images, documents, provider, search, rows } = {}) {
+    const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document, images, documents, provider, search, rows } });
     if (error) {
       let code = ""; try { code = (await error.context.json()).error; } catch {}
       throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。 / Connection lost. Please try again. / Koneksi terputus. Silakan coba lagi.", code };
@@ -268,7 +315,7 @@
     const cell = (v) => (v === "" || v == null ? "" : isNaN(Number(v)) ? String(v) : Number(v));
     const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English (Nama bahan: in Indonesian). Do not change the header row (row 7). / Isi SEMUA sel dalam bahasa Inggris (Nama bahan: dalam bahasa Indonesia). Jangan ubah baris judul kolom (baris 7)."],
       ["Project / Proyek", project || ""], ["Company / Perusahaan", company || ""], ["Amount unit (write %, g or mL) / Satuan jumlah (tulis %, g, atau mL) *", unit || "%"], [],
-      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", r.jaNote || ""] : [i + 1, "", "", "", "", "", "", ""]; }),
+      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", [jaStatusText(r), r.jaNote || ""].filter(Boolean).join(" ")] : [i + 1, "", "", "", "", "", "", ""]; }),
       ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
     ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
     ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
@@ -301,7 +348,7 @@
         host.innerHTML = `<div class="pdf-page"><div class="pdf-head">${logoData ? `<img src="${logoData}" alt="">` : ""}<div><div class="pdf-t">Formula / 処方表</div><div class="pdf-m">Project: <b>${esc(project || "")}</b>　Company: <b>${esc(company || "")}</b>${requester ? `　Requested by: ${esc(requester)}` : ""}</div>
           <div class="pdf-m">Unit: ${unit === "%" ? "% w/w" : esc(unit) + " per batch (% calculated)"}　Date: ${new Date().toISOString().slice(0, 10)}　Page ${pg + 1}/${pages}</div></div><div class="pdf-brand">BIOT<br><span>Artisans Production Co., Ltd.</span></div></div>
           <table class="pdf-tbl"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI name</th><th>Supplier</th>${unit === "%" ? "" : `<th>Amount (${esc(unit)})</th>`}<th>% w/w</th><th>Function</th><th>日本語表示名称</th></tr></thead><tbody>
-          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}</td></tr>`).join("")}
+          ${part.map((r, i) => `<tr><td>${pg * per + i + 1}</td><td>${esc(r.phase || "")}</td><td>${esc(r.trade || "")}</td><td>${esc(r.idName || "")}</td><td>${esc(r.inci || "")}</td><td>${esc(r.maker || "")}</td>${unit === "%" ? "" : `<td class="n">${esc(r.amt || "")}</td>`}<td class="n">${esc(r.pct || "")}</td><td>${esc(r.fn || "")}</td><td>${esc(r.ja || "")}${jaUnsure(r) ? " ［要確認］" : ""}</td></tr>`).join("")}
           ${pg === pages - 1 ? `<tr class="tot"><td colspan="6" style="text-align:right">Total</td>${unit === "%" ? "" : `<td class="n">${fmt(tot)}</td>`}<td class="n">${fmt(rows.reduce((a, r) => a + num(r.pct), 0))}</td><td colspan="2"></td></tr>` : ""}</tbody></table>
           <div class="pdf-foot">Confidential — Formula Bridge / Artisans Production Co., Ltd.</div></div>`;
         const cv = await h2c(host.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
@@ -321,7 +368,7 @@
       const tot = rows.reduce((a, r) => a + num(r[tk]), 0), pi = cols.findIndex((c) => c.k === tk);
       el.innerHTML = `<thead><tr><th>No.</th>${cols.map((c) => `<th class="${c.ja ? "ja-col" : ""}" style="min-width:${c.w}px">${esc(c.l)}</th>`).join("")}${readOnly ? "" : "<th></th>"}</tr></thead>
         <tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td>${cols.map((c) => c.ja || c.ro || readOnly
-          ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${boxed && !c.ja && !c.jn ? `<span class="cellbox">${esc(r[c.k] ?? "")}</span>` : esc(r[c.k] ?? "")}</td>`
+          ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${c.jn ? jaBadge(r) : ""}${boxed && !c.ja && !c.jn ? `<span class="cellbox">${esc(r[c.k] ?? "")}</span>` : esc(r[c.k] ?? "")}</td>`
           : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" class="${c.req && !String(r[c.k] ?? "").trim() ? "miss" : ""}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / Belum ada baris / まだ行がありません</td></tr>`}</tbody>
         ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
@@ -330,7 +377,8 @@
       const t = e.target; if (!t.dataset.k) return; const r = rows[+t.dataset.i]; if (!r) return;
       r[t.dataset.k] = t.value;
       if (cols.find((c) => c.k === t.dataset.k)?.req) t.classList.toggle("miss", !t.value.trim());
-      if (["idName", "inci", "trade"].includes(t.dataset.k) && "ja" in r && cols.some((c) => c.ja)) { r.ja = ""; r.jaNote = ""; }
+      if (["idName", "inci", "trade"].includes(t.dataset.k) && "ja" in r && cols.some((c) => c.ja)) { r.ja = ""; r.jaNote = ""; delete r.jaLevel; delete r.jaSrc; }
+      if (["ja", "inci"].includes(t.dataset.k) && !cols.some((c) => c.ja)) { delete r.jaLevel; delete r.jaSrc; r.jaNote = ""; } // Japan's own rows: typed by hand, not checked yet
       const tk = cols.find((c) => c.total)?.k || "pct";
       onChange();
       if (t.dataset.k === tk) { const c = el.querySelector("tfoot td.num"); if (c) { const tot = rows.reduce((a, x) => a + num(x[tk]), 0); c.textContent = fmt(tot); if (totalCheck && tk === "pct") c.className = "num " + (Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad"); } }
@@ -364,22 +412,39 @@
   }
 
   /* Indonesian / trade names → Japanese label names (日本語表示名称) */
-  async function convertToJapanese(rows) {
+  // Japanese label names: looked up on the web and checked against the source page on the server (ai function,
+  // provider "labels"). jaLevel: "official" = found on the JCIA label name list, "web" = another source page,
+  // "none" = could not be confirmed (shown as 要確認). jaSrc: the pages used, per component.
+  async function convertToJapanese(rows, onProgress) {
     const list = rows.map((r, i) => ({ i, trade: r.trade || "", idName: r.idName || "", inci: r.inci || "" })).filter((r) => r.trade || r.idName || r.inci);
     if (!list.length) throw { userMsg: "Enter at least one ingredient. / Isi minimal satu bahan. / 原料を1行以上入力してください。" };
-    const res = await ai(`あなたは日本とインドネシア（BPOM）の化粧品規制に詳しい処方技術者です。
-次はインドネシアの原料メーカーが入力した処方の原料リストです（trade=商品名, idName=インドネシアでの原料表示名称, inci=INCI名。空欄あり）。
-各行について、日本の化粧品の全成分表示で使う「日本語表示名称」（日本化粧品工業会の表示名称リストに準拠）を答えてください。
-- 1つの原料が複数成分の混合物なら、含まれる成分の日本語表示名称を「、」で区切って並べ、mix=true。
-- 確信が持てない場合は推測で断定せず、note に「要確認: 理由」を日本語で書く。日本の化粧品基準で配合制限・禁止がある成分も note に書く。
-- inci が空なら推定したINCI名を inci に入れ、推定である旨を note に書く。
-JSONのみで返答: {"items":[{"i":0,"ja":"","inci":"","mix":false,"note":""}]}
-
-${JSON.stringify(list)}`, { effort: "medium" });
-    let n = 0;
-    (res.items || []).forEach((x) => { const r = rows[+x.i]; if (!r) return; r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); if (!r.inci && x.inci) r.inci = String(x.inci); n++; });
-    return n;
+    const chunks = []; for (let k = 0; k < list.length; k += 4) chunks.push(list.slice(k, k + 4));
+    let n = 0, done = 0, lastErr = null, next = 0;
+    const one = async (ch) => {
+      try {
+        const res = await aiRaw("", { provider: "labels", rows: ch });
+        (res.items || []).forEach((x) => { const r = rows[+x.i]; if (!r) return;
+          r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); r.jaLevel = ["official", "web"].includes(x.level) ? x.level : "none";
+          r.jaSrc = (x.sources || []).filter((s) => /^https:\/\//i.test(s?.url || "")).map((s) => ({ inci: String(s.inci || ""), ja: String(s.ja || ""), level: String(s.level || ""), url: String(s.url) }));
+          if (!r.inci && x.inci) r.inci = String(x.inci); n++; });
+      } catch (e) { lastErr = e; }
+      finally { done++; onProgress?.(done, chunks.length); }
+    };
+    await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, async () => { while (next < chunks.length) await one(chunks[next++]); }));
+    if (!n && lastErr) throw lastErr;
+    const unsure = rows.filter((r) => r.ja && r.jaLevel !== "official" && r.jaLevel !== "web").length;
+    return { n, failed: list.length - n, unsure };
   }
+  const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
+  // Evidence for a Japanese label name, shown next to it (Japan side).
+  function jaBadge(r) {
+    if (!r.ja) return "";
+    const links = [...new Map((r.jaSrc || []).map((x) => [x.url, x])).values()].map((x) => `<a class="jsrc" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.url))}</a>`).join(" ");
+    return (r.jaLevel === "official" ? '<span class="jchk ok">✓ 粧工連リストで確認</span>' : r.jaLevel === "web" ? '<span class="jchk web">✓ Web出典で確認</span>'
+      : '<span class="jchk warn">要確認</span>') + (links ? " " + links : "") + " ";
+  }
+  const jaStatusText = (r) => !r.ja ? "" : r.jaLevel === "official" ? "[粧工連リストで確認]" : r.jaLevel === "web" ? `[Web出典で確認: ${(r.jaSrc || []).map((x) => hostOf(x.url)).filter(Boolean).join(", ")}]` : "[要確認]";
+  const jaUnsure = (r) => !!r.ja && r.jaLevel !== "official" && r.jaLevel !== "web";
 
   const UNIT_FIELDS = {
     viscosity: ["mPa·s", "cP", "Pa·s"], shelfLife: ["months", "years"],
@@ -662,8 +727,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     const tM = editTable($("t-materials"), COLS.materials, sp.materials, save.soon);
     const tT = editTable($("t-tests"), COLS.tests, sp.tests, save.soon);
     $("add-formula").onclick = () => tF.add(); $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;
-    $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Converting… / Mengonversi… / 変換しています…", async () => {
-      const n = await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); save.soon(); await save.now();
+    $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Looking up the official Japanese names (1–3 min)… / Mencari nama resmi Jepang (1–3 menit)… / 日本語表示名称を調べています…", async () => {
+      const { n } = await convertToJapanese(sp.formula, (d, t) => { $("st-toja").textContent = `Looking up… ${d}/${t} / Mencari… ${d}/${t}`; }); $("t-formula").innerHTML = ""; mountFormula(); save.soon(); await save.now();
       $("st-toja").textContent = `✓ ${n} rows converted. Japan will check the notes column (確認事項). / ${n} baris telah dikonversi. Jepang akan memeriksa kolom catatan (確認事項).`;
     });
 
@@ -733,7 +798,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       if (needsJa()) {
         $("st-submit").textContent = "Converting to Japanese names first… / Mengonversi ke nama Jepang… / 日本語表示名称に変換しています…";
         // The AI being unavailable must not block the submission: Japan can convert later in STEP 2.
-        try { await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); } catch (err) { console.error(err); }
+        try { await convertToJapanese(sp.formula, (d, t) => { $("st-submit").textContent = `Converting to Japanese names… ${d}/${t} / Mengonversi ke nama Jepang… ${d}/${t}`; }); $("t-formula").innerHTML = ""; mountFormula(); } catch (err) { console.error(err); }
       }
       $("st-submit").textContent = "Making the formula Excel + PDF… / Membuat Excel + PDF…";
       let fileNote = "", oldAuto = [];
@@ -1135,8 +1200,12 @@ JSONのみで返答: {"en": string, "id": string, "ja": string}
 日本語メモ:
 ${body}`, { effort: "medium" });
       if (!res.en) throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
-      Object.assign(brief, { en: String(res.en), id: String(res.id || ""), ja: String(res.ja || "") });
-      save.soon(); await save.now(); bl = "en"; renderBrief(); $("st-brief").textContent = "作成しました。「日本語（確認用）」で内容を確認してください。";
+      $("st-brief").textContent = "英語・インドネシア語の訳を別のAIで確認しています…";
+      const ck = await checkTranslation(String(res.ja || ""), "ja", { en: String(res.en), id: String(res.id || "") },
+        `原文は依頼書の日本語版です。元の日本語メモは次のとおりで、メモにない数値や条件が訳文に加わっていたら削除すること:\n${body}`);
+      Object.assign(brief, { en: ck.fixed.en, id: ck.fixed.id || "", ja: String(res.ja || ""), check: { by: ck.by, issues: ck.issues, at: new Date().toISOString() } });
+      save.soon(); await save.now(); bl = "en"; renderBrief();
+      $("st-brief").innerHTML = checkHtml(ck) + "作成しました。「日本語（確認用）」で内容を確認してください。";
     });
     // Step 1: show exactly who will receive the request. Step 2: send.
     $("send").onclick = () => {
@@ -1215,11 +1284,15 @@ JSONのみで返答: {"en": string, "id": string}
 
 判定: ${dec[0]} / ${dec[1]}
 コメント:
-${ja}`, { effort: "low" });
+${ja}`, { effort: "medium" });
         if (!r.en) throw { userMsg: "翻訳に失敗しました。もう一度押してください。" };
+        $("st-fb").textContent = "翻訳を別のAIで確認しています…";
+        const ck = await checkTranslation(`判定: ${dec[0]}\nコメント:\n${ja}`, "ja", { en: `Decision: ${dec[1]}\n${r.en}`, id: `Keputusan: ${dec[2] || ""}\n${r.id || ""}` }, "訳文の先頭行（Decision / Keputusan）は定型の訳なので、そのまま残すこと。");
+        const strip = (t) => String(t).replace(/^(Decision|Keputusan):[^\n]*\n/, "");
+        r.en = strip(ck.fixed.en); r.id = strip(ck.fixed.id);
         await ask({ title: `${coName(cur.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
           body: `<p class="sub">相手には英語とインドネシア語で届きます。訳文を確認してください。</p>${kvHtml([["判定", `${dec[0]}（${dec[1]}）`]])}
-            <h3>日本語（原文）</h3><div class="brief-out ja">${esc(ja)}</div><h3>English</h3><div class="brief-out">${esc(r.en)}</div><h3>Bahasa Indonesia</h3><div class="brief-out">${esc(r.id || "")}</div>` });
+            ${checkHtml(ck)}<h3>日本語（原文）</h3><div class="brief-out ja">${esc(ja)}</div><h3>English</h3><div class="brief-out">${esc(r.en)}</div>${ck.back.en ? `<details><summary class="sub">英語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.en)}</div></details>` : ""}<h3>Bahasa Indonesia</h3><div class="brief-out">${esc(r.id || "")}</div>${ck.back.id ? `<details><summary class="sub">インドネシア語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.id)}</div></details>` : ""}` });
         const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(cur.feedback?.history || []), ...(cur.feedback?.ja ? [{ at: cur.feedback_at, decision: cur.feedback.decision, ja: cur.feedback.ja }] : [])] };
         const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", cur.id).select("*").single();
         if (error) throw error;
@@ -1235,17 +1308,17 @@ ${ja}`, { effort: "low" });
       $("a-pdf").onclick = (e) => busy(e.currentTarget, $("st-toja"), "PDFを作成しています…", async () => { if (!sp.formula.length) throw { userMsg: "処方がまだありません。" }; download(fileBase(P.p.name, "formula_" + (co?.name || "")) + ".pdf", await formulaPdf(am())); $("st-toja").textContent = "✓ PDFを保存しました"; });
       editTable($("t-m"), COLS.materials, sp.materials, () => {}, { readOnly: true });
       editTable($("t-t"), COLS.tests, sp.tests, () => {}, { readOnly: true });
-      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "変換しています…", async () => {
+      $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "日本語表示名称を調べています…（公式リストと出典ページで確認するため1〜3分かかります）", async () => {
         // Convert on the latest data and write back only the Japanese-name fields, so the supplier's newer edits survive.
         const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle(); if (e1) throw e1;
         const latest = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, fresh?.supplier || {});
-        const n = await convertToJapanese(latest.formula);
+        const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
         const { data: again } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle();
         const merged = Object.assign({}, again?.supplier || latest);
-        merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, inci: r.inci || c.inci } : r; });
+        merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, jaLevel: c.jaLevel, jaSrc: c.jaSrc, inci: r.inci || c.inci } : r; });
         const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", cur.id); if (error) throw error;
         cur.supplier = merged;
-        draw(); $("st-toja").textContent = `${n}行を変換しました。`;
+        draw(); $("st-toja").textContent = `✓ ${n}行を変換しました。` + (unsure ? `うち${unsure}行は出典で確認できず「要確認」です（確認事項の欄をご覧ください）。` : "すべて出典で確認できました。") + (failed ? `　${failed}行は調べられませんでした。もう一度押してください。` : "");
       });
     };
     draw();
@@ -1255,8 +1328,9 @@ ${ja}`, { effort: "low" });
     ["採用（本処方は当社に帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to Artisans Production Co., Ltd.", "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd."]];
   function isWater(r) { return /^(water|aqua)\b/i.test(String(r.inci || "").trim()) || /^(水|精製水)$/.test(String(r.ja || "").trim()) || /^air$/i.test(String(r.idName || "").trim()); }
   function finalRows(fin) {
-    const base = (fin.base_formula || []).map((r) => ({ src: "base", ja: r.ja || "", jaNote: r.jaNote || "", inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));
-    const add = (fin.additions || []).map((r) => ({ src: "add", ja: r.ja || "", inci: r.inci || "", label: r.ja || r.inci || "", pct: num(r.pct), fn: r.purpose || "" }));
+    const ev = (r) => ({ jaNote: r.jaNote || "", jaLevel: r.jaLevel, jaSrc: r.jaSrc });
+    const base = (fin.base_formula || []).map((r) => ({ src: "base", ja: r.ja || "", ...ev(r), inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));
+    const add = (fin.additions || []).map((r) => ({ src: "add", ja: r.ja || "", ...ev(r), inci: r.inci || "", label: r.ja || r.inci || "", pct: num(r.pct), fn: r.purpose || "" }));
     return [...base, ...add].filter((r) => r.label || r.pct);
   }
   function fullList(rows) {
@@ -1277,9 +1351,9 @@ ${ja}`, { effort: "low" });
         <div class="pick">${subm.map((a) => `<label><input type="radio" name="adopt" value="${a.id}" ${a.id === fin.adopted_assignment ? "checked" : ""}> ${FLAG_ID}${esc(coName(a.company_id))}<span class="muted" style="font-size:12px;margin-left:8px">${esc(a.supplier?.product?.name || "")}　原料見積：${esc(a.supplier?.product?.cost || "—")}</span></label>`).join("") || '<div class="muted">まだ提出がありません。</div>'}</div></div>
       <div class="card"><div class="head"><h2>${FLAG_ID}採用した会社の提出内容（日本語訳）</h2><button class="btn ghost" id="tr-sup" ${adopted ? "" : "disabled"}>日本語に翻訳</button></div><div class="brief-out ja" id="sup-ja">${esc(fin.sup_ja || (adopted ? "「日本語に翻訳」を押すと表示します。" : "ベース処方を選んでください。"))}</div><div class="status" id="st-tr"></div></div>
       <div class="card"><h2>${FLAG_JP}当社で追記する原料</h2><div class="tbl-wrap"><table class="edit" id="t-add"></table></div>
-        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-row">＋ 原料を追加</button><button class="btn ghost" id="qs">水で100%に調整</button></div><div class="status" id="st-qs"></div></div>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-row">＋ 原料を追加</button><button class="btn ghost" id="qs">水で100%に調整</button><button class="btn ghost" id="chk-add">全原料の表示名称を確認</button></div><div class="status" id="st-qs"></div></div>
       <div class="card"><div class="head"><h2>${FLAG_JP}完成処方</h2><span id="tot"></span></div><div class="tbl-wrap"><table class="view" id="t-final"></table></div>
-        <h3>全成分表示（自動作成・配合量の多い順）</h3><div class="fulllist" id="full"></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="copy-full">全成分をコピー</button></div>
+        <div id="ja-warn"></div><h3>全成分表示（自動作成・配合量の多い順）</h3><div class="fulllist" id="full"></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="copy-full">全成分をコピー</button></div>
         <p class="sub" style="margin-top:8px">1%以下の成分は順不同で表示できます。複数成分を含む原料（※）は並び順を要確認。</p></div>
       <div class="card"><h2>${FLAG_JP}商品計画</h2>
         <div class="targets"><div><span>希望原料費</span><b>${esc(P.p.request?.costRaw || "—")}</b></div><div><span>希望完成品コスト</span><b>${esc(P.p.request?.costFin || "—")}</b></div><div><span>${FLAG_ID}原料見積（採用社）</span><b>${esc(adopted?.supplier?.product?.cost || "—")}</b></div></div>
@@ -1291,7 +1365,9 @@ ${ja}`, { effort: "low" });
     const render = () => {
       const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0);
       $("tot").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
-      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換：${esc(r.label)}）</span>`}</td><td class="jnote">${esc(r.jaNote)}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
+      $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換：${esc(r.label)}）</span>`}</td><td class="jnote">${jaBadge(r)}${esc(r.jaNote)}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
+      const nu = rows.filter(jaUnsure).length;
+      $("ja-warn").innerHTML = nu ? `<div class="notice off" style="margin:10px 0 0"><b>日本語表示名称に「要確認」が${nu}件あります。</b>確認事項の欄の出典リンクを開き、名称が正しいか目で確認してください（このままでも確定はできます）。</div>` : "";
       const list = fullList(rows); $("full").textContent = list.length ? list.map((x) => x.n + (x.mix ? "※" : "")).join("、") : "—";
     };
     // Any change to the formula after it was finalized takes the "finalized" mark away (it must be confirmed again).
@@ -1307,8 +1383,29 @@ ${ja}`, { effort: "low" });
 ${GLOSSARY}
 JSONのみで返答: {"ja": string}
 
-${supplierEnglish(adopted.supplier || {})}`, { effort: "low" });
-      fin.sup_ja = String(res.ja || ""); $("sup-ja").textContent = fin.sup_ja; save.soon(); await save.now(); $("st-tr").textContent = "";
+${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
+      $("st-tr").textContent = "訳を別のAIで確認しています…";
+      const ck = await checkTranslation(supplierEnglish(adopted.supplier || {}), "en", { ja: String(res.ja || "") });
+      fin.sup_ja = ck.fixed.ja; $("sup-ja").textContent = fin.sup_ja; save.soon(); await save.now(); $("st-tr").innerHTML = checkHtml(ck);
+    });
+    // All rows: the adopted base formula is checked again (it was copied when adopted), and Japan's own rows are
+    // checked against the sources by INCI name (a typed name that differs from the source is flagged).
+    $("chk-add").onclick = (e) => busy(e.currentTarget, $("st-qs"), "表示名称を調べています…（1〜3分）", async () => {
+      const rows = fin.additions.filter((r) => String(r.inci || "").trim());
+      if (!rows.length && !fin.base_formula.length) throw { userMsg: "原料がありません。" };
+      const tmp = rows.map((r) => ({ inci: r.inci, trade: "", idName: "" }));
+      const all = [...fin.base_formula, ...tmp];
+      await convertToJapanese(all, (d, t) => { $("st-qs").textContent = `表示名称を調べています… ${d}/${t}`; });
+      let diff = 0;
+      rows.forEach((r, k) => { const x = tmp[k]; if (!x.ja && !x.jaLevel) return;
+        const typed = String(r.ja || "").trim(), same = typed && typed.normalize("NFKC").replace(/\s/g, "") === String(x.ja).normalize("NFKC").replace(/\s/g, "");
+        if (!typed) { r.ja = x.ja; r.jaLevel = x.jaLevel; r.jaSrc = x.jaSrc; r.jaNote = x.jaNote; }
+        else if (same) { r.jaLevel = x.jaLevel; r.jaSrc = x.jaSrc; r.jaNote = x.jaNote; }
+        else { diff++; r.jaLevel = "none"; r.jaSrc = x.jaSrc; r.jaNote = `入力された名称と、調べた名称「${x.ja}」が異なります` + (x.jaLevel === "none" ? "（調べた名称も要確認）" : `（${x.jaLevel === "official" ? "粧工連リスト" : "Web出典"}で確認済み）`); }
+      });
+      unfix(); save.soon(); await save.now(); tA.render(); render();
+      const nu = finalRows(fin).filter(jaUnsure).length;
+      $("st-qs").className = "status"; $("st-qs").textContent = `✓ ${all.length}件を確認しました。` + (diff ? `当社追記のうち${diff}件は入力された名称と異なります。` : "") + (nu ? `「要確認」は${nu}件です（完成処方の確認事項をご覧ください）。` : "すべて出典で確認できました。");
     });
     $("qs").onclick = () => {
       const w = fin.base_formula.find(isWater), st = $("st-qs");
@@ -1326,7 +1423,8 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "low" });
       if (rows.some((r) => !r.ja)) miss.push("日本語表示名称が未変換の原料があります（STEP 2 の変換ボタン）");
       if (!fin.plan.productName) miss.push("商品名が未入力です");
       if (miss.length) throw { userMsg: "確定できません：" + miss.join("／") };
-      await ask({ title: "完成処方を確定しますか？", ok: "確定する", body: kvHtml([["採用するベース", coName(P.as.find((a) => a.id === fin.adopted_assignment)?.company_id)], ["原料数", `${rows.length}件`], ["合計", `${fmt(tot)}%`], ["商品名", fin.plan.productName]])
+      const nu = rows.filter(jaUnsure).length;
+      await ask({ title: "完成処方を確定しますか？", ok: "確定する", body: kvHtml([["採用するベース", coName(P.as.find((a) => a.id === fin.adopted_assignment)?.company_id)], ["原料数", `${rows.length}件`], ["合計", `${fmt(tot)}%`], ["表示名称の要確認", nu ? `${nu}件（出典で確認できていません）` : "なし（すべて出典で確認済み）"], ["商品名", fin.plan.productName]])
         + '<p class="sub">確定すると、採用したメーカーは提出内容を変更できなくなります（採用処方の証拠として固定されます）。あとで処方を変えた場合は、確定が自動で外れます。</p>' });
       fin.finalized_at = new Date().toISOString(); save.soon(); await save.now();
       toast("完了：完成処方を確定しました", "STEP 4 で企画書を作れます。"); adminProject(P.p.id, "fin");
@@ -1546,9 +1644,12 @@ ${GLOSSARY}
 JSONのみで返答: {"translation": string${dir === "ja2id" ? ', "back": string' : ""}}
 
 原文:
-${src}`, { effort: "low" });
-      if (dir === "ja2id") { $("t-id").value = r.translation || ""; $("back").textContent = r.back || ""; } else $("t-ja").value = r.translation || "";
-      $("st-t").textContent = "";
+${src}`, { effort: "medium" });
+      $("st-t").textContent = "別のAIで訳を確認しています… / Memeriksa terjemahan…";
+      const from = dir === "ja2id" ? "ja" : "id", to = dir === "ja2id" ? "id" : "ja";
+      const ck = await checkTranslation(src, from, { [to]: String(r.translation || "") });
+      if (dir === "ja2id") { $("t-id").value = ck.fixed.id || ""; $("back").textContent = ck.back.id || r.back || ""; } else { $("t-ja").value = ck.fixed.ja || ""; $("back").textContent = ck.back.ja || ""; }
+      $("st-t").innerHTML = checkHtml(ck);
     });
     $("go").onclick = go;
     [$("t-ja"), $("t-id")].forEach((t) => t.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); go(); } }));
