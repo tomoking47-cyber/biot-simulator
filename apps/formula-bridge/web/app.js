@@ -765,7 +765,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
           const rows = items.map((x) => ({ phase: String(x.phase || ""), trade: String(x.trade || ""), idName: String(x.idName || ""), inci: String(x.inci || ""), maker: String(x.maker || ""), fn: String(x.fn || ""), ...(unit === "%" ? { pct: String(x.amt || "") } : { amt: String(x.amt || "") }) }));
           if (replace) { sp.formula.splice(0, sp.formula.length, ...rows); sp.formulaUnit = unit; }
           else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead. / Satuan file berbeda dengan tabel — ganti tabel.`; return; } sp.formula.push(...rows); }
-          $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
+          dropSt.className = "status"; $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
           $("drop-preview").innerHTML = ""; const nb = blanks().length;
           dropSt.textContent = nb ? `✓ ${rows.length} rows added. Next, fill in the empty (yellow) cells, then press "Convert to Japanese names" (top right). / ✓ ${rows.length} baris ditambahkan. Isi sel kosong (kuning), lalu tekan "Konversi ke nama Jepang" (kanan atas).` : `✓ ${rows.length} rows added. Next, press "Convert to Japanese names" (top right, highlighted). / ✓ ${rows.length} baris ditambahkan. Selanjutnya tekan "Konversi ke nama Jepang" (kanan atas, disorot).`;
           $("to-ja").scrollIntoView({ behavior: "smooth", block: "center" });
@@ -874,7 +874,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const { data: r } = await sb.functions.invoke("notify", { body: { event: "submit", assignment_id: aid } });
       $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan. / Selesai: diajukan ke Jepang." + (r?.sent ? (fileNote ? " Japan has been emailed. / Jepang telah menerima email." : " Japan has been emailed (with the formula Excel + PDF). / Jepang telah menerima email (dengan Excel + PDF formula).") : "") + fileNote;
       shipState(); $("ship-card").scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Done: submitted to Japan ✓ / Selesai: diajukan ke Jepang ✓", r?.sent ? "Japan's development team has been notified by email. / Tim pengembangan Jepang telah diberi tahu melalui email. Terima kasih!" : "Japan will see it in Formula Bridge. / Jepang akan melihatnya di Formula Bridge. Terima kasih!");
+      toast("Done: submitted to Japan ✓ / Selesai: diajukan ke Jepang ✓", r?.sent ? "Japan's development team has been notified by email. Thank you! / Tim pengembangan Jepang telah diberi tahu melalui email. Terima kasih!" : "Japan will see it in Formula Bridge. Thank you! / Jepang akan melihatnya di Formula Bridge. Terima kasih!");
       document.querySelector(".who").classList.add("is-done"); document.querySelector(".who .state").textContent = "Done / Selesai ✓";
     });
 
@@ -1158,15 +1158,20 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const { error } = await sb.from("settings").upsert(up);
       $("st-set").className = error ? "status err" : "status"; $("st-set").textContent = error ? "保存できませんでした：" + error.message : "保存しました ✓";
     };
-    const { data: dic } = await sb.from("label_names").select("*").order("checked_at", { ascending: false }).limit(2000);
+    let dic = null; // loaded in the background, so that the other buttons work at once
     const LV = { official: '<span class="jchk ok">粧工連リスト</span>', web: '<span class="jchk web">Web出典</span>', manual: '<span class="jchk ok">当社で確認</span>' };
     const drawDic = () => {
+      if (!$("dic")) return; // the page was left
+      if (!dic) { $("dic").innerHTML = ""; $("st-dic").textContent = "読み込んでいます…"; return; }
       const q = $("dic-q").value.trim().toLowerCase(), rows = (dic || []).filter((x) => !q || x.inci.toLowerCase().includes(q) || x.ja.includes(q));
       $("dic").innerHTML = `<thead><tr><th>INCI</th><th>日本語表示名称</th><th>確認方法</th><th>出典</th><th>確認日</th><th></th></tr></thead><tbody>${rows.slice(0, 300).map((x) => `<tr><td>${esc(x.inci)}</td><td>${esc(x.ja)}</td><td>${LV[x.level] || esc(x.level)}${x.confirmed_by ? `<div class="muted" style="font-size:11px">${esc(x.confirmed_by)}</div>` : ""}</td>
         <td>${/^https:\/\//.test(x.source_url || "") ? `<a class="jsrc" href="${esc(x.source_url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.source_url))}</a>` : "—"}</td><td>${d(x.checked_at)}</td><td><button type="button" class="linkbtn" data-deldic="${esc(x.inci_key)}">削除</button></td></tr>`).join("") || '<tr><td colspan="6" class="empty">まだ登録がありません。「日本語表示名称に変換」を使うと、確認できた名称がここに保存されます。</td></tr>'}</tbody>`;
       $("st-dic").textContent = rows.length > 300 ? `${rows.length}件中300件を表示しています。絞り込んでください。` : `${rows.length}件`;
     };
     $("dic-q").oninput = drawDic; drawDic();
+    sb.from("label_names").select("*").order("checked_at", { ascending: false }).limit(2000).then(({ data, error }) => {
+      dic = data || []; drawDic(); if (error && $("st-dic")) $("st-dic").textContent = "辞書を読み込めませんでした：" + error.message;
+    });
     $("dic").onclick = async (e) => {
       const b = e.target.closest("[data-deldic]"); if (!b) return;
       const row = (dic || []).find((x) => x.inci_key === b.dataset.deldic); if (!row) return;
