@@ -133,7 +133,8 @@
   // Claude call that did not write the translation) compares each translation with the original, corrects it when
   // needed and translates it back. Numbers are also compared mechanically. Returns the corrected texts.
   const LANG_NAME = { ja: "日本語", en: "英語", id: "インドネシア語" };
-  const digitsIn = (t) => (String(t).normalize("NFKC").match(/\d[\d.,]*\d|\d/g) || []).map((x) => x.replace(/[.,]/g, ""));
+  const digitsIn = (t) => [...String(t).normalize("NFKC").matchAll(/\d[\d.,]*\d|\d/g)]
+    .filter((m) => !/^[年月日時]/.test(String(t).normalize("NFKC").slice(m.index + m[0].length))).map((m) => m[0].replace(/[.,]/g, "")); // dates are written differently in other languages
   async function checkTranslation(src, srcLang, outs, context = "") {
     const langs = Object.keys(outs).filter((k) => String(outs[k] || "").trim());
     const prompt = `あなたは化粧品業界に詳しい翻訳チェッカーです。翻訳者とは別の立場で、次の訳文を原文と一文ずつ照合してください。
@@ -156,6 +157,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       try { res = await ai(prompt, { effort: "medium" }); by = "Claude・確認専用"; }
       catch { return { by: "—", issues: [S.isAdmin ? "翻訳チェックを実行できませんでした。訳文は未確認です（もう一度押すと再確認します）。" : "The translation could not be checked. / Terjemahan tidak dapat diperiksa."], fixed: { ...outs }, back: {} }; }
     }
+    if (!res?.results || !langs.every((k) => res.results[k])) return { by, issues: [S.isAdmin ? "翻訳チェックの結果を読み取れませんでした。訳文は未確認です（もう一度押すと再確認します）。" : "The translation could not be checked. / Terjemahan tidak dapat diperiksa."], fixed: { ...outs }, back: {} };
     const out = { by, issues: [], fixed: {}, back: {} };
     for (const k of langs) {
       const r = res?.results?.[k] || {};
@@ -315,7 +317,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     const cell = (v) => (v === "" || v == null ? "" : isNaN(Number(v)) ? String(v) : Number(v));
     const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English (Nama bahan: in Indonesian). Do not change the header row (row 7). / Isi SEMUA sel dalam bahasa Inggris (Nama bahan: dalam bahasa Indonesia). Jangan ubah baris judul kolom (baris 7)."],
       ["Project / Proyek", project || ""], ["Company / Perusahaan", company || ""], ["Amount unit (write %, g or mL) / Satuan jumlah (tulis %, g, atau mL) *", unit || "%"], [],
-      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", [jaStatusText(r), r.jaNote || ""].filter(Boolean).join(" ")] : [i + 1, "", "", "", "", "", "", ""]; }),
+      head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", [S.isAdmin ? jaStatusText(r) : "", r.jaNote || ""].filter(Boolean).join(" ")] : [i + 1, "", "", "", "", "", "", ""]; }),
       ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
     ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
     ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
@@ -418,28 +420,32 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   async function convertToJapanese(rows, onProgress) {
     const list = rows.map((r, i) => ({ i, trade: r.trade || "", idName: r.idName || "", inci: r.inci || "" })).filter((r) => r.trade || r.idName || r.inci);
     if (!list.length) throw { userMsg: "Enter at least one ingredient. / Isi minimal satu bahan. / 原料を1行以上入力してください。" };
-    const chunks = []; for (let k = 0; k < list.length; k += 4) chunks.push(list.slice(k, k + 4));
+    const chunks = []; for (let k = 0; k < list.length; k += 3) chunks.push(list.slice(k, k + 3));
     let n = 0, done = 0, lastErr = null, next = 0;
     const one = async (ch) => {
       try {
         const res = await aiRaw("", { provider: "labels", rows: ch });
-        (res.items || []).forEach((x) => { const r = rows[+x.i]; if (!r) return;
-          r.ja = String(x.ja || ""); r.mix = !!x.mix; r.jaNote = String(x.note || ""); r.jaLevel = ["official", "web", "manual"].includes(x.level) ? x.level : "none";
-          r.jaSrc = (x.sources || []).filter((s) => /^https:\/\//i.test(s?.url || "")).map((s) => ({ inci: String(s.inci || ""), ja: String(s.ja || ""), level: String(s.level || ""), url: String(s.url) }));
+        (res.items || []).forEach((x) => {
+          const r = rows[+x.i], sent = ch.find((c) => c.i === +x.i);
+          // The lookup takes minutes: skip a row that was moved, deleted or edited in the meantime.
+          if (!r || !sent || (r.trade || "") !== sent.trade || (r.idName || "") !== sent.idName || (r.inci || "") !== sent.inci) return;
+          if (x.ja || !r.ja) r.ja = String(x.ja || "");
+          r.mix = !!x.mix; r.jaNote = String(x.note || ""); r.jaLevel = x.ja && ["official", "web", "manual"].includes(x.level) ? x.level : "none"; delete r.jaBy;
+          r.jaSrc = (x.sources || []).map((s) => ({ inci: String(s?.inci || ""), ja: String(s?.ja || ""), level: String(s?.level || ""), url: /^https:\/\//i.test(s?.url || "") ? String(s.url) : "" }));
           if (!r.inci && x.inci) r.inci = String(x.inci); n++; });
       } catch (e) { lastErr = e; }
       finally { done++; onProgress?.(done, chunks.length); }
     };
     await Promise.all(Array.from({ length: Math.min(3, chunks.length) }, async () => { while (next < chunks.length) await one(chunks[next++]); }));
     if (!n && lastErr) throw lastErr;
-    const unsure = rows.filter((r) => r.ja && r.jaLevel !== "official" && r.jaLevel !== "web").length;
+    const unsure = rows.filter((r) => r.ja && !["official", "web", "manual"].includes(r.jaLevel)).length;
     return { n, failed: list.length - n, unsure };
   }
   const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return ""; } };
   // Evidence for a Japanese label name, shown next to it (Japan side).
   function jaBadge(r) {
     if (!r.ja) return "";
-    const links = [...new Map((r.jaSrc || []).map((x) => [x.url, x])).values()].map((x) => `<a class="jsrc" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.url))}</a>`).join(" ");
+    const links = [...new Map((r.jaSrc || []).filter((x) => /^https:\/\//i.test(x.url || "")).map((x) => [x.url, x])).values()].map((x) => `<a class="jsrc" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer">${esc(hostOf(x.url))}</a>`).join(" ");
     return (r.jaLevel === "official" ? '<span class="jchk ok">✓ 粧工連リストで確認</span>' : r.jaLevel === "manual" ? '<span class="jchk ok">✓ 当社で確認</span>' : r.jaLevel === "web" ? '<span class="jchk web">✓ Web出典で確認</span>'
       : '<span class="jchk warn">要確認</span>') + (links ? " " + links : "") + " ";
   }
@@ -449,16 +455,40 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   const splitInci = (s) => String(s).split(/\s*\(and\)\s*|,\s+|;\s*/i).map((x) => x.trim()).filter(Boolean);
   // Japan-side staff confirmed a name by eye: store it in the label-name dictionary so it is reused next time.
   async function confirmJa(r) {
-    const incis = splitInci(r.inci || ""), jas = String(r.ja || "").split(/[、,，]/).map((x) => x.trim()).filter(Boolean);
-    const src = (r.jaSrc || []).find((x) => x.url)?.url || "";
-    const pairs = incis.length === jas.length ? incis.map((c, k) => [c, jas[k]]) : incis.length ? [[incis.join(" (and) "), jas.join("、")]] : [];
+    // Pairs per component come from the lookup (never from splitting the joined name: names may contain commas).
+    const incis = splitInci(r.inci || ""), src = (r.jaSrc || []).filter((x) => x.inci);
+    const pairs = src.length ? src.map((x) => [x.inci, x.ja]) : incis.length === 1 ? [[incis[0], r.ja]] : [];
+    if (incis.length > 1 && !src.length) throw { userMsg: "複数成分の原料は、成分ごとの名称が必要です。先に「全原料の表示名称を確認」を押してください。" };
+    if (pairs.some(([, ja]) => !String(ja || "").trim())) throw { userMsg: "名称が見つかっていない成分があります。完成処方の名称を直してから確認済みにしてください。" };
     const who = S.profile?.full_name || S.profile?.email || "";
     if (pairs.length) {
-      const { error } = await sb.from("label_names").upsert(pairs.map(([inci, ja]) => ({ inci_key: normInci(inci), inci, ja, level: "manual", source_url: (r.jaSrc || []).find((x) => normInci(x.inci) === normInci(inci))?.url || src, confirmed_by: who, checked_at: new Date().toISOString() })), { onConflict: "inci_key" });
+      const { error } = await sb.from("label_names").upsert(pairs.map(([inci, ja]) => ({ inci_key: normInci(inci), inci, ja, level: "manual", source_url: src.find((x) => normInci(x.inci) === normInci(inci))?.url || "", confirmed_by: who, checked_at: new Date().toISOString() })), { onConflict: "inci_key" });
       if (error) throw { userMsg: "辞書に保存できませんでした：" + error.message };
     }
-    r.jaLevel = "manual"; r.jaNote = `当社で確認（${who}・${new Date().toLocaleDateString("ja-JP")}）`;
+    r.jaLevel = "manual"; r.jaBy = who; (r.jaSrc || []).forEach((x) => (x.level = "manual"));
+    r.jaNote = `当社で確認（${who}・${new Date().toLocaleDateString("ja-JP")}）`;
     return pairs.length;
+  }
+  // Japan side: a "confirmed" mark in data that came from a supplier counts only when the dictionary holds the same
+  // name for every component (suppliers could edit the mark in their own data).
+  async function trustJa(rows) {
+    const same = (a, b) => String(a || "").normalize("NFKC").replace(/\s/g, "") === String(b || "").normalize("NFKC").replace(/\s/g, "");
+    const comps = (r) => {
+      const src = (r.jaSrc || []).filter((x) => x.inci && x.ja);
+      if (src.length) return same(src.map((x) => x.ja).join("、"), r.ja) ? src.map((x) => [normInci(x.inci), x.ja]) : null;
+      const incis = splitInci(r.inci || ""); return incis.length === 1 ? [[normInci(incis[0]), r.ja]] : null;
+    };
+    const list = (rows || []).filter((r) => r && r.ja && r.jaLevel && r.jaLevel !== "none");
+    const keys = [...new Set(list.flatMap((r) => (comps(r) || []).map((x) => x[0])))], dic = new Map();
+    for (let k = 0; k < keys.length; k += 150) { const { data } = await sb.from("label_names").select("inci_key, ja, level").in("inci_key", keys.slice(k, k + 150)); (data || []).forEach((d) => dic.set(d.inci_key, d)); }
+    list.forEach((r) => {
+      delete r.jaBy;
+      const cs = comps(r);
+      if (!cs || !cs.length || cs.some(([k, ja]) => !dic.has(k) || !same(dic.get(k).ja, ja))) {
+        r.jaLevel = "none"; r.jaNote = ["日本側でまだ確認できていません（「全原料の表示名称を確認」で確認できます）", r.jaNote].filter(Boolean).join("／"); return;
+      }
+      const lv = cs.map(([k]) => dic.get(k).level); r.jaLevel = lv.includes("web") ? "web" : lv.includes("manual") ? "manual" : "official";
+    });
   }
 
   const UNIT_FIELDS = {
@@ -1173,6 +1203,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     if (!p) { app.innerHTML = `<div class="card">案件が見つかりません。<a href="#/">← マスター画面へ</a></div>`; return; }
     S.market = mk?.data || null;
     const P = { p, as: as || [], fin: fin || { project_id: pid, base_formula: [], additions: [], plan: {} }, plan: plan?.plan || null };
+    await Promise.all(P.as.map((a) => trustJa(a.supplier?.formula))); // marks in suppliers' data are checked against the dictionary
     const sent = P.as.filter((a) => a.status !== "draft"), subm = P.as.filter((a) => a.status === "submitted");
     const done = { req: sent.length > 0, dev: subm.length > 0 && subm.length === sent.length && subm.every((a) => a.feedback_at), fin: !!P.fin.finalized_at, plan: !!P.plan };
     step = step || "req";
@@ -1322,9 +1353,8 @@ JSONのみで返答: {"en": string, "id": string}
 ${ja}`, { effort: "medium" });
         if (!r.en) throw { userMsg: "翻訳に失敗しました。もう一度押してください。" };
         $("st-fb").textContent = "翻訳を別のAIで確認しています…";
-        const ck = await checkTranslation(`判定: ${dec[0]}\nコメント:\n${ja}`, "ja", { en: `Decision: ${dec[1]}\n${r.en}`, id: `Keputusan: ${dec[2] || ""}\n${r.id || ""}` }, "訳文の先頭行（Decision / Keputusan）は定型の訳なので、そのまま残すこと。");
-        const strip = (t) => String(t).replace(/^(Decision|Keputusan):[^\n]*\n/, "");
-        r.en = strip(ck.fixed.en); r.id = strip(ck.fixed.id);
+        const ck = await checkTranslation(ja, "ja", { en: String(r.en), id: String(r.id || "") }, `これはサンプル評価のコメントです（判定「${dec[0]}」は定型の訳で別に送るので、コメントの訳だけを確認すること）。`);
+        r.en = ck.fixed.en; r.id = ck.fixed.id;
         await ask({ title: `${coName(cur.company_id)} にフィードバックを送りますか？`, ok: "この内容で送る", tone: "saff",
           body: `<p class="sub">相手には英語とインドネシア語で届きます。訳文を確認してください。</p>${kvHtml([["判定", `${dec[0]}（${dec[1]}）`]])}
             ${checkHtml(ck)}<h3>日本語（原文）</h3><div class="brief-out ja">${esc(ja)}</div><h3>English</h3><div class="brief-out">${esc(r.en)}</div>${ck.back.en ? `<details><summary class="sub">英語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.en)}</div></details>` : ""}<h3>Bahasa Indonesia</h3><div class="brief-out">${esc(r.id || "")}</div>${ck.back.id ? `<details><summary class="sub">インドネシア語を日本語に訳し戻した文（意味の確認用）</summary><div class="brief-out ja">${esc(ck.back.id)}</div></details>` : ""}` });
@@ -1350,7 +1380,7 @@ ${ja}`, { effort: "medium" });
         const { n, failed, unsure } = await convertToJapanese(latest.formula, (d, t) => { $("st-toja").textContent = `日本語表示名称を調べています… ${d}/${t}`; });
         const { data: again } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle();
         const merged = Object.assign({}, again?.supplier || latest);
-        merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, jaLevel: c.jaLevel, jaSrc: c.jaSrc, inci: r.inci || c.inci } : r; });
+        merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") && (c.inci || "") === (r.inci || c.inci || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, jaLevel: c.jaLevel, jaSrc: c.jaSrc, inci: r.inci || c.inci } : r; });
         const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", cur.id); if (error) throw error;
         cur.supplier = merged;
         draw(); $("st-toja").textContent = `✓ ${n}行を変換しました。` + (unsure ? `うち${unsure}行は出典で確認できず「要確認」です（確認事項の欄をご覧ください）。` : "すべて出典で確認できました。") + (failed ? `　${failed}行は調べられませんでした。もう一度押してください。` : "");
@@ -1411,7 +1441,7 @@ ${ja}`, { effort: "medium" });
     $("add-row").onclick = tA.add;
     pv.querySelectorAll('input[name="adopt"]').forEach((r) => (r.onchange = () => {
       const a = P.as.find((x) => x.id === r.value); fin.adopted_assignment = a.id; fin.base_formula = JSON.parse(JSON.stringify(a.supplier?.formula || [])); fin.sup_ja = ""; unfix();
-      save.soon(); save.now().then(() => adminProject(P.p.id, "fin"), (err) => toast("保存できませんでした", err?.userMsg || "", "info"));
+      trustJa(fin.base_formula).then(() => save.soon()).then(() => save.now()).then(() => adminProject(P.p.id, "fin"), (err) => toast("保存できませんでした", err?.userMsg || "", "info"));
     }));
     $("tr-sup").onclick = (e) => busy(e.currentTarget, $("st-tr"), "翻訳しています…", async () => {
       const res = await ai(`次は化粧品原料メーカー（インドネシア）の開発担当者が英語で書いた試作品の説明です。日本の化粧品メーカーの経営者が読む日本語に正確に翻訳してください。構成は保ち、数値・単位・INCI名・試験機関名はそのまま残すこと。意味を足さないこと。
@@ -1426,7 +1456,7 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
     $("t-final").onclick = async (e) => {
       const b = e.target.closest("[data-okja]"); if (!b) return;
       const r = finalRows(fin)[+b.dataset.okja]; if (!r) return;
-      const links = [...new Set((r.jaSrc || []).map((x) => x.url))].map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`).join("<br>");
+      const links = [...new Set((r.jaSrc || []).map((x) => x.url).filter((u) => /^https:\/\//i.test(u || "")))].map((u) => `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>`).join("<br>");
       if (!(await confirmModal({ title: "この表示名称を「確認済み」にしますか？", ok: "確認済みにする", body: kvHtml([["日本語表示名称", r.ja], ["INCI", r.inci || "（未記入）"]])
         + `<p class="sub">出典や粧工連の成分表示名称リストで、名称が正しいことを目で確認してから押してください。確認者としてあなたの名前が記録され、次回からこの名称が自動で使われます。</p>${links ? `<p class="sub">出典：<br>${links}</p>` : ""}` }))) return;
       try { await confirmJa(r.ref); save.soon(); await save.now(); render(); toast("完了：確認済みにしました", r.ja); }
@@ -1438,14 +1468,14 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "medium" });
       const rows = fin.additions.filter((r) => String(r.inci || "").trim());
       if (!rows.length && !fin.base_formula.length) throw { userMsg: "原料がありません。" };
       const tmp = rows.map((r) => ({ inci: r.inci, trade: "", idName: "" }));
-      const all = [...fin.base_formula, ...tmp];
+      const all = [...fin.base_formula.filter((r) => !(r.jaLevel === "manual" && r.jaBy)), ...tmp]; // names our staff confirmed stay as they are
       await convertToJapanese(all, (d, t) => { $("st-qs").textContent = `表示名称を調べています… ${d}/${t}`; });
       let diff = 0;
       rows.forEach((r, k) => { const x = tmp[k]; if (!x.ja && !x.jaLevel) return;
         const typed = String(r.ja || "").trim(), same = typed && typed.normalize("NFKC").replace(/\s/g, "") === String(x.ja).normalize("NFKC").replace(/\s/g, "");
         if (!typed) { r.ja = x.ja; r.jaLevel = x.jaLevel; r.jaSrc = x.jaSrc; r.jaNote = x.jaNote; }
         else if (same) { r.jaLevel = x.jaLevel; r.jaSrc = x.jaSrc; r.jaNote = x.jaNote; }
-        else { diff++; r.jaLevel = "none"; r.jaSrc = x.jaSrc; r.jaNote = `入力された名称と、調べた名称「${x.ja}」が異なります` + (x.jaLevel === "none" ? "（調べた名称も要確認）" : `（${x.jaLevel === "official" ? "粧工連リスト" : "Web出典"}で確認済み）`); }
+        else { diff++; r.jaLevel = "none"; r.jaSrc = x.jaSrc; r.jaNote = `入力された名称と、調べた名称「${x.ja}」が異なります` + (x.jaLevel === "none" ? "（調べた名称も要確認）" : `（${{ official: "粧工連リスト", web: "Web出典", manual: "当社" }[x.jaLevel] || "出典"}で確認済み）`); }
       });
       unfix(); save.soon(); await save.now(); tA.render(); render();
       const nu = finalRows(fin).filter(jaUnsure).length;

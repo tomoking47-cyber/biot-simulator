@@ -90,6 +90,7 @@
     constructor(t) { this.t = t; this.op = "select"; this.filters = []; this.mode = "many"; }
     select(cols) { if (this.op === "select") this.cols = cols; this.returning = true; return this; }
     eq(k, v) { this.filters.push([k, v]); return this; }
+    in(k, vs) { this.filters.push([k, (x) => vs.includes(x)]); return this; }
     order(k, o = {}) { this.ord = [k, o.ascending !== false]; return this; }
     limit(n) { this.lim = n; return this; }
     single() { this.mode = "one"; return this; }
@@ -100,7 +101,7 @@
     delete() { this.op = "delete"; return this; }
     run() {
       const table = (db[this.t] = db[this.t] || []);
-      const match = (r) => this.filters.every(([k, v]) => r[k] === v);
+      const match = (r) => this.filters.every(([k, v]) => typeof v === "function" ? v(r[k]) : r[k] === v);
       let out = [];
       if (this.op === "select") {
         out = visible(this.t, table).filter(match);
