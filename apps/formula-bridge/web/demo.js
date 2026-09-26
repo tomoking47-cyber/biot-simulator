@@ -13,12 +13,12 @@
 
   const CA = "c-demo-a", CB = "c-demo-b", CC = "c-demo-c", P1 = "p-demo-1", ADMIN = "u-demo-admin", SUP = "u-demo-sup";
   const brief = {
-    en: "FORMULA DEVELOPMENT REQUEST (DEMO)\n\nProduct category: Facial lotion (toner), 150 mL\nBenchmark: moisturizing lotion sold at Japanese drugstores\nTarget sensory profile: slightly viscous, absorbs quickly, non-sticky finish, fragrance-free\nKey ingredients: ceramide NP, niacinamide\nAvoid: parabens, mineral oil, ethanol\nTarget raw material cost: JPY 100 per unit / finished product: JPY 250 per unit\nTrial sample by: end of October 2026\n\nPlease submit in English: product features, formula (% w/w, INCI, Indonesian label name), raw material data and graphs, specifications/SDS/COA, sales materials, third-party test data.",
-    id: "PERMINTAAN PENGEMBANGAN FORMULA (DEMO)\n\nKategori: Losion wajah (toner), 150 mL\nTekstur agak kental, cepat meresap, tidak lengket, tanpa pewangi.\nBahan utama: seramida NP, niasinamida.\nTarget biaya bahan: JPY 100 per botol.",
+    en: "FORMULA DEVELOPMENT REQUEST (DEMO)\n\nProduct category: Facial lotion (toner), 150 mL\nBenchmark: moisturizing lotion sold at Japanese drugstores\nTarget sensory profile: slightly viscous, absorbs quickly, non-sticky finish, fragrance-free\nKey ingredients: ceramide NP, niacinamide\nAvoid: parabens, mineral oil, ethanol\nTarget raw material cost: JPY 100 per unit / finished product: JPY 250 per unit\nTrial sample by: end of October 2026\n\nPlease submit in English (the Indonesian ingredient name, Nama bahan, stays in Indonesian): product features, formula (% w/w, INCI, Nama bahan), raw material data and graphs, specifications/SDS/COA, sales materials, third-party test data.",
+    id: "PERMINTAAN PENGEMBANGAN FORMULA (DEMO)\n\nKategori produk: Losion wajah (toner), 150 mL\nProduk acuan: losion pelembap yang dijual di toko obat Jepang\nSensasi pemakaian: agak kental, cepat meresap, tidak lengket, tanpa pewangi\nBahan utama: seramida NP, niasinamida\nHindari: paraben, minyak mineral, etanol\nTarget biaya bahan baku: JPY 100 per unit / produk jadi: JPY 250 per unit\nSampel uji coba paling lambat: akhir Oktober 2026\n\nHarap kirim dalam bahasa Inggris (Nama bahan tetap dalam bahasa Indonesia): fitur produk, formula (% w/w, INCI, Nama bahan), data dan grafik bahan baku, spesifikasi/SDS/COA, materi penjualan, data uji pihak ketiga.",
     ja: "（デモ）処方開発依頼書\n化粧水 150mL／ややとろみ・さっぱり・無香料／セラミドNP・ナイアシンアミド／原料費100円・完成品コスト250円／10月末に試作",
   };
   const snapshot = { name: "【デモ】セラミド保湿化粧水", brief: { en: brief.en, id: brief.id }, request: { costRaw: "100円", costFin: "250円", price: "1,980円", vol: "150mL", date: "2026年10月末" } };
-  const F = (phase, idName, inci, pct, fn, ja) => ({ phase, trade: "", idName, inci, maker: "Demo", pct, fn, ja, jaNote: "" });
+  const F = (phase, idName, inci, pct, fn, ja) => ({ phase, trade: inci + " (demo)", idName, inci, maker: "Demo", pct, fn, ja, jaNote: "" });
   const formula = [F("A", "Air", "Water", "83.7", "Solvent", "水"), F("A", "Butilen glikol", "Butylene Glycol", "6", "Humectant", "BG"), F("A", "Gliserin", "Glycerin", "4", "Humectant", "グリセリン"),
     F("A", "Niasinamida", "Niacinamide", "3", "Skin conditioning", "ナイアシンアミド"), F("A", "Pentilen glikol", "Pentylene Glycol", "2", "Humectant", "ペンチレングリコール"), F("A", "Karbomer", "Carbomer", "0.3", "Thickener", "カルボマー"),
     F("A", "Dinatrium EDTA", "Disodium EDTA", "0.05", "Chelating agent", "EDTA-2Na"), F("B", "Natrium hialuronat", "Sodium Hyaluronate", "0.1", "Humectant", "ヒアルロン酸Na"), F("B", "Seramida NP", "Ceramide NP", "0.05", "Skin conditioning", "セラミドNP"),
@@ -61,7 +61,7 @@
     market: [], mail_log: [], admin_emails: [{ email: "demo-admin@example.com" }],
     settings: [{ key: "dev_email", value: "rd@instinct-bro.com" }, { key: "app_url", value: location.origin }],
     terms: [["nda", "Confidentiality Agreement (NDA)", "Perjanjian Kerahasiaan (NDA)", "秘密保持契約（NDA）"], ["purchase", "Declaration of Purchase by Artisans Production", "Pernyataan Pembelian oleh Artisans Production", "原料購入に関する当社宣言書"], ["ip", "Ownership of Adopted Formulas", "Kepemilikan Formula yang Diadopsi", "採用処方の帰属に関する合意"]]
-      .map(([doc, en, idt, ja]) => ({ doc, version: "demo", current: true, title_en: en, title_id: idt, title_ja: ja, text_en: "(Demo) The full text is shown on the real registration page.", text_id: "(Demo) Teks lengkap ditampilkan di halaman pendaftaran.", text_ja: "（デモ）本番の登録画面には全文が表示されます。" })),
+      .map(([doc, en, idt, ja]) => ({ doc, version: "demo", current: true, title_en: en, title_id: idt, title_ja: ja, text_en: "(Demo) The full text is shown on the real agreement page.", text_id: "(Demo) Teks lengkap ditampilkan di halaman persetujuan yang sebenarnya.", text_ja: "（デモ）本番の合意画面には全文が表示されます。" })),
     agreement_log: ["nda", "purchase", "ip"].map((doc, i) => ({ id: i + 1, user_id: SUP, company_id: CA, doc, version: "demo", accepted_at: ago(200) })),
   };
   let db;
@@ -83,7 +83,7 @@
     return [];
   }
   function embed(table, cols, rows) {
-    if (table !== "projects" || !/assignments\(/.test(cols || "")) return rows;
+    if (table !== "projects" || !/(assignments|finals|plans)\(/.test(cols || "")) return rows;
     return rows.map((p) => ({ ...p, assignments: db.assignments.filter((a) => a.project_id === p.id), finals: db.finals.filter((f) => f.project_id === p.id), plans: db.plans.filter((f) => f.project_id === p.id) }));
   }
   class Query {
@@ -146,9 +146,9 @@
     functions: {
       invoke: async (name, opts) => /Extract the cosmetic formula/.test(opts?.body?.prompt || "")
         ? { data: { text: JSON.stringify({ unit: "g", notes: "(Demo) Sample result — the real file is not read in the demo.", items: [
-            { phase: "A", trade: "", idName: "Air", inci: "Water", maker: "", amt: "800", fn: "Solvent" },
+            { phase: "A", trade: "Purified water", idName: "Air", inci: "Water", maker: "", amt: "800", fn: "Solvent" },
             { phase: "A", trade: "Glycerin 99.5%", idName: "Gliserin", inci: "Glycerin", maker: "Demo Chem", amt: "50", fn: "Humectant" },
-            { phase: "A", trade: "", idName: "Butilen glikol", inci: "Butylene Glycol", maker: "Demo Chem", amt: "60", fn: "Humectant" },
+            { phase: "A", trade: "BG (demo)", idName: "Butilen glikol", inci: "Butylene Glycol", maker: "Demo Chem", amt: "60", fn: "Humectant" },
             { phase: "B", trade: "", idName: "Niasinamida", inci: "Niacinamide", maker: "Demo Chem", amt: "30", fn: "Skin conditioning" },
             { phase: "C", trade: "", idName: "Fenoksietanol", inci: "Phenoxyethanol", maker: "Demo Chem", amt: "5", fn: "Preservative" }] }) }, error: null }
         : name === "notify" || name === "invite"

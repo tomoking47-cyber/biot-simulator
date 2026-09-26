@@ -16,7 +16,14 @@
   });
   new MutationObserver(labelCells).observe(app, { childList: true, subtree: true });
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-  const num = (v) => { const n = parseFloat(String(v ?? "").replace(/[^\d.\-]/g, "")); return isFinite(n) ? n : 0; };
+  // Numbers as suppliers type them (Indonesian convention: comma = decimal): "0,5" = 0.5, "1,25" = 1.25;
+  // "1,000.5" and "1.000,5" = 1000.5; "1,000,000" = 1000000.
+  const num = (v) => {
+    let t = String(v ?? "").trim().replace(/[^\d.,\-]/g, "");
+    const thousands = /^-?[1-9]\d{0,2}(,\d{3}){2,}$/.test(t); // "1,000,000" = thousands; a single comma is a decimal comma
+    if (!thousands && /,\d+$/.test(t) && (!t.includes(".") || t.lastIndexOf(",") > t.lastIndexOf("."))) t = t.replace(/\./g, "").replace(",", ".");
+    const n = parseFloat(t.replace(/,/g, "")); return isFinite(n) ? n : 0;
+  };
   const fmt = (n) => (Math.round(n * 1000) / 1000).toString();
   const today = () => new Date().toISOString().slice(0, 10);
   const dt = (s) => (s ? new Date(s).toLocaleString("ja-JP", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
@@ -38,11 +45,11 @@
   function termsBlock(terms) {
     return terms.map((t, i) => `<div class="terms" data-doc="${esc(t.doc)}">
       <div class="head" style="margin-bottom:6px"><b>${i + 1}. ${esc(t.title_en)} / ${esc(t.title_id)}</b>
-        <div class="seg"><button type="button" data-tl="en" aria-pressed="true">English</button><button type="button" data-tl="id" aria-pressed="false">Indonesia</button></div></div>
+        <div class="seg"><button type="button" data-tl="en" aria-pressed="true">English</button><button type="button" data-tl="id" aria-pressed="false">Bahasa Indonesia</button></div></div>
       <div class="terms-text" data-en="${esc(t.text_en)}" data-id="${esc(t.text_id)}">${esc(t.text_en)}</div>
       <label class="check" style="margin-top:8px"><input type="checkbox" data-agree="${esc(t.doc)}" data-ver="${esc(t.version)}" required>
-        ${t.doc === "purchase" ? "I have read and acknowledge this declaration. / Saya telah membaca dan memahami pernyataan ini." : "I agree on behalf of my company. / Saya menyetujui atas nama perusahaan saya."} *</label>
-      <div class="muted" style="font-size:11px">Version ${esc(t.version)}</div></div>`).join("");
+        ${t.doc === "purchase" ? "I have read and understood this declaration. / Saya telah membaca dan memahami pernyataan ini." : "I agree on behalf of my company. / Saya menyetujuinya atas nama perusahaan saya."} *</label>
+      <div class="muted" style="font-size:11px">Version / Versi ${esc(t.version)}</div></div>`).join("");
   }
   function wireTerms(root) {
     root.querySelectorAll(".terms").forEach((box) => box.querySelectorAll("[data-tl]").forEach((b) => (b.onclick = () => {
@@ -66,7 +73,7 @@
   async function copy(text, btn) {
     const old = btn.textContent;
     try { await navigator.clipboard.writeText(text); btn.textContent = "コピーしました / Copied"; }
-    catch { btn.textContent = "コピーできませんでした"; }
+    catch { btn.textContent = "コピーできませんでした / Gagal menyalin"; }
     setTimeout(() => (btn.textContent = old), 1800);
   }
   function download(filename, blob) {
@@ -81,37 +88,49 @@
 
   /* ---------------- AI (server-side Claude) ---------------- */
   const GLOSSARY = `化粧品開発の用語は次の訳語で統一すること:
-処方=formula / formulasi, 試作=trial sample / sampel uji coba, 使用感=sensory profile / sensasi pemakaian, ベンチマーク品=benchmark product / produk acuan,
+処方=formula / formula, 試作=trial sample / sampel uji coba, 使用感=sensory profile / sensasi pemakaian, ベンチマーク品=benchmark product / produk acuan,
 全成分=full ingredient list (INCI) / daftar bahan lengkap, 原料=raw material / bahan baku, 規格書=specification / spesifikasi, SDS, COA,
 防腐剤=preservative / pengawet, 増粘剤=thickener / pengental, 保湿剤=humectant / humektan, 乳化剤=emulsifier / pengemulsi,
-安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期=lead time,
-化粧品基準=Japanese Standards for Cosmetics, 医薬部外品=quasi-drug, ハラール=halal, BPOM.`;
-  const AI_ERR = { demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。", not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。", rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。", no_credit: "AIの利用残高（クレジット）が不足しています。各社の管理画面の Billing をご確認ください。", refused: "この内容は処理できませんでした。表現を変えてお試しください。", unauthorized: "ログインし直してください。" };
+安定性試験=stability test / uji stabilitas, 防腐効力試験=challenge test / uji efektivitas pengawet, 原価=cost of goods / HPP, 最低発注量=MOQ, 納期（リードタイム）=lead time / waktu tunggu, 原料費=raw material cost / biaya bahan baku, 完成品コスト=finished product cost / biaya produk jadi,
+化粧品基準=Japanese Standards for Cosmetics / Standar Kosmetik Jepang, 医薬部外品=quasi-drug / quasi-drug (produk kuasi-obat Jepang), ハラール=halal, BPOM.`;
+  const AI_ERR = {
+    demo: "デモ画面ではAI機能（翻訳・変換・企画書作成）は動きません。 / AI is not available in the demo.",
+    not_configured: "AIの設定（APIキー）がまだです。設定手順をご確認ください。 / AI is not set up yet. / AI belum diatur.",
+    rate_limited: "混み合っています。1分ほど待ってからもう一度押してください。 / Busy — please try again in a minute. / Sedang sibuk — coba lagi dalam 1 menit.",
+    no_credit: "AIの利用残高（クレジット）が不足しています。各社の管理画面の Billing をご確認ください。 / The AI account has no credit. / Saldo AI habis.",
+    refused: "この内容は処理できませんでした。表現を変えてお試しください。 / This content could not be processed. / Konten ini tidak dapat diproses.",
+    bad_request: "AIに送れない内容でした（ファイルが大きすぎる等）。 / The request could not be processed (e.g. file too large). / Permintaan tidak dapat diproses (mis. file terlalu besar).",
+    empty: "AIから答えがありませんでした。もう一度押してください。 / No answer from the AI. Please try again. / AI tidak memberi jawaban. Coba lagi.",
+    upstream: "AIのサービスで問題が起きました。少し待ってからもう一度押してください。 / The AI service had a problem. Please try again. / Layanan AI bermasalah. Coba lagi.",
+    forbidden: "この機能は使えません。 / Not allowed. / Tidak diizinkan.",
+    unauthorized: "ログインし直してください。 / Please sign in again. / Silakan masuk kembali.",
+  };
   function parseJSON(text) {
     const t = String(text).trim();
     try { return JSON.parse(t); } catch {}
     const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/); if (fence) { try { return JSON.parse(fence[1]); } catch {} }
     const a = Math.min(...["{", "["].map((c) => (t.indexOf(c) + 1 || Infinity) - 1)), b = Math.max(t.lastIndexOf("}"), t.lastIndexOf("]"));
     if (isFinite(a) && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch {} }
-    throw { userMsg: "結果の形式が崩れました。もう一度押してください。" };
+    throw { userMsg: "結果の形式が崩れました。もう一度押してください。 / Unexpected result — please try again. / Hasil tidak sesuai — coba lagi." };
   }
   // provider: "claude" (default) | "gemini" (Google Search research) | "openai" (review). aiRaw keeps the model name and web sources.
   async function aiRaw(prompt, { effort = "medium", image, document, images, documents, provider, search } = {}) {
     const { data, error } = await sb.functions.invoke("ai", { body: { prompt, effort, image, document, images, documents, provider, search } });
     if (error) {
       let code = ""; try { code = (await error.context.json()).error; } catch {}
-      throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。", code };
+      throw { userMsg: AI_ERR[code] || "通信が途切れました。もう一度押してください。 / Connection lost. Please try again.", code };
     }
+    if (data?.error) throw { userMsg: AI_ERR[data.error] || "AIの処理に失敗しました。もう一度押してください。 / The AI request failed. Please try again.", code: data.error };
     return data;
   }
   async function ai(prompt, opts = {}) { return parseJSON((await aiRaw(prompt, opts)).text); }
   const blobB64 = (blob) => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
   async function busy(btn, stEl, msg, fn) {
     if (btn.disabled) return;
-    const label = btn.textContent; btn.disabled = true; btn.textContent = "処理中… / Working…";
+    const label = btn.textContent; btn.disabled = true; btn.textContent = "処理中… / Working… / Memproses…";
     if (stEl) { stEl.className = "status"; stEl.textContent = msg; }
     try { await fn(); }
-    catch (e) { if (stEl) { stEl.className = "status err"; stEl.textContent = e?.userMsg || e?.message || "エラーが発生しました / Something went wrong"; } console.error(e); }
+    catch (e) { if (stEl) { stEl.className = "status err"; stEl.textContent = e?.userMsg || e?.message || "エラーが発生しました / Something went wrong / Terjadi kesalahan"; } console.error(e); }
     finally { btn.disabled = false; btn.textContent = label; }
   }
 
@@ -136,8 +155,8 @@
       <p class="lang-note">${FLAG_JP}${FLAG_ID} Sign in / Masuk / ログイン</p>
       <form id="f-login">
         <div class="field"><label for="l-email">Email</label><input id="l-email" type="email" autocomplete="email" required></div>
-        <div class="field"><label for="l-pass">Password</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
-        <div class="row"><button class="btn" type="submit">Sign in / ログイン</button><span class="spacer"></span><button class="linkbtn" type="button" id="to-reset">Forgot password?</button></div>
+        <div class="field"><label for="l-pass">Password / Kata sandi</label><input id="l-pass" type="password" autocomplete="current-password" required></div>
+        <div class="row"><button class="btn" type="submit">Sign in / Masuk / ログイン</button><span class="spacer"></span><button class="linkbtn" type="button" id="to-reset">Forgot password? / Lupa kata sandi?</button></div>
         <div class="status" id="st-login" role="status" aria-live="polite"></div>
       </form>
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
@@ -146,121 +165,74 @@
     $("to-reset").onclick = () => (location.hash = "#/reset");
     $("f-login").onsubmit = async (e) => {
       e.preventDefault();
-      const st = $("st-login"); st.className = "status"; st.textContent = "Signing in…";
+      const st = $("st-login"); st.className = "status"; st.textContent = "Signing in… / Masuk…";
       const { error } = await sb.auth.signInWithPassword({ email: $("l-email").value.trim(), password: $("l-pass").value });
-      if (error) { st.className = "status err"; st.textContent = /confirm/i.test(error.message) ? "Please confirm your email first (check your inbox). / 確認メールのリンクを先に開いてください。" : "Email or password is incorrect. / メールアドレスかパスワードが違います。"; return; }
+      if (error) { st.className = "status err"; st.textContent = /confirm/i.test(error.message) ? "Please confirm your email first (check your inbox). / Harap konfirmasi email Anda terlebih dahulu. / 確認メールのリンクを先に開いてください。" : "Email or password is incorrect. / Email atau kata sandi salah. / メールアドレスかパスワードが違います。"; return; }
       await loadMe(); route(true);
     };
   }
 
-  const REG_FIELDS = [
-    ["company.name", "Company name / Nama perusahaan", true], ["full_name", "Your name / Nama Anda", true], ["title", "Job title / Jabatan"],
-    ["email", "Email", true, "email"], ["password", "Password (min. 8 characters)", true, "password"], ["phone", "Phone / Telepon", true, "tel"],
-    ["whatsapp", "WhatsApp", false, "tel"], ["company.address", "Company address / Alamat"], ["company.website", "Website"],
-    ["company.nib", "Business ID (NIB)"], ["company.halal", "Halal certification (number or \"in progress\")"], ["company.materials", "Main raw materials you supply / Bahan baku utama"],
-  ];
-  function viewRegister() {
-    $("topbar").hidden = true;
-    app.innerHTML = `<div class="auth card en">
-      <h1>${FLAG_ID} Supplier registration</h1>
-      <p class="lang-note">${FLAG_JP} Artisans Production Co., Ltd. (Japan)</p>
-      <p class="lang-note">Pendaftaran pemasok · 仕入先の企業登録. After registering, requests from Japan will appear on your page and be emailed to you.</p>
-      <form id="f-reg">
-        ${REG_FIELDS.map(([k, l, req, type]) => `<div class="field"><label for="g-${k}">${esc(l)}${req ? " *" : ""}</label>${k === "company.materials" || k === "company.address"
-          ? `<textarea id="g-${k}"></textarea>` : `<input id="g-${k}" type="${type || "text"}" ${req ? "required" : ""} ${type === "password" ? 'minlength="8" autocomplete="new-password"' : ""}>`}</div>`).join("")}
-        <h2 style="margin-top:16px">Agreements / Perjanjian</h2>
-        <p class="sub">Please read all three and tick each box. Registration is not possible without them. / Harap baca ketiganya dan centang setiap kotak.</p>
-        <div id="g-terms"><div class="hint">Loading…</div></div>
-        <div class="row"><button class="btn saff" type="submit">Register / Daftar</button><a href="#/login" class="linkbtn">Back to sign in</a></div>
-        <div class="status" id="st-reg" role="status" aria-live="polite"></div>
-      </form></div>`;
-    let terms = [];
-    loadTerms().then((t) => { terms = t; $("g-terms").innerHTML = termsBlock(t) || '<div class="status err">Agreements could not be loaded. Please reload.</div>'; wireTerms($("g-terms")); });
-    $("f-reg").onsubmit = async (e) => {
-      e.preventDefault();
-      const agreements = agreedFrom($("g-terms"));
-      if (!terms.length || terms.some((t) => agreements[t.doc] !== t.version)) { $("st-reg").className = "status err"; $("st-reg").textContent = "Please agree to all three agreements. / Harap setujui ketiga perjanjian."; return; }
-      const v = (k) => $("g-" + k).value.trim(), st = $("st-reg"), btn = e.submitter || $("f-reg").querySelector('button[type="submit"]');
-      if (btn.disabled) return;
-      btn.disabled = true; setTimeout(() => (btn.disabled = false), 60000);
-      st.className = "status"; st.textContent = "Registering… / 登録しています…";
-      const company = {}; REG_FIELDS.filter(([k]) => k.startsWith("company.")).forEach(([k]) => (company[k.slice(8)] = v(k)));
-      const { data, error } = await sb.auth.signUp({
-        email: v("email"), password: $("g-password").value,
-        options: { emailRedirectTo: location.origin + location.pathname, data: { full_name: v("full_name"), title: v("title"), phone: v("phone"), whatsapp: v("whatsapp"), agreements, user_agent: navigator.userAgent, company } },
-      });
-      if (error) {
-        st.className = "status err";
-        st.textContent = /registered/i.test(error.message) ? "This email is already registered. Please sign in. / 登録済みです。ログインしてください。"
-          : /seconds|rate/i.test(error.message) ? "Your registration may already have been received. Please check your email, or wait one minute and try again. / 登録は受け付け済みの可能性があります。メールを確認するか、1分後にもう一度お試しください。"
-          : "Could not register: " + error.message;
-        return;
-      }
-      if (!data.session) { st.className = "status"; st.innerHTML = "✓ Registered. We sent a confirmation email — please open the link in it, then sign in.<br>✓ Terdaftar. Silakan buka tautan di email konfirmasi, lalu masuk."; return; }
-      toast("Registered ✓", "Welcome to Formula Bridge."); await loadMe(); location.hash = "#/"; route(true);
-    };
-  }
   function viewReset() {
     $("topbar").hidden = true;
-    app.innerHTML = `<div class="auth card"><h1>Reset password / パスワード再設定</h1>
+    app.innerHTML = `<div class="auth card"><h1>Reset password / Atur ulang kata sandi / パスワード再設定</h1>
       <form id="f-reset"><div class="field"><label for="r-email">Email</label><input id="r-email" type="email" required></div>
-      <div class="row"><button class="btn" type="submit">Send reset link</button><a href="#/login" class="linkbtn">Back</a></div>
+      <div class="row"><button class="btn" type="submit">Send reset link / Kirim tautan</button><a href="#/login" class="linkbtn">Back / Kembali</a></div>
       <div class="status" id="st-reset"></div></form></div>`;
     $("f-reset").onsubmit = async (e) => {
       e.preventDefault();
       const { error } = await sb.auth.resetPasswordForEmail($("r-email").value.trim(), { redirectTo: location.origin + location.pathname + "#/update-password" });
-      $("st-reset").textContent = error ? "Could not send: " + error.message : "If the address is registered, a reset link has been sent. / 登録済みなら再設定メールを送りました。";
+      $("st-reset").textContent = error ? "Could not send / Gagal mengirim: " + error.message : "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みなら再設定メールを送りました。";
     };
   }
   function viewUpdatePassword(inApp) {
     $("topbar").hidden = !inApp;
-    app.innerHTML = `<div class="auth card"><h1>New password / 新しいパスワード</h1>
-      <form id="f-up"><div class="field"><label for="u-pass">New password (min. 8)</label><input id="u-pass" type="password" minlength="8" required autocomplete="new-password"></div>
-      <button class="btn" type="submit">Save</button><div class="status" id="st-up"></div></form></div>`;
+    app.innerHTML = `<div class="auth card"><h1>New password / Kata sandi baru / 新しいパスワード</h1>
+      <form id="f-up"><div class="field"><label for="u-pass">New password (min. 8 characters) / Kata sandi baru (min. 8 karakter)</label><input id="u-pass" type="password" minlength="8" required autocomplete="new-password"></div>
+      <button class="btn" type="submit">Save / Simpan / 保存</button><div class="status" id="st-up"></div></form></div>`;
     $("f-up").onsubmit = async (e) => {
       e.preventDefault();
       const { error } = await sb.auth.updateUser({ password: $("u-pass").value });
       if (error) { $("st-up").className = "status err"; $("st-up").textContent = error.message; return; }
-      toast("Password updated ✓", ""); location.hash = "#/";
+      toast("Password updated ✓ / Kata sandi diperbarui ✓ / パスワードを変更しました", ""); location.hash = "#/";
     };
   }
 
   /* ---------------- Shared: formula tables ---------------- */
   const COLS = {
     formula: [
-      { k: "phase", l: "Phase", w: 60, req: true }, { k: "trade", l: "Trade name", w: 150, req: true }, { k: "idName", l: "Nama bahan (Indonesian label name)", w: 190, req: true },
+      { k: "phase", l: "Phase", w: 60, req: true }, { k: "trade", l: "Trade name", w: 150, req: true }, { k: "idName", l: "Nama bahan (Indonesian ingredient name)", w: 190, req: true },
       { k: "inci", l: "INCI name", w: 190, req: true }, { k: "maker", l: "Supplier / maker", w: 130, req: true }, { k: "pct", l: "% w/w", w: 80, num: true, req: true },
       { k: "fn", l: "Function", w: 120, req: true }, { k: "ja", l: "日本語表示名称", ja: true, w: 170 },
       { k: "jaNote", l: "確認事項（AI）", jn: true, ro: true, w: 280 } ],
-    materials: [{ k: "material", l: "Raw material", w: 180 }, { k: "feature", l: "Key feature", w: 280 }, { k: "data", l: "Supporting data (supplier / literature)", w: 360 }],
-    tests: [{ k: "lab", l: "Laboratory", w: 160 }, { k: "item", l: "Test item", w: 170 }, { k: "method", l: "Method / n", w: 170 }, { k: "result", l: "Result", w: 260 }, { k: "date", l: "Date", w: 100 }],
+    materials: [{ k: "material", l: "Raw material / Bahan baku", w: 180 }, { k: "feature", l: "Key feature / Keunggulan", w: 280 }, { k: "data", l: "Supporting data (supplier / literature) / Data pendukung", w: 360 }],
+    tests: [{ k: "lab", l: "Laboratory / Laboratorium", w: 160 }, { k: "item", l: "Test item / Item uji", w: 170 }, { k: "method", l: "Method, n / Metode, n", w: 170 }, { k: "result", l: "Result / Hasil", w: 260 }, { k: "date", l: "Date / Tanggal", w: 100 }],
     additions: [{ k: "ja", l: "日本語表示名称", w: 200 }, { k: "inci", l: "INCI", w: 200 }, { k: "pct", l: "配合量 %", w: 90, num: true }, { k: "purpose", l: "配合目的", w: 160 }, { k: "note", l: "備考（仕入先など）", w: 200 }],
   };
   const TPL_MARK = "Formula Bridge formula template v1";
-  const TPL_HEAD = ["No.", "Phase", "Trade name", "Nama bahan (Indonesian label name)", "INCI name", "Supplier / maker", "Amount", "Function"];
+  const TPL_HEAD = ["No.", "Phase", "Trade name", "Nama bahan (Indonesian ingredient name)", "INCI name", "Supplier / maker", "Amount", "Function"];
   /* Formula as our Excel template (re-importable) — empty for the template, filled for exports. */
   async function formulaXlsx({ project, company, unit, rows }) {
     const XLSX = await lib("XLSX"), wb = XLSX.utils.book_new(), n = Math.max(40, rows.length), extra = rows.length ? ["% w/w", "日本語表示名称 (Japanese label name)", "確認事項（AI）"] : [];
     const head = TPL_HEAD.map((h) => h + (h === "No." ? "" : " *")).concat(extra);
     const cell = (v) => (v === "" || v == null ? "" : isNaN(Number(v)) ? String(v) : Number(v));
-    const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English. Do not change the header row (row 7). / Isi SEMUA kolom dalam bahasa Inggris. Jangan ubah baris judul (baris 7)."],
-      ["Project", project || ""], ["Company", company || ""], ["Amount unit (write %, g or mL) *", unit || "%"], [],
+    const ws = XLSX.utils.aoa_to_sheet([[TPL_MARK], ["Fill in EVERY cell in English (Nama bahan: in Indonesian). Do not change the header row (row 7). / Isi SEMUA sel dalam bahasa Inggris (Nama bahan: dalam bahasa Indonesia). Jangan ubah baris judul kolom (baris 7)."],
+      ["Project / Proyek", project || ""], ["Company / Perusahaan", company || ""], ["Amount unit (write %, g or mL) / Satuan jumlah (tulis %, g, atau mL) *", unit || "%"], [],
       head, ...Array.from({ length: n }, (_, i) => { const r = rows[i]; return r ? [i + 1, r.phase || "", r.trade || "", r.idName || "", r.inci || "", r.maker || "", cell(unit === "%" ? r.pct : r.amt), r.fn || "", cell(r.pct), r.ja || "", r.jaNote || ""] : [i + 1, "", "", "", "", "", "", ""]; }),
       ["", "", "", "", "", "Total", { f: `SUM(G8:G${7 + n})` }, "", ...(rows.length ? [{ f: `SUM(I8:I${7 + n})` }] : [])]]);
     ws["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22, 10, 28, 40].map((w) => ({ wch: w }));
     ws["!merges"] = [{ s: { r: 1, c: 0 }, e: { r: 1, c: 7 } }];
     XLSX.utils.book_append_sheet(wb, ws, "Formula");
-    const ex = XLSX.utils.aoa_to_sheet([["EXAMPLE — do not fill in this sheet / CONTOH"], [], TPL_HEAD,
+    const ex = XLSX.utils.aoa_to_sheet([["EXAMPLE — do not fill in this sheet / CONTOH — jangan isi lembar ini"], [], TPL_HEAD,
       [1, "A", "Purified water", "Air", "Water", "—", 83.7, "Solvent"], [2, "A", "Glycerin 99.5%", "Gliserin", "Glycerin", "Wilmar", 4, "Humectant"],
       [3, "B", "Ceramide NP-3", "Seramida NP", "Ceramide NP", "Evonik", 0.05, "Skin conditioning"], [4, "C", "Euxyl PE 9010", "Fenoksietanol, Etilheksilgliserin", "Phenoxyethanol, Ethylhexylglycerin", "Schülke", 0.5, "Preservative"]]);
     ex["!cols"] = [8, 10, 24, 30, 30, 22, 12, 22].map((w) => ({ wch: w }));
     XLSX.utils.book_append_sheet(wb, ex, "Example");
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["How to fill in / Cara mengisi"], [],
-      ["1", "One row per raw material, in the order you add them. / Satu baris per bahan baku."], ["2", "Phase: A, B, C … (the manufacturing phase). / Fase pembuatan."],
-      ["3", "Trade name: the product name of the raw material. / Nama dagang bahan baku."], ["4", "Nama bahan: the Indonesian label name. / Nama bahan sesuai label Indonesia."],
-      ["5", "INCI name: the international name. For a blend, list all INCI names separated by commas. / Untuk campuran, tulis semua nama INCI."],
-      ["6", "Supplier / maker: who makes the raw material. / Produsen bahan baku."], ["7", "Amount: numbers only, in the unit written in cell B5 (%, g or mL). If %, the total must be 100. / Hanya angka. Jika %, total harus 100."],
-      ["8", "Function: e.g. Humectant, Emulsifier, Preservative. / Fungsi bahan."], ["9", "Save the file and drop it into Formula Bridge (section B). / Simpan lalu unggah ke Formula Bridge (bagian B)."]]), "How to fill");
+      ["1", "One row per raw material, in the order you add them. / Satu baris per bahan baku, sesuai urutan penambahan."], ["2", "Phase: A, B, C … (the manufacturing phase). / Phase: A, B, C … (fase pembuatan)."],
+      ["3", "Trade name: the product name of the raw material. / Nama dagang bahan baku."], ["4", "Nama bahan: the ingredient name in Indonesian. / Nama bahan dalam bahasa Indonesia."],
+      ["5", "INCI name: the international name. For a blend, list all INCI names separated by commas. / Nama INCI: nama internasional. Untuk campuran, tulis semua nama INCI, dipisahkan koma."],
+      ["6", "Supplier / maker: who makes the raw material. / Produsen bahan baku."], ["7", "Amount: numbers only, in the unit written in cell B5 (%, g or mL). If %, the total must be 100. / Jumlah: hanya angka, dalam satuan yang ditulis di sel B5 (%, g, atau mL). Jika %, total harus 100."],
+      ["8", "Function (in English): e.g. Humectant, Emulsifier, Preservative. / Fungsi bahan (tulis dalam bahasa Inggris), mis. Humectant, Emulsifier, Preservative."], ["9", "Save the file and drop it into Formula Bridge (section B). / Simpan lalu unggah ke Formula Bridge (bagian B)."]]), "How to fill");
     return new Blob([XLSX.write(wb, { type: "array", bookType: "xlsx" })], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
   }
   const fileBase = (name, kind) => `FormulaBridge_${kind}_` + String(name || "request").replace(/[\\/:*?"<>|\s]+/g, "_");
@@ -301,7 +273,7 @@
           ? `<td class="${c.ja ? "ja" : c.jn ? "jnote" : c.num ? "num" : ""}" style="padding:8px">${boxed && !c.ja && !c.jn ? `<span class="cellbox">${esc(r[c.k] ?? "")}</span>` : esc(r[c.k] ?? "")}</td>`
           : `<td class="${c.num ? "num" : ""}"><input data-i="${i}" data-k="${c.k}" value="${esc(r[c.k] ?? "")}" class="${c.req && !String(r[c.k] ?? "").trim() ? "miss" : ""}" aria-label="${esc(c.l)} ${i + 1}" ${c.ph ? `placeholder="${esc(c.ph)}"` : ""} ${c.num ? 'inputmode="decimal"' : ""}></td>`).join("")}
           ${readOnly ? "" : `<td><button class="x" data-del="${i}" aria-label="Delete row">×</button></td>`}</tr>`).join("") || `<tr><td colspan="${cols.length + 2}" class="hint" style="padding:12px">No rows yet / まだ行がありません</td></tr>`}</tbody>
-        ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
+        ${pi >= 0 ? `<tfoot><tr><td colspan="${pi + 1}" style="text-align:right">Total</td><td class="num ${totalCheck && tk === "pct" ? (Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad") : ""}">${fmt(tot)}</td><td colspan="${cols.length - pi + (readOnly ? -1 : 0)}"></td></tr></tfoot>` : ""}`;
     };
     el.oninput = (e) => {
       const t = e.target; if (!t.dataset.k) return; const r = rows[+t.dataset.i]; if (!r) return;
@@ -310,10 +282,10 @@
       if (["idName", "inci", "trade"].includes(t.dataset.k) && "ja" in r && cols.some((c) => c.ja)) { r.ja = ""; r.jaNote = ""; }
       const tk = cols.find((c) => c.total)?.k || "pct";
       onChange();
-      if (t.dataset.k === tk) { const c = el.querySelector("tfoot td.num"); if (c) { const tot = rows.reduce((a, x) => a + num(x[tk]), 0); c.textContent = fmt(tot); if (totalCheck && tk === "pct") c.className = "num " + (Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"); } }
+      if (t.dataset.k === tk) { const c = el.querySelector("tfoot td.num"); if (c) { const tot = rows.reduce((a, x) => a + num(x[tk]), 0); c.textContent = fmt(tot); if (totalCheck && tk === "pct") c.className = "num " + (Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad"); } }
     };
     el.onclick = (e) => { const b = e.target.closest("[data-del]"); if (b) { rows.splice(+b.dataset.del, 1); onChange(); render(); } };
-    el.addEventListener("focusout", () => setTimeout(render, 0));
+    el.onfocusout = () => setTimeout(render, 0);
     render();
     return { render, add() { rows.push({}); onChange(); render(); el.querySelector("tbody tr:last-child input")?.focus(); } };
   }
@@ -321,9 +293,17 @@
   /* Debounced save helper: one write at a time. */
   function saver(fn, st) {
     let t, chain = Promise.resolve(), pending = false;
-    const run = () => { pending = false; chain = chain.then(fn).then(() => { if (st) st.textContent = "Saved / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
-      (e) => { if (st) st.textContent = "Could not save / 保存できませんでした"; console.error(e); }); return chain; };
-    return { soon() { pending = true; if (st) st.textContent = "Saving… / 保存待ち…"; clearTimeout(t); t = setTimeout(run, 1000); }, now() { clearTimeout(t); return pending ? run() : chain; } };
+    // run() returns a promise that rejects when the save fails (so "done" messages are not shown), while the chain
+    // itself keeps going for the next save.
+    let last = Promise.resolve();
+    const run = () => { pending = false;
+      last = chain.then(fn).then(() => { if (st) st.textContent = "Saved / Tersimpan / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
+        (e) => { pending = true; console.error(e);
+          const why = /adopted formula is locked/.test(e?.message || "") ? "This formula has been adopted by Japan and can no longer be changed. / Formula ini telah diadopsi oleh Jepang dan tidak dapat diubah lagi. / 採用・確定済みのため変更できません。" : (e?.message || e?.userMsg || "");
+          if (st) st.textContent = "Could not save / Gagal menyimpan / 保存できませんでした";
+          throw { userMsg: "Could not save / Gagal menyimpan / 保存できませんでした: " + why }; });
+      chain = last.catch(() => {}); return last; };
+    return { soon() { pending = true; if (st) st.textContent = "Saving… / Menyimpan… / 保存中…"; clearTimeout(t); t = setTimeout(() => run().catch(() => {}), 1000); }, now() { clearTimeout(t); return pending ? run() : last; } };
   }
 
   /* Indonesian / trade names → Japanese label names (日本語表示名称) */
@@ -356,7 +336,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     stability: "e.g. 3 months at 4/25/45°C, no separation", cost: "e.g. 15000", moq: "e.g. 25", leadTime: "e.g. 4",
     process: "Main steps and temperatures, e.g. Phase A at 75°C → cool → add Phase B below 40°C",
   };
-  const PRODUCT_FIELDS = [["name", "Product name"], ["concept", "Concept"], ["features", "Key features (one per line)"], ["claims", "Possible marketing claims"], ["appearance", "Appearance / texture"], ["ph", "pH"], ["viscosity", "Viscosity"], ["shelfLife", "Shelf life"], ["stability", "Stability test summary"], ["cost", "Your quote: raw material cost per unit"], ["moq", "MOQ"], ["leadTime", "Lead time"], ["process", "Manufacturing process"]];
+  const PRODUCT_FIELDS = [["name", "Product name / Nama produk"], ["concept", "Concept / Konsep"], ["features", "Key features (one per line) / Fitur utama (satu per baris)"], ["claims", "Possible marketing claims / Klaim pemasaran"], ["appearance", "Appearance / texture / Tampilan / tekstur"], ["ph", "pH"], ["viscosity", "Viscosity / Viskositas"], ["shelfLife", "Shelf life / Masa simpan"], ["stability", "Stability test summary / Ringkasan uji stabilitas"], ["cost", "Your quote: raw material cost per unit / Penawaran Anda: biaya bahan baku per unit"], ["moq", "MOQ"], ["leadTime", "Lead time / Waktu tunggu"], ["process", "Manufacturing process / Proses pembuatan"]];
   function supplierEnglish(sp) {
     const p = sp.product || {};
     const lines = PRODUCT_FIELDS.filter(([k]) => p[k]).map(([k, l]) => `${l}: ${p[k]}`);
@@ -367,23 +347,23 @@ ${JSON.stringify(list)}`, { effort: "medium" });
   }
   async function openFile(path) {
     const { data, error } = await sb.storage.from("attachments").createSignedUrl(path, 600);
-    if (error) { toast("Could not open file", error.message, "info"); return; }
+    if (error) { toast("Could not open file / Gagal membuka file / ファイルを開けませんでした", error.message, "info"); return; }
     window.open(data.signedUrl, "_blank", "noopener");
   }
 
   /* ================= SUPPLIER (Indonesia) ================= */
   async function supplierHome() {
     const { data: rows, error } = await sb.from("assignments").select("id, status, request_snapshot, requested_at, submitted_at, shipped_at, feedback_at, updated_at").order("requested_at", { ascending: false });
-    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG). <a href="#/company">Company profile →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these.</small></div>
+    app.innerHTML = `${S.company && !S.company.logo_path ? `<div class="notice off en"><b>Please upload your company logo (JPG).</b> Japan uses it to tell suppliers apart. / Harap unggah logo perusahaan Anda (JPG). <a href="#/company">Company profile / Profil perusahaan →</a></div>` : ""}<div class="who id">${FLAG_ID}${esc(S.company?.name || "")} — requests from Japan<small>Permintaan dari Jepang · Only your company can see these. / Hanya perusahaan Anda yang dapat melihatnya.</small></div>
       <div class="card en"><h2>Requests / Permintaan</h2>
-      ${error ? `<p class="status err">${esc(error.message)}</p>` : (rows || []).length ? `<div class="tbl-wrap"><table class="view master"><thead><tr><th>Project</th><th>Received</th><th>Status</th><th>Submitted</th><th>Sample shipped</th><th>Feedback from Japan</th><th></th></tr></thead><tbody>
-      ${rows.map((a) => `<tr><td>${esc(a.request_snapshot?.name || "(project)")}</td><td>${d(a.requested_at)}</td><td>${chip(a.status, true)}</td><td>${d(a.submitted_at)}</td><td>${a.shipped_at ? '<span class="chip done">Shipped ✓</span>' : "—"}</td><td>${a.feedback_at ? '<span class="chip done">Received ✓</span>' : "—"}</td><td><a href="#/a/${a.id}">Open / Buka →</a></td></tr>`).join("")}
-      </tbody></table></div>` : `<div class="empty">No requests yet. You will receive an email when Japan sends one.<br>Belum ada permintaan.</div>`}
+      ${error ? `<p class="status err">${esc(error.message)}</p>` : (rows || []).length ? `<div class="tbl-wrap"><table class="view master"><thead><tr><th>Project / Proyek</th><th>Received / Diterima</th><th>Status</th><th>Submitted / Diajukan</th><th>Sample shipped / Sampel dikirim</th><th>Feedback / Umpan balik</th><th></th></tr></thead><tbody>
+      ${rows.map((a) => `<tr><td>${esc(a.request_snapshot?.name || "(project)")}</td><td>${d(a.requested_at)}</td><td>${chip(a.status, true)}</td><td>${d(a.submitted_at)}</td><td>${a.shipped_at ? '<span class="chip done">Shipped / Terkirim ✓</span>' : "—"}</td><td>${a.feedback_at ? '<span class="chip done">Received / Diterima ✓</span>' : "—"}</td><td><a href="#/a/${a.id}">Open / Buka →</a></td></tr>`).join("")}
+      </tbody></table></div>` : `<div class="empty">No requests yet. You will receive an email when Japan sends one.<br>Belum ada permintaan. Anda akan menerima email saat Jepang mengirim permintaan.</div>`}
       </div>`;
   }
 
   function chip(status, en) {
-    const L = { draft: ["下書き", "Draft"], requested: ["依頼済み", "New request"], developing: ["開発中", "In progress"], submitted: ["提出済み ✓", "Submitted ✓"] }[status] || [status, status];
+    const L = { draft: ["下書き", "Draft"], requested: ["依頼済み", "New request / Baru"], developing: ["開発中", "In progress / Dalam proses"], submitted: ["提出済み ✓", "Submitted / Diajukan ✓"] }[status] || [status, status];
     return `<span class="chip ${esc(status)}">${esc(en ? L[1] : L[0])}</span>`;
   }
 
@@ -393,53 +373,53 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     const sp = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, a.supplier || {});
     const snap = a.request_snapshot || {}, rq = snap.request || {};
     await loadLogos([S.company]);
-    app.innerHTML = `<div class="who id ${a.status === "submitted" ? "is-done" : ""}">${FLAG_ID}Your company fills in this page · Diisi oleh tim Indonesia<small>Please write in English</small><span class="state">${a.status === "submitted" ? "Done ✓" : "In progress"}</span></div>
+    app.innerHTML = `<div class="who id ${a.status === "submitted" ? "is-done" : ""}">${FLAG_ID}Your company fills in this page · Diisi oleh perusahaan Anda<small>Please write in English / Harap tulis dalam bahasa Inggris</small><span class="state">${a.status === "submitted" ? "Done ✓" : "In progress"}</span></div>
     <div class="stack en">
       ${a.feedback_at ? `<div class="card" style="border-color:var(--ok)"><h2>${FLAG_JP}Feedback from Japan / Umpan balik dari Jepang</h2>
-        <p class="sub">${dt(a.feedback_at)} · <b>${esc(a.feedback?.decision_en || "")}</b></p>
+        <p class="sub">${dt(a.feedback_at)} · <b>${esc(a.feedback?.decision_en || "")}</b>${(() => { const x = a.feedback?.decision_id || (FB_DECISIONS.find(([j]) => j === a.feedback?.decision) || [])[2]; return x ? ` / <b>${esc(x)}</b>` : ""; })()}</p>
         <div class="brief-out">${esc(a.feedback?.en || "")}</div><div class="brief-out" style="margin-top:8px">${esc(a.feedback?.id || "")}</div></div>` : ""}
-      <div class="card"><div class="head"><div><h2>${FLAG_JP}Request from Japan: ${esc(snap.name || "")}</h2>${rq.requester ? `<p class="sub" style="margin:0">Requested by / Diminta oleh: <b>${esc(rq.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}</div>
+      <div class="card"><div class="head"><div><h2>${FLAG_JP}Request from Japan / Permintaan dari Jepang: ${esc(snap.name || "")}</h2>${rq.requester ? `<p class="sub" style="margin:0">Requested by / Diminta oleh: <b>${esc(rq.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}</div>
         <div class="seg"><button type="button" data-rq="en" aria-pressed="true">English</button><button type="button" data-rq="id" aria-pressed="false">Bahasa Indonesia</button></div></div>
         <div class="brief-out" id="dev-brief"></div></div>
-      <div class="card"><h2>${FLAG_ID}A. Product overview</h2><p class="sub">Changes are saved automatically. <span class="saved" id="saved"></span></p>
-        <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE</span><b>${esc(rq.price || "—")}</b></div></div>
+      <div class="card"><h2>${FLAG_ID}A. Product overview / Ringkasan produk</h2><p class="sub">Changes are saved automatically. / Perubahan tersimpan otomatis. <span class="saved" id="saved"></span></p>
+        <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE (INCL. TAX)</span><b>${esc(rq.price || "—")}</b></div></div>
         <div id="prod-fields"></div></div>
-      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian label name (Nama bahan) and the amount. The Japanese name is filled in by the button.</p></div>
+      <div class="card"><div class="head"><div><h2>${FLAG_ID}B. Base formula / Formula dasar</h2><p class="sub" style="margin:0">One row per raw material. Enter the Indonesian ingredient name (Nama bahan) and the amount. The Japanese name is filled in by the button. / Satu baris per bahan baku. Isi Nama bahan dan jumlahnya. Nama Jepang diisi dengan tombol.</p></div>
         <div class="to-ja-wrap"><span class="next-tag" id="to-ja-tag" hidden>▶ Next step / Langkah berikutnya</span><button class="btn ghost" id="to-ja">Convert to Japanese names / 日本語表示名称に変換</button></div></div>
         <div class="tpl-box"><div><b>① Download our formula template (Excel), fill in every cell, then ② drop it in the box below.</b>
-          <span>Unduh template formula kami (Excel), isi semua kolom, lalu letakkan di kotak di bawah. A PDF in your lab's own format is also OK — any empty cells must then be filled in here.</span></div>
-          <button type="button" class="btn saff" id="tpl-dl">⬇ Formula template (Excel)</button></div>
+          <span>A PDF in your lab's own format is also OK — any empty cells must then be filled in here. / Unduh template formula kami (Excel), isi semua sel, lalu letakkan file di kotak di bawah. PDF dengan format lab Anda sendiri juga boleh — sel yang kosong harus diisi di sini.</span></div>
+          <button type="button" class="btn saff" id="tpl-dl">⬇ Formula template (Excel) / Template formula</button></div>
         <div class="drop" id="f-drop" tabindex="0" role="button" aria-label="Import formula from a file">
-          <b>⬇ Drop your formula file here, or tap to choose</b>
+          <b>⬇ Drop your formula file here, or tap to choose / Letakkan file formula di sini atau ketuk untuk memilih</b>
           <span>PDF, Excel (.xlsx / .xls), CSV or a photo — the table below is filled in automatically.</span>
-          <span>Letakkan file formula di sini (PDF, Excel, CSV, foto). ／ 成分表ファイルをここにドロップすると自動で入力されます。</span>
+          <span>PDF, Excel, CSV atau foto — tabel di bawah akan terisi otomatis. ／ 処方ファイルをここにドロップすると自動で入力されます。</span>
           <input type="file" id="f-drop-in" accept=".pdf,.xlsx,.xls,.csv,image/jpeg,image/png,image/webp" hidden></div>
         <div class="status" id="st-drop" role="status" aria-live="polite"></div><div id="drop-preview"></div>
-        <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated)</option><option value="mL">mL per batch (% is calculated)</option></select></div>
+        <div class="field" style="max-width:340px"><label for="f-unit">Amount unit / Satuan jumlah</label><select id="f-unit"><option value="%">% w/w (total 100%)</option><option value="g">g per batch (% is calculated) / g per batch (% dihitung otomatis)</option><option value="mL">mL per batch (% is calculated) / mL per batch (% dihitung otomatis)</option></select></div>
         <div class="tbl-wrap"><table class="edit" id="t-formula"></table></div>
         <div class="status err" id="st-miss" role="status"></div>
-        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row</button><span class="spacer"></span>
+        <div class="row" style="margin-top:8px"><button class="btn ghost" id="add-formula">＋ Add row / Tambah baris</button><span class="spacer"></span>
           <span class="muted" style="font-size:12.5px">Save the formula as / Simpan sebagai:</span><button type="button" class="btn ghost" id="f-xlsx">⬇ Excel</button><button type="button" class="btn ghost" id="f-pdf">⬇ PDF</button></div>
-        <p class="sub" style="margin:6px 0 0">When you submit, the formula is also sent to Japan as Excel and PDF automatically. / Saat dikirim, formula juga dikirim ke Jepang dalam Excel dan PDF.</p>
+        <p class="sub" style="margin:6px 0 0">When you submit, the formula is also sent to Japan as Excel and PDF automatically. / Saat Anda menekan Submit, formula juga otomatis dikirim ke Jepang dalam format Excel dan PDF.</p>
         <div class="status" id="st-toja"></div></div>
-      <div class="card"><h2>${FLAG_ID}C. Raw material highlights</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E.</p>
-        <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row</button></div></div>
-      <div class="card"><h2>${FLAG_ID}D. Third-party test data</h2><p class="sub">Tests by independent laboratories (patch test, efficacy, stability, microbiology…). Attach reports in section E.</p>
-        <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-tests">＋ Add row</button></div></div>
-      <div class="card"><h2>${FLAG_ID}E. Attachments</h2><p class="sub">Data sheets, graphs, specifications, sales materials, third-party reports, SDS, COA (max 25 MB each).</p>
+      <div class="card"><h2>${FLAG_ID}C. Raw material highlights / Keunggulan bahan baku</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E. / Keunggulan bahan baku utama dan data Anda (efikasi, mekanisme, dosis). Lampirkan grafik di bagian E.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row / Tambah baris</button></div></div>
+      <div class="card"><h2>${FLAG_ID}D. Third-party test data / Data uji pihak ketiga</h2><p class="sub">Tests by independent laboratories (patch test, efficacy, stability, microbiology…). Attach reports in section E. / Uji oleh laboratorium independen (uji tempel, efikasi, stabilitas, mikrobiologi…). Lampirkan laporan di bagian E.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-tests">＋ Add row / Tambah baris</button></div></div>
+      <div class="card"><h2>${FLAG_ID}E. Attachments / Lampiran</h2><p class="sub">Data sheets, graphs, specifications, sales materials, third-party reports, SDS, COA (max 25 MB each). / Lembar data, grafik, spesifikasi, materi penjualan, laporan pihak ketiga, SDS, COA (maks. 25 MB per file).</p>
         <div class="files" id="files"></div>
-        <div class="upl"><div class="field" style="margin:0"><label for="f-cat">Category</label><select id="f-cat"><option>Raw material data</option><option>Graph / chart</option><option>Specification</option><option>Sales material</option><option>Third-party report</option><option>SDS</option><option>COA</option><option>Other</option></select></div>
-          <div class="field" style="margin:0"><label for="f-desc">Description</label><input id="f-desc" placeholder="e.g. Hydration graph, 4 weeks, n=20"></div>
-          <label class="btn saff" style="position:relative">Upload file<input type="file" id="f-file" multiple style="position:absolute;width:1px;height:1px;opacity:0"></label></div>
+        <div class="upl"><div class="field" style="margin:0"><label for="f-cat">Category / Kategori</label><select id="f-cat"><option value="Raw material data">Raw material data / Data bahan baku</option><option value="Graph / chart">Graph / chart / Grafik</option><option value="Specification">Specification / Spesifikasi</option><option value="Sales material">Sales material / Materi penjualan</option><option value="Third-party report">Third-party report / Laporan pihak ketiga</option><option value="SDS">SDS</option><option value="COA">COA</option><option value="Other">Other / Lainnya</option></select></div>
+          <div class="field" style="margin:0"><label for="f-desc">Description / Keterangan</label><input id="f-desc" placeholder="e.g. Hydration graph, 4 weeks, n=20"></div>
+          <label class="btn saff" style="position:relative">Upload file / Unggah file<input type="file" id="f-file" multiple style="position:absolute;width:1px;height:1px;opacity:0"></label></div>
         <div class="status" id="st-upl"></div></div>
-      <div class="card"><h2>${FLAG_ID}Submit to Japan</h2><p class="sub">When the sample is ready and A–E are complete, press Submit. Japan's development team is notified by email.</p>
-        <div class="row"><button class="btn saff big" id="submit">Submit to Japan</button><span class="spacer"></span>
+      <div class="card"><h2>${FLAG_ID}Submit to Japan / Kirim ke Jepang</h2><p class="sub">When the sample is ready and A–E are complete, press Submit. Japan's development team is notified by email. / Setelah sampel siap dan bagian A–E lengkap, tekan Submit. Tim pengembangan Jepang akan diberi tahu melalui email.</p>
+        <div class="row"><button class="btn saff big" id="submit">Submit to Japan / Kirim ke Jepang</button><span class="spacer"></span>
           </div>
         <div class="status" id="st-submit"></div></div>
       <div class="card" id="ship-card"><h2>${FLAG_ID}F. Sample shipment to Japan / Pengiriman sampel</h2>
-        <p class="sub">After submitting, send the sample to Japan and enter the tracking number. Press "Shipment complete" — Japan's development team is emailed automatically.</p>
+        <p class="sub">After submitting, send the sample to Japan and enter the tracking number. Press "Shipment complete" — Japan's development team is emailed automatically. / Setelah mengirim data, kirim sampel ke Jepang dan isi nomor resi. Tekan "Pengiriman selesai" — tim pengembangan Jepang akan menerima email otomatis.</p>
         <div class="grid2">
-          <div class="field"><label for="s-carrier">Courier / Kurir</label><select id="s-carrier"><option></option><option>DHL</option><option>FedEx</option><option>UPS</option><option>EMS (Pos Indonesia)</option><option>JNE</option><option>Other</option></select></div>
+          <div class="field"><label for="s-carrier">Courier / Kurir</label><select id="s-carrier"><option></option><option>DHL</option><option>FedEx</option><option>UPS</option><option>EMS (Pos Indonesia)</option><option>JNE</option><option value="Other">Other / Lainnya</option></select></div>
           <div class="field"><label for="s-tracking">Tracking number / Nomor resi *</label><input id="s-tracking"></div>
           <div class="field"><label for="s-date">Ship date / Tanggal kirim</label><input id="s-date" type="date"></div>
           <div class="field"><label for="s-qty">Samples / Jumlah sampel</label><div class="num-unit"><input id="s-qty" inputmode="decimal" placeholder="e.g. 3"><select id="s-qtyu" aria-label="unit"><option>pcs</option><option>bottles</option><option>mL</option><option>g</option><option>kg</option><option>L</option></select></div></div>
@@ -497,7 +477,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     const needsJa = () => sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja);
     const refreshCues = () => {
       const b = blanks(), n = b.reduce((a, x) => a + x.m.length, 0);
-      $("st-miss").textContent = n ? `⚠ ${n} empty cell${n > 1 ? "s" : ""} (highlighted in yellow) — please fill in every cell before submitting. / Harap isi semua kolom yang kosong.` : "";
+      $("st-miss").textContent = n ? `⚠ ${n} empty cell${n > 1 ? "s" : ""} (highlighted in yellow) — please fill in every cell before submitting. / ${n} sel kosong (kuning) — harap isi semua sel sebelum mengirim.` : "";
       const next = !n && needsJa();
       $("to-ja").classList.toggle("next", next); $("to-ja").classList.toggle("ghost", !next); $("to-ja-tag").hidden = !next;
     };
@@ -505,7 +485,7 @@ ${JSON.stringify(list)}`, { effort: "medium" });
     $("f-unit").value = sp.formulaUnit;
     $("f-unit").onchange = () => {
       const prev = sp.formulaUnit; sp.formulaUnit = $("f-unit").value;
-      if (sp.formulaUnit !== "%" && prev === "%") sp.formula.forEach((r) => (r.amt = r.amt || r.pct || ""));
+      if (sp.formulaUnit !== "%" && prev === "%") sp.formula.forEach((r) => (r.amt = r.pct || r.amt || ""));
       recalcPct(); save.soon(); $("t-formula").innerHTML = ""; mountFormula();
     };
     mountFormula();
@@ -529,11 +509,11 @@ ${JSON.stringify(list)}`, { effort: "medium" });
         made.push({ path, name, cat: "Formula (auto)", desc: ext === "pdf" ? "Formula as PDF (made on submit)" : "Formula as Excel (made on submit)", type, size: blob.size, auto: true });
       }
       const old = sp.files.filter((f) => f.auto); sp.files = sp.files.filter((f) => !f.auto).concat(made); renderFiles();
-      if (old.length) sb.storage.from("attachments").remove(old.map((f) => f.path));
+      return old; // removed from storage only after the submission is saved
     };
     $("tpl-dl").onclick = async () => {
       download(fileBase(snap.name, "formula_template") + ".xlsx", await formulaXlsx({ project: snap.name, company: S.company?.name, unit: "%", rows: [] }));
-      toast("Template downloaded ✓", "Fill in every cell, save, then drop the file in the orange box.", "info");
+      toast("Template downloaded ✓ / Template diunduh ✓", "Fill in every cell, save, then drop the file in the orange box. / Isi semua sel, simpan, lalu letakkan file di kotak oranye.", "info");
     };
     // Our own template is read directly (exact, instant); anything else goes to the AI.
     const readTemplate = (XLSX, wb) => {
@@ -541,8 +521,10 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true });
       if (String(rows[0]?.[0] || "").trim() !== TPL_MARK) return null;
       const u = rows.find((r) => /^Amount unit/i.test(String(r[0] || "")))?.[1];
-      const unit = { "%": "%", g: "g", ml: "mL" }[String(u || "%").trim().toLowerCase()] || "%";
-      const h = rows.findIndex((r) => /^Phase/.test(String(r[1] || "")));
+      const uu = String(u || "%").trim().toLowerCase();
+      const unit = /^g(r|ram|rams|ramm?e?)?s?$/.test(uu) ? "g" : /^(ml|mililiter|milliliters?|millilitres?)$/.test(uu) ? "mL" : "%";
+      const h = rows.findIndex((r) => String(r[0] || "").trim() === "No." && /^Phase/.test(String(r[1] || "")));
+      if (h < 0) return null;
       const s = (v) => String(v ?? "").trim();
       const items = rows.slice(h + 1).filter((r) => s(r[5]) !== "Total" && [2, 3, 4, 5, 6, 7].some((j) => s(r[j])))
         .map((r) => ({ phase: s(r[1]), trade: s(r[2]), idName: s(r[3]), inci: s(r[4]), maker: s(r[5]), amt: s(r[6]), fn: s(r[7]) }));
@@ -553,9 +535,9 @@ ${JSON.stringify(list)}`, { effort: "medium" });
       const name = file.name.toLowerCase(), isPdf = file.type === "application/pdf" || name.endsWith(".pdf");
       const isSheet = /\.(xlsx|xls|csv)$/.test(name), isImg = /^image\/(jpeg|png|webp)$/.test(file.type);
       dropSt.className = "status";
-      if (!isPdf && !isSheet && !isImg) { dropSt.className = "status err"; dropSt.textContent = "Please use a PDF, Excel (.xlsx/.xls), CSV, JPG or PNG file."; return; }
-      if (file.size > 10 * 1024 * 1024) { dropSt.className = "status err"; dropSt.textContent = "The file is larger than 10 MB. Please send a smaller file."; return; }
-      drop.classList.add("busy"); dropSt.textContent = `Reading ${file.name}… (20–60 seconds) / Membaca file…`; $("drop-preview").innerHTML = "";
+      if (!isPdf && !isSheet && !isImg) { dropSt.className = "status err"; dropSt.textContent = "Please use a PDF, Excel (.xlsx/.xls), CSV, JPG or PNG file. / Gunakan file PDF, Excel, CSV, JPG, atau PNG."; return; }
+      if (file.size > 10 * 1024 * 1024) { dropSt.className = "status err"; dropSt.textContent = "The file is larger than 10 MB. Please send a smaller file. / File lebih dari 10 MB. Kirim file yang lebih kecil."; return; }
+      drop.classList.add("busy"); dropSt.textContent = `Reading ${file.name}… (20–60 seconds) / Membaca file… (20–60 detik)`; $("drop-preview").innerHTML = "";
       try {
         let source = "", opts = { effort: "medium" }, res = null;
         if (/\.xlsx?$/.test(name)) { const XLSX = await lib("XLSX"), wb = XLSX.read(await file.arrayBuffer(), { type: "array" }); res = readTemplate(XLSX, wb); if (!res) source = "this spreadsheet (converted to CSV):\n" + wb.SheetNames.map((n) => `### Sheet: ${n}\n` + XLSX.utils.sheet_to_csv(wb.Sheets[n])).join("\n").slice(0, 60000); }
@@ -566,36 +548,36 @@ ${JSON.stringify(list)}`, { effort: "medium" });
 Rules:
 - List every raw material row in the original order. Skip headers, totals and blank rows.
 - Copy names and numbers exactly. Do not invent, round or change any value. Leave a field "" when it is not shown.
-- Fields per row: phase (e.g. A/B/C), trade (trade name), idName (Indonesian label name / Nama bahan), inci (INCI name), maker (supplier or manufacturer), amt (the amount as written, number only), fn (function, only if shown).
+- Fields per row: phase (e.g. A/B/C), trade (trade name), idName (Indonesian ingredient name / Nama bahan), inci (INCI name), maker (supplier or manufacturer), amt (the amount as written, number only), fn (function, only if shown).
 - unit: "%" if the amounts are percentages (w/w) or add up to about 100; "g" if grams; "mL" if millilitres.
 - notes: anything unclear or unreadable, in English, short. "" if none.
 Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","inci":"","maker":"","amt":"","fn":""}],"notes":""}`, opts);
         const items = (Array.isArray(res.items) ? res.items : []).filter((x) => x && (x.trade || x.idName || x.inci));
-        if (!items.length) throw { userMsg: "No formula rows were found in this file. Please check the file or enter the rows by hand." };
+        if (!items.length) throw { userMsg: "No formula rows were found in this file. Please check the file or enter the rows by hand. / Tidak ada baris formula dalam file ini. Periksa file atau isi baris secara manual." };
         const unit = ["%", "g", "mL"].includes(res.unit) ? res.unit : "%";
         const tot = items.reduce((a, x) => a + num(x.amt), 0);
         const F7 = ["phase", "trade", "idName", "inci", "maker", "amt", "fn"], empty = items.reduce((a, x) => a + F7.filter((k) => !String(x[k] ?? "").trim()).length, 0);
-        dropSt.textContent = `✓ ${items.length} rows found (${unit === "%" ? `total ${fmt(tot)}%` : `total ${fmt(tot)} ${unit}`}). Please check them, then press "Use these rows".` + (empty ? ` ${empty} empty cell${empty > 1 ? "s" : ""} (yellow) must be filled in after importing.` : "");
+        dropSt.textContent = `✓ ${items.length} rows found (${unit === "%" ? `total ${fmt(tot)}%` : `total ${fmt(tot)} ${unit}`}). Please check them, then press "Use these rows". / ${items.length} baris ditemukan — periksa, lalu tekan "Use these rows".` + (empty ? ` ${empty} empty cell${empty > 1 ? "s" : ""} (yellow) must be filled in after importing. / ${empty} sel kosong (kuning) harus diisi setelah impor.` : "");
         $("drop-preview").innerHTML = `<div class="confirm-box">${res.notes ? `<div class="status err" style="margin:0">Note: ${esc(res.notes)}</div>` : ""}
           <div class="tbl-wrap"><table class="view"><thead><tr><th>No.</th><th>Phase</th><th>Trade name</th><th>Nama bahan</th><th>INCI</th><th>Maker</th><th>Amount (${esc(unit)})</th><th>Function</th></tr></thead><tbody>
           ${items.map((x, i) => `<tr><td class="no">${i + 1}</td>${F7.map((k) => `<td class="${k === "inci" ? "inci " : k === "amt" ? "num " : ""}${String(x[k] ?? "").trim() ? "" : "miss"}">${esc(x[k])}</td>`).join("")}</tr>`).join("")}</tbody></table></div>
-          <div class="row"><button type="button" class="btn saff" id="imp-replace">Use these rows${sp.formula.length ? " (replace current table)" : ""}</button>
-          ${sp.formula.length ? '<button type="button" class="btn ghost" id="imp-append">Add below current rows</button>' : ""}<button type="button" class="btn ghost" id="imp-cancel">Cancel</button></div></div>`;
+          <div class="row"><button type="button" class="btn saff" id="imp-replace">Use these rows / Gunakan baris ini${sp.formula.length ? " (replace current table / ganti tabel)" : ""}</button>
+          ${sp.formula.length ? '<button type="button" class="btn ghost" id="imp-append">Add below current rows / Tambahkan di bawah</button>' : ""}<button type="button" class="btn ghost" id="imp-cancel">Cancel / Batal</button></div></div>`;
         const apply = (replace) => {
           const rows = items.map((x) => ({ phase: String(x.phase || ""), trade: String(x.trade || ""), idName: String(x.idName || ""), inci: String(x.inci || ""), maker: String(x.maker || ""), fn: String(x.fn || ""), ...(unit === "%" ? { pct: String(x.amt || "") } : { amt: String(x.amt || "") }) }));
           if (replace) { sp.formula.splice(0, sp.formula.length, ...rows); sp.formulaUnit = unit; }
-          else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead.`; return; } sp.formula.push(...rows); }
+          else { if (sp.formulaUnit !== unit) { dropSt.className = "status err"; dropSt.textContent = `The file uses "${unit}" but the table uses "${sp.formulaUnit}". Please replace the table instead. / Satuan file berbeda dengan tabel — ganti tabel.`; return; } sp.formula.push(...rows); }
           $("f-unit").value = sp.formulaUnit; recalcPct(); $("t-formula").innerHTML = ""; mountFormula(); save.soon();
           $("drop-preview").innerHTML = ""; const nb = blanks().length;
-          dropSt.textContent = nb ? `✓ ${rows.length} rows added. Next, fill in the empty (yellow) cells, then press "Convert to Japanese names" (top right).` : `✓ ${rows.length} rows added. Next, press "Convert to Japanese names" (top right, highlighted).`;
+          dropSt.textContent = nb ? `✓ ${rows.length} rows added. Next, fill in the empty (yellow) cells, then press "Convert to Japanese names" (top right). / Isi sel kosong (kuning), lalu tekan "Convert to Japanese names" (kanan atas).` : `✓ ${rows.length} rows added. Next, press "Convert to Japanese names" (top right, highlighted). / Selanjutnya tekan "Convert to Japanese names" (kanan atas).`;
           $("to-ja").scrollIntoView({ behavior: "smooth", block: "center" });
-          toast("Formula imported ✓", `${rows.length} rows`);
+          toast("Formula imported ✓ / Formula diimpor ✓", `${rows.length} rows / baris`);
         };
         $("imp-replace").onclick = () => apply(true);
         if ($("imp-append")) $("imp-append").onclick = () => apply(false);
         $("imp-cancel").onclick = () => { $("drop-preview").innerHTML = ""; dropSt.textContent = ""; };
       } catch (e) {
-        dropSt.className = "status err"; dropSt.textContent = e?.userMsg || "The file could not be read. Please try again or enter the rows by hand.";
+        dropSt.className = "status err"; dropSt.textContent = e?.userMsg || "The file could not be read. Please try again or enter the rows by hand. / File tidak dapat dibaca. Coba lagi atau isi baris secara manual.";
       } finally { drop.classList.remove("busy"); }
     };
     drop.onclick = () => $("f-drop-in").click();
@@ -609,11 +591,11 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     $("add-formula").onclick = () => tF.add(); $("add-materials").onclick = tM.add; $("add-tests").onclick = tT.add;
     $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "Converting… / 変換しています…", async () => {
       const n = await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); save.soon(); await save.now();
-      $("st-toja").textContent = `✓ ${n} rows converted. Please check the notes column (確認事項) if any.`;
+      $("st-toja").textContent = `✓ ${n} rows converted. Japan will check the notes column (確認事項). / ${n} baris telah dikonversi. Jepang akan memeriksa kolom catatan (確認事項).`;
     });
 
     const renderFiles = () => {
-      $("files").innerHTML = sp.files.length ? sp.files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span><div><button class="linkbtn" data-open="${i}">${esc(f.name)}</button>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div><button class="x" data-rm="${i}" aria-label="Remove">×</button></div>`).join("") : `<div class="hint">No files yet.</div>`;
+      $("files").innerHTML = sp.files.length ? sp.files.map((f, i) => `<div class="file"><span class="cat">${esc(f.cat)}</span><div><button class="linkbtn" data-open="${i}">${esc(f.name)}</button>${f.desc ? `<div class="d">${esc(f.desc)}</div>` : ""}</div><button class="x" data-rm="${i}" aria-label="Remove">×</button></div>`).join("") : `<div class="hint">No files yet. / Belum ada file.</div>`;
     };
     $("files").onclick = async (e) => {
       const o = e.target.closest("[data-open]"), r = e.target.closest("[data-rm]");
@@ -624,12 +606,12 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     $("f-file").onchange = async (e) => {
       const files = [...(e.target.files || [])]; e.target.value = ""; const st = $("st-upl");
       for (const f of files) {
-        st.className = "status"; st.textContent = `Uploading ${f.name}…`;
+        st.className = "status"; st.textContent = `Uploading / Mengunggah ${f.name}…`;
         const path = `${a.company_id}/${aid}/${Date.now()}_${f.name.replace(/[^\w.\-]+/g, "_")}`;
         const { error } = await sb.storage.from("attachments").upload(path, f, { contentType: f.type || undefined });
-        if (error) { st.className = "status err"; st.textContent = `${f.name}: upload failed (${error.message})`; continue; }
+        if (error) { st.className = "status err"; st.textContent = `${f.name}: upload failed / gagal diunggah (${error.message})`; continue; }
         sp.files.push({ path, name: f.name, cat: $("f-cat").value, desc: $("f-desc").value.trim(), type: f.type, size: f.size });
-        renderFiles(); save.soon(); await save.now(); st.textContent = `Uploaded: ${f.name}`;
+        renderFiles(); save.soon(); await save.now(); st.textContent = `Uploaded / Terunggah: ${f.name}`;
       }
       $("f-desc").value = "";
     };
@@ -642,10 +624,10 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       const ok = status === "submitted";
       $("ship").disabled = !ok;
       $("st-ship").className = "status";
-      $("st-ship").textContent = a.shipped_at ? `✓ Shipped: ${dt(a.shipped_at)} (tracking ${sh.tracking || ""})` : ok ? "" : "Submit sections A–E first. / Kirim bagian A–E terlebih dahulu.";
+      $("st-ship").textContent = a.shipped_at ? `✓ Shipped / Terkirim: ${dt(a.shipped_at)} (tracking / resi ${sh.tracking || ""})` : ok ? "" : "Submit sections A–E first. / Kirim bagian A–E terlebih dahulu.";
     };
     shipState();
-    $("ship").onclick = (e) => busy(e.currentTarget, $("st-ship"), "Sending…", async () => {
+    $("ship").onclick = (e) => busy(e.currentTarget, $("st-ship"), "Sending… / Mengirim…", async () => {
       SH.forEach((k) => (sh[k] = $("s-" + k).value.trim()));
       if (sh.qty) sh.qty = `${sh.qty} ${$("s-qtyu").value}`;
       if (!sh.tracking) throw { userMsg: "Please enter the tracking number. / Harap isi nomor resi." };
@@ -654,51 +636,65 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       a.shipped_at = up.shipped_at; a.shipment = sh;
       const { data: r } = await sb.functions.invoke("notify", { body: { event: "shipped", assignment_id: aid } });
       shipState();
-      toast("Done: shipment reported ✓", r?.sent ? "Japan's development team has been emailed with the tracking number." : "Japan will see it on the master screen.");
+      toast("Done: shipment reported ✓ / Selesai: pengiriman dilaporkan ✓", r?.sent ? "Japan's development team has been emailed with the tracking number. / Tim pengembangan Jepang telah menerima email beserta nomor resi." : "Japan will see it on the master screen. / Jepang akan melihatnya di layar utama.");
     });
 
-    $("submit").onclick = (e) => busy(e.currentTarget, $("st-submit"), "Submitting…", async () => {
+    $("submit").onclick = (e) => busy(e.currentTarget, $("st-submit"), "Submitting… / Mengirim…", async () => {
       const miss = [], tot = sp.formula.reduce((x, r) => x + num(r.pct), 0);
-      if (!sp.product.name) miss.push("Product name");
-      if (!sp.formula.length) miss.push("Formula");
-      else if (Math.abs(tot - 100) > 0.01) miss.push(sp.formulaUnit === "%" ? `Formula total is ${fmt(tot)}% (must be 100%)` : "Formula amounts");
-      const b = blanks(); if (b.length) miss.push("Empty cells in the formula — " + b.slice(0, 5).map((x) => `row ${x.i + 1}: ${x.m.join(", ")}`).join("; ") + (b.length > 5 ? " …" : ""));
-      if (miss.length) throw { userMsg: "Please check: " + miss.join(", ") };
-      if (needsJa()) { $("st-submit").textContent = "Converting to Japanese names first… / 日本語表示名称に変換しています…"; await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); }
+      if (!sp.product.name) miss.push("Product name / Nama produk");
+      if (!sp.formula.length) miss.push("Formula (empty / kosong)");
+      else if (Math.abs(tot - 100) > 0.01) miss.push(sp.formulaUnit === "%" ? `Formula total is ${fmt(tot)}% (must be 100%) / Total formula ${fmt(tot)}% (harus 100%)` : "Formula amounts / Jumlah formula");
+      const b = blanks(); if (b.length) miss.push("Empty cells in the formula / Sel kosong dalam formula — " + b.slice(0, 5).map((x) => `row / baris ${x.i + 1}: ${x.m.join(", ")}`).join("; ") + (b.length > 5 ? " …" : ""));
+      if (miss.length) throw { userMsg: "Please check / Harap periksa: " + miss.join(", ") };
+      if (needsJa()) {
+        $("st-submit").textContent = "Converting to Japanese names first… / Mengonversi ke nama Jepang… / 日本語表示名称に変換しています…";
+        // The AI being unavailable must not block the submission: Japan can convert later in STEP 2.
+        try { await convertToJapanese(sp.formula); $("t-formula").innerHTML = ""; mountFormula(); } catch (err) { console.error(err); }
+      }
       $("st-submit").textContent = "Making the formula Excel + PDF… / Membuat Excel + PDF…";
-      let fileNote = "";
-      try { await attachFormulaFiles(); } catch (err) { console.error(err); fileNote = " (The Excel/PDF copy could not be attached; Japan can still see the formula.)"; }
-      $("st-submit").textContent = "Submitting…";
+      let fileNote = "", oldAuto = [];
+      try { oldAuto = await attachFormulaFiles(); } catch (err) { console.error(err); fileNote = " (The Excel/PDF copy could not be attached; Japan can still see the formula. / Salinan Excel/PDF tidak dapat dilampirkan; Jepang tetap dapat melihat formula.)"; }
+      $("st-submit").textContent = "Submitting… / Mengirim…";
       await save.now();
       const { error } = await sb.from("assignments").update({ supplier: sp, status: "submitted" }).eq("id", aid);
-      if (error) throw { userMsg: "Could not submit: " + error.message };
+      if (error) throw { userMsg: "Could not submit / Gagal mengirim: " + error.message };
       status = "submitted";
+      if (oldAuto.length) sb.storage.from("attachments").remove(oldAuto.map((f) => f.path));
       const { data: r } = await sb.functions.invoke("notify", { body: { event: "submit", assignment_id: aid } });
-      $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan." + (r?.sent ? " Japan has been emailed (with the formula Excel + PDF)." : "") + fileNote;
+      $("st-submit").className = "status"; $("st-submit").textContent = "✓ Done: submitted to Japan. / Selesai: terkirim ke Jepang." + (r?.sent ? " Japan has been emailed (with the formula Excel + PDF). / Jepang telah menerima email (dengan Excel + PDF formula)." : "") + fileNote;
       shipState(); $("ship-card").scrollIntoView({ behavior: "smooth", block: "center" });
-      toast("Done: submitted to Japan ✓", r?.sent ? "Japan's development team has been notified by email." : "Japan will see it on the master screen. Terima kasih!");
+      toast("Done: submitted to Japan ✓ / Selesai: terkirim ke Jepang ✓", r?.sent ? "Japan's development team has been notified by email. / Tim pengembangan Jepang telah diberi tahu melalui email. Terima kasih!" : "Japan will see it on the master screen. / Jepang akan melihatnya di layar utama. Terima kasih!");
       document.querySelector(".who").classList.add("is-done"); document.querySelector(".who .state").textContent = "Done ✓";
     });
 
   }
 
   async function supplierCompany() {
-    const c = S.company || {}; await loadLogos([c]);
-    const F = [["name", "Company name"], ["contact_name", "Contact person"], ["contact_email", "Contact email"], ["phone", "Phone"], ["whatsapp", "WhatsApp"], ["address", "Address"], ["website", "Website"], ["nib", "Business ID (NIB)"], ["halal", "Halal certification"], ["materials", "Main raw materials"]];
+    const c = S.company;
+    if (!c) { app.innerHTML = `<div class="card en">Your account is not linked to a company yet. Please contact Artisans Production. / Akun Anda belum terhubung dengan perusahaan. Silakan hubungi Artisans Production.</div>`; return; }
+    await loadLogos([c]);
+    // Company name and contact email are managed by Japan (the confidential requests are sent there).
+    const RO = [["name", "Company name / Nama perusahaan"], ["contact_email", "Contact email / Email kontak"]];
+    const F = [["contact_name", "Contact person / Nama kontak"], ["phone", "Phone / Telepon"], ["whatsapp", "WhatsApp"], ["address", "Company address / Alamat perusahaan"], ["website", "Website / Situs web"],
+      ["nib", "Business ID (NIB) / Nomor Induk Berusaha (NIB)"], ["halal", "Halal certification / Sertifikasi halal"], ["materials", "Main raw materials you supply / Bahan baku utama yang Anda pasok"]];
     app.innerHTML = `<div class="who id">${FLAG_ID}Company profile / Profil perusahaan</div><form class="card en" id="f-co">
+      ${RO.map(([k, l]) => `<div class="field"><label>${l}</label><div class="ro-box" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--ground)">${esc(c[k] || "—")}</div></div>`).join("")}
+      <p class="sub">To change these two, please contact Artisans Production. / Untuk mengubah keduanya, silakan hubungi Artisans Production.</p>
       ${F.map(([k, l]) => `<div class="field"><label for="c-${k}">${l}</label><input id="c-${k}" value="${esc(c[k] || "")}"></div>`).join("")}
-      <div class="field"><label for="c-logo">Company logo (JPG) * / Logo perusahaan</label><div class="logo-in">${logoImg(c, 72)}<input id="c-logo" type="file" accept="image/jpeg,image/png"><span id="c-logo-prev"></span></div><div class="status" id="st-logo"></div></div>
-      <p class="sub">NDA agreed: ${dt(c.nda_agreed_at)}</p><button class="btn" type="submit">Save</button><div class="status" id="st-co"></div></form>`;
+      <div class="field"><label for="c-logo">Company logo (JPG) / Logo perusahaan (JPG) *</label><div class="logo-in">${logoImg(c, 72)}<input id="c-logo" type="file" accept="image/jpeg,image/png"><span id="c-logo-prev"></span></div><div class="status" id="st-logo"></div></div>
+      <p class="sub">NDA agreed / NDA disetujui: ${dt(c.nda_agreed_at)}</p><button class="btn" type="submit">Save / Simpan</button><div class="status" id="st-co"></div></form>`;
     $("c-logo").onchange = async (e) => {
       const f = e.target.files?.[0]; if (!f) return; const st = $("st-logo"); st.className = "status"; st.textContent = "Uploading… / Mengunggah…";
-      try { await uploadLogo(S.company, f); st.textContent = "✓ Logo saved / Logo tersimpan"; supplierCompany(); } catch (err) { st.className = "status err"; st.textContent = err?.userMsg || "Upload failed"; }
+      try { await uploadLogo(c, f); st.textContent = "✓ Logo saved / Logo tersimpan"; supplierCompany(); } catch (err) { st.className = "status err"; st.textContent = err?.userMsg || "Upload failed / Gagal mengunggah"; }
     };
     $("f-co").onsubmit = async (e) => {
       e.preventDefault(); const patch = {}; F.forEach(([k]) => (patch[k] = $("c-" + k).value.trim()));
       const { error } = await sb.from("companies").update(patch).eq("id", c.id);
-      $("st-co").textContent = error ? "Could not save: " + error.message : "Saved ✓"; if (!error) Object.assign(S.company, patch);
+      $("st-co").className = error ? "status err" : "status";
+      $("st-co").textContent = error ? "Could not save / Gagal menyimpan: " + error.message : "Saved ✓ / Tersimpan ✓"; if (!error) Object.assign(c, patch);
     };
   }
+
 
   /* ---------------- Company logos (JPG, private bucket, shown through signed URLs) ---------------- */
   const logoUrls = {};
@@ -718,8 +714,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   }
   // Resize to at most 480px and save as JPG, so every logo looks alike and stays small.
   async function toJpeg(file) {
-    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw { userMsg: "JPG（または PNG）の画像を選んでください。 / Please choose a JPG image." };
-    if (file.size > 8 * 1024 * 1024) throw { userMsg: "画像が大きすぎます（8MBまで）。 / The image is larger than 8 MB." };
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) throw { userMsg: "JPG（または PNG）の画像を選んでください。 / Please choose a JPG or PNG image. / Pilih gambar JPG atau PNG." };
+    if (file.size > 8 * 1024 * 1024) throw { userMsg: "画像が大きすぎます（8MBまで）。 / The image is larger than 8 MB. / Ukuran gambar melebihi 8 MB." };
     const url = URL.createObjectURL(file);
     try {
       const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
@@ -732,10 +728,10 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   async function uploadLogo(company, file) {
     const blob = await toJpeg(file), path = `${company.id}/logo/logo-${Date.now()}.jpg`;
     const { error } = await sb.storage.from("attachments").upload(path, blob, { contentType: "image/jpeg" });
-    if (error) throw { userMsg: "ロゴをアップロードできませんでした / Upload failed: " + error.message };
+    if (error) throw { userMsg: "ロゴをアップロードできませんでした / Upload failed / Gagal mengunggah: " + error.message };
     const { error: e2 } = await sb.from("companies").update({ logo_path: path }).eq("id", company.id);
-    if (e2) throw { userMsg: "ロゴを保存できませんでした / Could not save: " + e2.message };
-    if (company.logo_path) sb.storage.from("attachments").remove([company.logo_path]);
+    if (e2) throw { userMsg: "ロゴを保存できませんでした / Could not save / Gagal menyimpan: " + e2.message };
+    if (company.logo_path && company.logo_path.startsWith(company.id + "/logo/")) sb.storage.from("attachments").remove([company.logo_path]);
     company.logo_path = path; await loadLogos([company]); return path;
   }
   const logoPreview = (input, box) => { input.onchange = () => { const f = input.files?.[0]; box.innerHTML = f ? `<img class="co-logo" style="width:72px;height:72px" alt="" src="${URL.createObjectURL(f)}">` : ""; }; };
@@ -762,9 +758,11 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   // Outcome per company: adopted (final formula based on it, or feedback "採用（…）") / not adopted (feedback "不採用", or another company's formula was adopted).
   function outcomeOf(p, a) {
     const f = one(p.finals), dec = String(a.feedback?.decision || "");
-    if ((f?.finalized_at && f.adopted_assignment === a.id) || dec.startsWith("採用（")) return { k: "yes", at: f?.adopted_assignment === a.id && f?.finalized_at ? f.finalized_at : a.feedback_at, why: f?.adopted_assignment === a.id && f?.finalized_at ? "完成処方に採用" : "フィードバックで採用" };
+    // A finalized formula decides first (only one company can be adopted per project); otherwise the feedback decision.
+    if (f?.finalized_at && f.adopted_assignment === a.id) return { k: "yes", at: f.finalized_at, why: "完成処方に採用" };
+    if (f?.finalized_at && f.adopted_assignment) return { k: "no", at: f.finalized_at, why: "他社の処方を採用" };
+    if (dec.startsWith("採用（")) return { k: "yes", at: a.feedback_at, why: "フィードバックで採用" };
     if (dec === "不採用") return { k: "no", at: a.feedback_at, why: a.feedback?.ja || "不採用" };
-    if (f?.finalized_at && f.adopted_assignment && f.adopted_assignment !== a.id) return { k: "no", at: f.finalized_at, why: "他社の処方を採用" };
     return null;
   }
 
@@ -812,7 +810,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       <div class="head"><h2 style="margin:0">登録企業 ${S.companies.length}社</h2><button class="btn" id="new-proj">＋ 新規案件</button></div>
       <div class="kpis">${stats.map(({ c, req, dev, sub, fb }) => `<a class="kpi kpi-link" href="#/co/${c.id}" title="${esc(c.name)} の案件一覧を見る"><div class="co">${logoImg(c, 40)}<span>${esc(c.name)}</span><span class="kpi-go">案件一覧 ›</span></div>
         <div class="nums"><div><b>${req}</b>依頼</div><div><b>${dev}</b>開発中</div><div><b>${sub}</b>提出済み</div><div><b style="${fb ? "color:var(--warn)" : ""}">${fb}</b>FB待ち</div></div>
-        <div class="muted" style="font-size:12px">${esc(c.contact_name || "")}　${esc(c.contact_email || "")}</div></a>`).join("") || `<div class="kpi"><div class="muted">まだ登録企業がありません。インドネシア各社にこのページのURLを送り、「Register company」から登録してもらってください。</div></div>`}</div>
+        <div class="muted" style="font-size:12px">${esc(c.contact_name || "")}　${esc(c.contact_email || "")}</div></a>`).join("") || `<div class="kpi"><div class="muted">まだ登録企業がありません。「登録企業」画面から仕入先を登録し、ログイン情報を送ってください。</div></div>`}</div>
       <div class="card"><h2>${FLAG_JP}案件一覧</h2><div class="tbl-wrap" style="margin-top:10px"><table class="view master"><thead><tr><th>案件</th><th>依頼先と進捗</th><th>完成処方</th><th>企画書</th><th>更新</th></tr></thead><tbody>
       ${listP.map((p) => { const as = openAs(p), nd = (p.assignments || []).filter((a) => a.status !== "draft").length - as.length, f = one(p.finals), pl = one(p.plans);
         return `<tr><td><a href="#/p/${p.id}">${esc(p.name)}</a><div class="muted" style="font-size:12px">${esc(p.request?.cat || "")}</div></td>
@@ -867,7 +865,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         throw { userMsg: code === "already_registered" ? "このメールアドレスは既に登録されています。" : code === "is_admin_email" ? "管理者のアドレスは仕入先に使えません。" : code === "demo" ? "デモ画面では登録できません。" : "登録できませんでした：" + (err?.message || code || "") };
       }
       const url = location.origin + location.pathname;
-      const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, purchase declaration, ownership of adopted formulas).\n3. Set your own password and complete your company profile (address, NIB, halal status, main raw materials and your company logo as a JPG).\n\n1. Masuk dengan email dan kata sandi sementara.\n2. Setujui tiga perjanjian.\n3. Buat kata sandi baru dan lengkapi profil perusahaan (termasuk logo perusahaan dalam JPG).\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
+      const msg = `Dear ${body.full_name},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge, platform pengembangan formula kami.\n\nURL: ${url}\nEmail: ${data.email}\nTemporary password / Kata sandi sementara: ${data.password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, Declaration of Purchase, Ownership of Adopted Formulas).\n3. Set your own password and complete your company profile (address, NIB, halal status, main raw materials and your company logo as a JPG).\n\n1. Masuk dengan email dan kata sandi sementara di atas.\n2. Baca dan setujui ketiga perjanjian (NDA, Pernyataan Pembelian, Kepemilikan Formula yang Diadopsi).\n3. Buat kata sandi baru dan lengkapi profil perusahaan (alamat, NIB, status halal, bahan baku utama, dan logo perusahaan dalam JPG).\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
       $("st-sup").className = "status"; $("st-sup").textContent = "✓ 完了：登録しました。下のログイン情報を相手に送ってください（仮パスワードは今だけ表示されます）。";
       $("sup-result").innerHTML = `<div class="brief-out" style="margin-top:10px" id="sup-msg"></div><div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="copy-sup">案内文をコピー（英語・インドネシア語）</button><button type="button" class="btn ghost" id="done-sup">一覧を更新</button></div>`;
       $("sup-msg").textContent = msg;
@@ -886,7 +884,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     app.innerHTML = `<div class="who jp">${FLAG_JP}設定</div><div class="stack">
       <form class="card" id="f-set"><h2>メールの設定</h2><p class="sub">インドネシア側からの提出は「開発専用メールアドレス」に自動で届きます。</p>
         <div class="field"><label for="s-dev">開発専用メールアドレス（複数はカンマ区切り）</label><input id="s-dev" type="text" value="${esc(conf.dev_email || "")}" placeholder="dev@example.co.jp"></div>
-        <div class="field"><label for="s-from">送信元（例: 処方ブリッジ &lt;noreply@御社ドメイン&gt;）</label><input id="s-from" value="${esc(conf.from_email || "")}" placeholder="未設定の場合はテスト用の送信元を使います"></div>
+        <div class="field"><label for="s-from">送信元（例: 処方ブリッジ &lt;noreply@自社ドメイン&gt;）</label><input id="s-from" value="${esc(conf.from_email || "")}" placeholder="未設定の場合はテスト用の送信元を使います"></div>
         <div class="field"><label for="s-url">このサイトのURL（メール内のリンク先）</label><input id="s-url" value="${esc(conf.app_url || location.origin + location.pathname.replace(/index\.html$/, ""))}"></div>
         <div class="row"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" id="mail-test">テストメールを送る</button></div><div class="status" id="st-set"></div></form>
       <div class="card"><h2>AIの接続確認</h2><p class="sub">企画書は Claude・GPT・Gemini の3社のAIを使います。鍵（APIキー）が登録されているか、実際につながるかを確認します（鍵の中身は表示しません）。</p>
@@ -921,7 +919,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         : data?.reason === "not_configured" ? "メールサーバーがまだ設定されていません（指示書の手順2を確認してください）。"
         : data?.reason === "no_dev_email" ? "開発専用メールアドレスを入れて保存してから押してください。"
         : "送信に失敗しました：" + (data?.detail || "") ;
-      if (data?.reason !== "demo") setTimeout(() => adminSettings(), 4000);
+      if (data?.reason !== "demo") { const h = location.hash; setTimeout(() => { if (location.hash === h) adminSettings(); }, 4000); }
     });
     document.querySelectorAll("[data-invite]").forEach((b) => (b.onclick = (e) => busy(e.currentTarget, $("st-inv"), "招待メールを送っています…", async () => {
       const email = b.dataset.invite;
@@ -980,11 +978,11 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       <div class="field"><label>販売予定の市場</label><div class="checks" id="r-markets">${Object.entries(MK).map(([k, l]) => `<label><input type="checkbox" value="${k}" ${(r.markets || []).includes(k) ? "checked" : ""}> ${l}</label>`).join("")}</div></div>
     </form>
     <div class="stack">
-      <div class="card"><div class="head"><h2>${FLAG_JP}依頼書</h2><div class="seg"><button type="button" data-b="en" aria-pressed="true">English</button><button type="button" data-b="id" aria-pressed="false">Indonesia</button><button type="button" data-b="ja" aria-pressed="false">日本語（確認用）</button></div></div>
+      <div class="card"><div class="head"><h2>${FLAG_JP}依頼書</h2><div class="seg"><button type="button" data-b="en" aria-pressed="true">English</button><button type="button" data-b="id" aria-pressed="false">Bahasa Indonesia</button><button type="button" data-b="ja" aria-pressed="false">日本語（確認用）</button></div></div>
         <div class="brief-out" id="brief"></div>
         <div class="row" style="margin-top:10px"><button class="btn" id="go-brief">依頼書を作成（英語・インドネシア語）</button><button class="btn ghost" id="copy-brief">コピー</button></div><div class="status" id="st-brief"></div></div>
       <div class="card"><h2>${FLAG_JP}依頼先を選んで送る</h2><p class="sub">選んだ会社の登録メールアドレスに、入力用リンクが自動で送られます。</p>
-        <div class="pick co-tiles" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label class="co-pick"><input type="checkbox" value="${c.id}" ${a && a.status !== "draft" ? "checked" : ""}><span class="co-tick" aria-hidden="true">選択</span>${coCard(c, a)}</label>`; }).join("") || '<div class="muted">登録企業がありません。「登録企業」の画面から仕入先を登録してください。</div>'}</div>
+        <div class="pick co-tiles" id="pick">${S.companies.map((c) => { const a = P.as.find((x) => x.company_id === c.id); return `<label class="co-pick"><input type="checkbox" value="${c.id}"><span class="co-tick" aria-hidden="true">${a && a.status !== "draft" ? "依頼済み（選ぶと再送）" : "選択"}</span>${coCard(c, a)}</label>`; }).join("") || '<div class="muted">登録企業がありません。「登録企業」の画面から仕入先を登録してください。</div>'}</div>
         <div class="row" style="margin-top:10px"><button class="btn saff big" id="send">依頼先を確認する</button></div><div class="status" id="st-send"></div><div id="send-confirm"></div></div>
     </div></div>`;
     const save = saver(async () => { const { error } = await sb.from("projects").update({ name: p.name, request: r, brief }).eq("id", p.id); if (error) throw error; }, $("saved"));
@@ -1006,7 +1004,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
 - 内容を創作しない。メモにない数値や条件は書かない。記入のない項目は省く。
 - 金額は円なら「JPY」表記。希望原料費と希望完成品コスト（原料＋容器＋充填・製造）は別物として明確に書き分け、原料メーカーには原料費の見積もりを依頼する。
 - 使用感は処方技術者向けの技術用語（粘度感、伸び、仕上がり等）で明確に。
-- 最後に「開発後に提出してほしいもの」として次を列挙: 製品の特徴、処方（% w/w・INCI名・インドネシアの原料表示名称）、主要原料の特徴とメーカーデータ・グラフ、規格書・SDS・COA、営業資料、第三者機関の試験データ。すべて英語で。
+- 最後に「開発後に提出してほしいもの」として次を列挙: 製品の特徴、処方（% w/w・INCI名・インドネシア語の原料名〔Nama bahan〕）、主要原料の特徴とメーカーデータ・グラフ、規格書・SDS・COA、営業資料、第三者機関の試験データ。提出物は英語で記入すること（ただしインドネシア語の原料名〔Nama bahan〕はインドネシア語のまま）。
 - 出力は3言語: en=英語, id=インドネシア語（丁寧なビジネス文）, ja=日本語（内容確認用の訳）。
 ${GLOSSARY}
 JSONのみで返答: {"en": string, "id": string, "ja": string}
@@ -1027,7 +1025,7 @@ ${body}`, { effort: "medium" });
       st.textContent = "";
       const list = ids.map((id) => S.companies.find((c) => c.id === id)).filter(Boolean);
       $("send-confirm").innerHTML = `<div class="confirm-box"><b>依頼者：${esc(r.requester)}　／　次の${list.length}社に、案件「${esc(p.name)}」の依頼を送ります。会社名と担当者に間違いがないか確認してください。</b>
-        ${list.map((c) => `<div class="co-card-wrap">${coCard(c)}</div>`).join("")}
+        ${list.map((c) => { const was = P.as.find((a) => a.company_id === c.id && a.status !== "draft"); return `<div class="co-card-wrap">${was ? '<div class="status err" style="margin:0 0 4px">この会社には依頼済みです。依頼内容を最新にして、もう一度メールを送ります。</div>' : ""}${coCard(c)}</div>`; }).join("")}
         <div class="row" style="margin-top:10px"><button class="btn saff big" id="send-go">この${list.length}社に依頼を送る</button><button class="btn ghost" id="send-back">選び直す</button></div></div>`;
       $("send-back").onclick = () => { $("send-confirm").innerHTML = ""; };
       $("send-go").onclick = (ev) => doSend(ev.currentTarget, ids);
@@ -1049,7 +1047,7 @@ ${body}`, { effort: "medium" });
       }
       $("st-send").className = "status"; $("st-send").innerHTML = "✓ 完了：<br>" + results.map(esc).join("<br>");
       toast("完了：依頼を送りました", results.join(" ／ "));
-      setTimeout(() => adminProject(p.id, "req"), 1500);
+      { const h = location.hash; setTimeout(() => { if (location.hash === h) adminProject(p.id, "req"); }, 1500); }
     });
   }
 
@@ -1064,7 +1062,7 @@ ${body}`, { effort: "medium" });
         <div class="cotabs">${sent.map((a) => `<button type="button" data-a="${a.id}" aria-pressed="${a.id === cur.id}">${logoImg(S.companies.find((c) => c.id === a.company_id), 26)}${esc(coName(a.company_id))} ${chip(a.status)}</button>`).join("")}</div>
         <div class="stack en">
           <div class="card"><h2>${FLAG_ID}A. Product overview</h2><p class="sub">メーカーが入力した内容（メーカー側と同じ画面配置・閲覧のみ）</p>
-            <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE</span><b>${esc(rq.price || "—")}</b></div></div>
+            <div class="targets"><div><span>${FLAG_JP}TARGET RAW MATERIAL COST / UNIT</span><b>${esc(rq.costRaw || "—")}</b></div><div><span>${FLAG_JP}TARGET FINISHED PRODUCT COST / UNIT</span><b>${esc(rq.costFin || "—")}</b></div><div><span>${FLAG_JP}PLANNED RETAIL PRICE (INCL. TAX)</span><b>${esc(rq.price || "—")}</b></div></div>
             <div class="grid2 mirror">${PRODUCT_FIELDS.map(([k, l]) => { const wide = ["concept", "features", "claims", "stability", "process"].includes(k), v = sp.product[k];
               return `<div class="field ${wide ? "span2" : ""}"><label>${esc(l)}${k === "name" ? " *" : ""}</label><div class="ro-box ${wide ? "tall" : ""} ${v ? "" : "empty"}">${v ? esc(v) : "未入力 / not filled in"}</div></div>`; }).join("")}</div></div>
           <div class="card"><div class="head"><h2>${FLAG_ID}B. Base formula</h2>${(() => { const nx = sp.formula.some((r) => (r.trade || r.idName || r.inci) && !r.ja); return `<div class="to-ja-wrap">${nx ? '<span class="next-tag">▶ 未変換の原料があります</span>' : ""}<button class="btn ${nx ? "next" : "ghost"}" id="to-ja">日本語表示名称に変換</button></div>`; })()}</div><p class="sub" style="margin:0 0 8px">Amount unit / 単位：<b>${sp.formulaUnit && sp.formulaUnit !== "%" ? esc(sp.formulaUnit) + " per batch（%は自動計算）" : "% w/w（合計100%）"}</b></p><div class="tbl-wrap"><table class="edit mirror" id="t-f"></table></div>
@@ -1095,7 +1093,7 @@ JSONのみで返答: {"en": string, "id": string}
 コメント:
 ${ja}`, { effort: "low" });
         if (!r.en) throw { userMsg: "翻訳に失敗しました。もう一度押してください。" };
-        const feedback = { decision: dec[0], decision_en: dec[1], ja, en: String(r.en), id: String(r.id || ""), history: [...(cur.feedback?.history || []), ...(cur.feedback?.ja ? [{ at: cur.feedback_at, decision: cur.feedback.decision, ja: cur.feedback.ja }] : [])] };
+        const feedback = { decision: dec[0], decision_en: dec[1], decision_id: dec[2] || "", ja, en: String(r.en), id: String(r.id || ""), history: [...(cur.feedback?.history || []), ...(cur.feedback?.ja ? [{ at: cur.feedback_at, decision: cur.feedback.decision, ja: cur.feedback.ja }] : [])] };
         const { data: up, error } = await sb.from("assignments").update({ feedback, feedback_at: new Date().toISOString() }).eq("id", cur.id).select("*").single();
         if (error) throw error;
         Object.assign(cur, up);
@@ -1111,15 +1109,23 @@ ${ja}`, { effort: "low" });
       editTable($("t-m"), COLS.materials, sp.materials, () => {}, { readOnly: true });
       editTable($("t-t"), COLS.tests, sp.tests, () => {}, { readOnly: true });
       $("to-ja").onclick = (e) => busy(e.currentTarget, $("st-toja"), "変換しています…", async () => {
-        const n = await convertToJapanese(sp.formula); cur.supplier = sp;
-        const { error } = await sb.from("assignments").update({ supplier: sp }).eq("id", cur.id); if (error) throw error;
+        // Convert on the latest data and write back only the Japanese-name fields, so the supplier's newer edits survive.
+        const { data: fresh, error: e1 } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle(); if (e1) throw e1;
+        const latest = Object.assign({ product: {}, formula: [], materials: [], tests: [], files: [] }, fresh?.supplier || {});
+        const n = await convertToJapanese(latest.formula);
+        const { data: again } = await sb.from("assignments").select("supplier").eq("id", cur.id).maybeSingle();
+        const merged = Object.assign({}, again?.supplier || latest);
+        merged.formula = (merged.formula || []).map((r, i) => { const c = latest.formula[i]; return c && (c.trade || "") === (r.trade || "") && (c.idName || "") === (r.idName || "") ? { ...r, ja: c.ja, jaNote: c.jaNote, mix: c.mix, inci: r.inci || c.inci } : r; });
+        const { error } = await sb.from("assignments").update({ supplier: merged }).eq("id", cur.id); if (error) throw error;
+        cur.supplier = merged;
         draw(); $("st-toja").textContent = `${n}行を変換しました。`;
       });
     };
     draw();
   }
 
-  const FB_DECISIONS = [["採用候補", "Candidate for adoption"], ["再試作を依頼", "Please revise and send a new sample"], ["不採用", "Not adopted this time"], ["採用（本処方は当社に帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to Artisans Production Co., Ltd."]];
+  const FB_DECISIONS = [["採用候補", "Candidate for adoption", "Kandidat untuk diadopsi"], ["再試作を依頼", "Please revise and send a new sample", "Mohon revisi dan kirim sampel baru"], ["不採用", "Not adopted this time", "Tidak diadopsi kali ini"],
+    ["採用（本処方は当社に帰属）", "Adopted — under the Ownership of Adopted Formulas agreement, this formula now belongs to Artisans Production Co., Ltd.", "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd."]];
   function isWater(r) { return /^(water|aqua)\b/i.test(String(r.inci || "").trim()) || /^(水|精製水)$/.test(String(r.ja || "").trim()) || /^air$/i.test(String(r.idName || "").trim()); }
   function finalRows(fin) {
     const base = (fin.base_formula || []).map((r) => ({ src: "base", ja: r.ja || "", jaNote: r.jaNote || "", inci: r.inci || "", label: r.ja || r.idName || r.trade || r.inci || "", pct: num(r.pct), fn: r.fn || "" }));
@@ -1157,15 +1163,17 @@ ${ja}`, { effort: "low" });
     const save = saver(async () => { const { error } = await sb.from("finals").upsert(fin); if (error) throw error; }, $("saved"));
     const render = () => {
       const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0);
-      $("tot").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) < 0.001 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
+      $("tot").innerHTML = rows.length ? `<span class="${Math.abs(tot - 100) <= 0.01 ? "total-ok" : "total-bad"}">合計 ${fmt(tot)}%</span>` : "";
       $("t-final").innerHTML = `<thead><tr><th>No.</th><th>区分</th><th class="ja-col">日本語表示名称</th><th>確認事項（AI）</th><th>INCI</th><th>配合量 %</th><th>配合目的</th></tr></thead><tbody>${rows.map((r, i) => `<tr><td class="no">${i + 1}</td><td><span class="badge ${r.src}">${r.src === "base" ? "ベース" : "当社追加"}</span></td><td>${esc(r.ja) || `<span class="hint">（未変換: ${esc(r.label)}）</span>`}</td><td class="jnote">${esc(r.jaNote)}</td><td class="inci">${esc(r.inci)}</td><td class="num">${fmt(r.pct)}</td><td>${esc(r.fn)}</td></tr>`).join("") || '<tr><td colspan="7" class="empty">ベース処方を選んでください。</td></tr>'}</tbody>`;
       const list = fullList(rows); $("full").textContent = list.length ? list.map((x) => x.n + (x.mix ? "※" : "")).join("、") : "—";
     };
-    const tA = editTable($("t-add"), COLS.additions, fin.additions, () => { save.soon(); render(); });
+    // Any change to the formula after it was finalized takes the "finalized" mark away (it must be confirmed again).
+    const unfix = () => { if (fin.finalized_at) { fin.finalized_at = null; toast("完成処方の確定を解除しました", "処方を変更したため、もう一度「完成処方を確定」を押してください。", "info"); } };
+    const tA = editTable($("t-add"), COLS.additions, fin.additions, () => { unfix(); save.soon(); render(); });
     $("add-row").onclick = tA.add;
     pv.querySelectorAll('input[name="adopt"]').forEach((r) => (r.onchange = () => {
-      const a = P.as.find((x) => x.id === r.value); fin.adopted_assignment = a.id; fin.base_formula = JSON.parse(JSON.stringify(a.supplier?.formula || [])); fin.sup_ja = "";
-      save.soon(); save.now().then(() => adminProject(P.p.id, "fin"));
+      const a = P.as.find((x) => x.id === r.value); fin.adopted_assignment = a.id; fin.base_formula = JSON.parse(JSON.stringify(a.supplier?.formula || [])); fin.sup_ja = ""; unfix();
+      save.soon(); save.now().then(() => adminProject(P.p.id, "fin"), (err) => toast("保存できませんでした", err?.userMsg || "", "info"));
     }));
     $("tr-sup").onclick = (e) => busy(e.currentTarget, $("st-tr"), "翻訳しています…", async () => {
       const res = await ai(`次は化粧品原料メーカー（インドネシア）の開発担当者が英語で書いた試作品の説明です。日本の化粧品メーカーの経営者が読む日本語に正確に翻訳してください。構成は保ち、数値・単位・INCI名・試験機関名はそのまま残すこと。意味を足さないこと。
@@ -1180,14 +1188,14 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "low" });
       if (!w) { st.className = "status err"; st.textContent = "ベース処方に水（Water / Aqua）の行が見つかりません。"; return; }
       const others = finalRows(fin).reduce((a, r) => a + r.pct, 0) - num(w.pct), nw = Math.round((100 - others) * 1000) / 1000;
       if (nw < 0) { st.className = "status err"; st.textContent = "追記分が多すぎて100%を超えます。"; return; }
-      w.pct = String(nw); save.soon(); render(); st.className = "status"; st.textContent = `水を ${fmt(nw)}% に調整しました（合計100%）。`;
+      w.pct = String(nw); unfix(); save.soon(); render(); st.className = "status"; st.textContent = `水を ${fmt(nw)}% に調整しました（合計100%）。`;
     };
     $("copy-full").onclick = (e) => copy(fullList(finalRows(fin)).map((x) => x.n).join("、"), e.currentTarget);
     ["productName", "brand", "target", "price", "cost", "channel", "launch", "goal", "usp"].forEach((k) => ($("pl-" + k).oninput = (e) => { fin.plan[k] = e.target.value; save.soon(); }));
     $("fix").onclick = (e) => busy(e.currentTarget, $("st-fix"), "確定しています…", async () => {
       const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0), miss = [];
       if (!rows.length) miss.push("完成処方がありません");
-      else if (Math.abs(tot - 100) > 0.001) miss.push(`合計が ${fmt(tot)}% です`);
+      else if (Math.abs(tot - 100) > 0.01) miss.push(`合計が ${fmt(tot)}% です（100%にしてください）`);
       if (rows.some((r) => !r.ja)) miss.push("日本語表示名称が未変換の原料があります（STEP 2 の変換ボタン）");
       if (!fin.plan.productName) miss.push("商品名が未入力です");
       if (miss.length) throw { userMsg: "確定できません：" + miss.join("／") };
@@ -1209,7 +1217,7 @@ ${supplierEnglish(adopted.supplier || {})}`, { effort: "low" });
   function stepPlan(pv, P, done) {
     const p = P.p, fin = P.fin, adopted = P.as.find((a) => a.id === fin.adopted_assignment), sp = adopted?.supplier || {};
     const rows = finalRows(fin), tot = rows.reduce((a, r) => a + r.pct, 0);
-    const checks = [[P.as.some((a) => a.status !== "draft"), "依頼を送った"], [!!adopted, "採用するベース処方を選んだ"], [rows.length > 0 && Math.abs(tot - 100) < 0.001, `完成処方の合計が100%（現在 ${fmt(tot)}%）`],
+    const checks = [[P.as.some((a) => a.status !== "draft"), "依頼を送った"], [!!adopted, "採用するベース処方を選んだ"], [rows.length > 0 && Math.abs(tot - 100) <= 0.01, `完成処方の合計が100%（現在 ${fmt(tot)}%）`],
       [!!fin.finalized_at, "完成処方を確定した"], [(sp.tests || []).length > 0, "第三者試験データがある"], [!!fin.plan?.price, "販売価格を記入した"], [!!S.market, "市場データが登録されている"]];
     pv.innerHTML = `<div class="who jp ${done.plan ? "is-done" : ""}">${FLAG_JP}日本側が操作する画面<span class="state">${done.plan ? "完了 ✓" : "未作成"}</span></div>
     <div class="stack"><div class="cols">
@@ -1391,16 +1399,16 @@ ${JSON.stringify(critique)}`, { effort: "high" }));
   /* ---------------- Translator (both roles) ---------------- */
   function viewTranslate() {
     app.innerHTML = `<div class="bar"><div class="seg"><button type="button" id="d-ja" aria-pressed="true">日本語 → Bahasa Indonesia</button><button type="button" id="d-id" aria-pressed="false">Bahasa Indonesia → 日本語</button></div></div>
-      <div class="panes"><div class="pane id"><div class="pane-head"><span class="lang">${FLAG_ID}Bahasa Indonesia</span><span class="role" id="role-id">翻訳結果</span></div><textarea id="t-id" readonly></textarea>
-        <div class="back" id="back-wrap"><b>逆翻訳（意味の確認用）</b><span id="back"></span></div><div class="pane-foot"><span></span><button class="btn ghost" id="c-id">コピー</button></div></div>
-      <div class="pane ja"><div class="pane-head"><span class="lang">${FLAG_JP}日本語</span><span class="role" id="role-ja">ここに入力</span></div><textarea id="t-ja"></textarea>
+      <div class="panes"><div class="pane id"><div class="pane-head"><span class="lang">${FLAG_ID}Bahasa Indonesia</span><span class="role" id="role-id">Hasil terjemahan / 翻訳結果</span></div><textarea id="t-id" readonly></textarea>
+        <div class="back" id="back-wrap"><b>逆翻訳（意味の確認用） / Terjemahan balik (untuk cek makna)</b><span id="back"></span></div><div class="pane-foot"><span></span><button class="btn ghost" id="c-id">コピー / Salin</button></div></div>
+      <div class="pane ja"><div class="pane-head"><span class="lang">${FLAG_JP}日本語</span><span class="role" id="role-ja">ここに入力 / Tulis di sini</span></div><textarea id="t-ja"></textarea>
         <div class="pane-foot"><span class="hint">Ctrl / ⌘ + Enter</span><button class="btn" id="go">翻訳する / Terjemahkan</button></div></div></div><div class="status" id="st-t"></div>`;
     let dir = "ja2id";
-    const setDir = (x) => { dir = x; $("d-ja").setAttribute("aria-pressed", String(x === "ja2id")); $("d-id").setAttribute("aria-pressed", String(x === "id2ja")); $("t-ja").readOnly = x !== "ja2id"; $("t-id").readOnly = x === "ja2id"; $("role-ja").textContent = x === "ja2id" ? "ここに入力" : "翻訳結果"; $("role-id").textContent = x === "ja2id" ? "翻訳結果" : "Tulis di sini"; $("back-wrap").hidden = x !== "ja2id"; };
+    const setDir = (x) => { dir = x; $("d-ja").setAttribute("aria-pressed", String(x === "ja2id")); $("d-id").setAttribute("aria-pressed", String(x === "id2ja")); $("t-ja").readOnly = x !== "ja2id"; $("t-id").readOnly = x === "ja2id"; $("role-ja").textContent = x === "ja2id" ? "ここに入力 / Tulis di sini" : "翻訳結果 / Hasil terjemahan"; $("role-id").textContent = x === "ja2id" ? "Hasil terjemahan / 翻訳結果" : "Tulis di sini / ここに入力"; $("back-wrap").hidden = x !== "ja2id"; };
     $("d-ja").onclick = () => setDir("ja2id"); $("d-id").onclick = () => setDir("id2ja");
     $("c-id").onclick = (e) => copy($("t-id").value, e.currentTarget);
-    const go = () => busy($("go"), $("st-t"), "翻訳しています…", async () => {
-      const src = (dir === "ja2id" ? $("t-ja") : $("t-id")).value.trim(); if (!src) throw { userMsg: "文章を入力してください。" };
+    const go = () => busy($("go"), $("st-t"), "翻訳しています… / Menerjemahkan…", async () => {
+      const src = (dir === "ja2id" ? $("t-ja") : $("t-id")).value.trim(); if (!src) throw { userMsg: "文章を入力してください。 / Silakan masukkan teks." };
       const r = await ai(`あなたは日本の化粧品メーカーとインドネシアの化粧品原料メーカーの間に立つ、化粧品処方開発に詳しいプロの通訳です。
 次の${dir === "ja2id" ? "日本語" : "インドネシア語"}を、ビジネスで失礼のない丁寧な${dir === "ja2id" ? "インドネシア語" : "日本語"}に翻訳してください。意味を足したり省いたりせず、数字・単位・日付・商品名・INCI名は正確に残す。
 ${dir === "ja2id" ? "訳文を日本語に訳し戻した逆翻訳も作る。" : ""}
@@ -1430,57 +1438,63 @@ ${src}`, { effort: "low" });
     $("f-gate").onsubmit = async (e) => {
       e.preventDefault();
       const ag = agreedFrom($("gate-terms"));
-      if (terms.some((t) => ag[t.doc] !== t.version)) { $("st-gate").className = "status err"; $("st-gate").textContent = "Please tick all boxes."; return; }
+      if (terms.some((t) => ag[t.doc] !== t.version)) { $("st-gate").className = "status err"; $("st-gate").textContent = "Please tick all boxes. / Harap centang semua kotak."; return; }
       const rows = terms.map((t) => ({ user_id: S.user.id, company_id: S.profile.company_id, doc: t.doc, version: t.version, user_agent: navigator.userAgent.slice(0, 300) }));
       const { error } = await sb.from("agreement_log").insert(rows);
-      if (error) { $("st-gate").className = "status err"; $("st-gate").textContent = "Could not save: " + error.message; return; }
+      if (error) { $("st-gate").className = "status err"; $("st-gate").textContent = "Could not save / Gagal menyimpan: " + error.message; return; }
       if (ag.nda && S.company && !S.company.nda_agreed_at) await sb.from("companies").update({ nda_agreed_at: new Date().toISOString() }).eq("id", S.company.id);
-      toast("Thank you ✓", "Agreements recorded."); route();
+      toast("Thank you ✓ / Terima kasih ✓", "Agreements recorded. / Persetujuan telah dicatat."); route();
     };
   }
 
   /* First sign-in of a supplier: own password + company profile (with logo) before anything else. */
   const mustChangePassword = () => !!S.user?.user_metadata?.must_change_password;
   const needsOnboarding = () => !S.isAdmin && (mustChangePassword() || (S.company && !S.company.profile_completed_at));
-  const ONB = [["phone", "Phone / Telepon", true], ["whatsapp", "WhatsApp", false], ["address", "Company address / Alamat perusahaan", true], ["website", "Website", false],
-    ["nib", "Business ID (NIB) / Nomor Induk Berusaha", true], ["halal", "Halal certification (write \"None\" if none) / Sertifikasi halal", true], ["materials", "Main raw materials / Bahan baku utama", true]];
+  const ONB = [["phone", "Phone / Telepon", true], ["whatsapp", "WhatsApp", false], ["address", "Company address / Alamat perusahaan", true], ["website", "Website / Situs web", false],
+    ["nib", "Business ID (NIB) / Nomor Induk Berusaha (NIB)", true], ["halal", "Halal certification (write \"None\" if none) / Sertifikasi halal (tulis \"Tidak ada\" jika tidak ada)", true], ["materials", "Main raw materials you supply / Bahan baku utama yang Anda pasok", true]];
   async function viewOnboarding() {
     $("nav").innerHTML = "";
-    const c = S.company || {}; await loadLogos([c]);
-    const pw = mustChangePassword();
-    app.innerHTML = `<div class="auth card en" style="max-width:760px"><h1>${FLAG_ID}Welcome — first-time setup</h1>
+    const c = S.company; if (c) await loadLogos([c]);
+    const pwBlock = () => `<div id="o-pw"><h2 style="font-size:16px;margin:14px 0 6px">1. Your own password / Kata sandi baru</h2>
+        <div class="grid2"><div class="field"><label for="o-p1">New password (min. 8 characters) / Kata sandi baru (min. 8 karakter) *</label><input id="o-p1" type="password" minlength="8" required autocomplete="new-password"></div>
+          <div class="field"><label for="o-p2">New password again / Ulangi kata sandi baru *</label><input id="o-p2" type="password" minlength="8" required autocomplete="new-password"></div></div></div>`;
+    app.innerHTML = `<div class="auth card en" style="max-width:760px"><h1>${FLAG_ID}Welcome — first-time setup / Selamat datang — pengaturan awal</h1>
       <p class="lang-note">Please complete these steps once. You can see requests from Japan after this. / Harap lengkapi langkah berikut satu kali sebelum melihat permintaan dari Jepang.</p>
       <form id="f-onb" autocomplete="off">
-        ${pw ? `<h2 style="font-size:16px;margin:14px 0 6px">1. Your own password / Kata sandi baru</h2>
-        <div class="grid2"><div class="field"><label for="o-p1">New password (min. 8) *</label><input id="o-p1" type="password" minlength="8" required autocomplete="new-password"></div>
-          <div class="field"><label for="o-p2">New password again *</label><input id="o-p2" type="password" minlength="8" required autocomplete="new-password"></div></div>` : ""}
-        <h2 style="font-size:16px;margin:14px 0 6px">${pw ? "2" : "1"}. Company profile / Profil perusahaan</h2>
+        ${mustChangePassword() ? pwBlock() : ""}
+        ${c ? `<h2 style="font-size:16px;margin:14px 0 6px">${mustChangePassword() ? "2" : "1"}. Company profile / Profil perusahaan</h2>
         <div class="field"><label>Company name / Nama perusahaan</label><div class="ro-box" style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--ground)">${esc(c.name || "")}</div></div>
         <p class="req-note">* Required / Wajib diisi</p>
         <div class="grid2">${ONB.map(([k, l, req]) => `<div class="field ${k === "materials" || k === "address" ? "span2" : ""}"><label for="o-${k}">${l}${req ? " *" : ""}</label><input id="o-${k}" value="${esc(c[k] || "")}" ${req ? "required" : ""}></div>`).join("")}</div>
-        <div class="field"><label for="o-logo">Company logo (JPG) * / Logo perusahaan</label><div class="logo-in">${logoImg(c, 72)}<input id="o-logo" type="file" accept="image/jpeg,image/png" ${c.logo_path ? "" : "required"}><span id="o-logo-prev"></span></div>
-          <p class="sub" style="margin:4px 0 0">Japan uses your logo to tell suppliers apart. / Logo digunakan untuk membedakan pemasok.</p></div>
+        <div class="field"><label for="o-logo">Company logo (JPG) / Logo perusahaan (JPG) *</label><div class="logo-in">${logoImg(c, 72)}<input id="o-logo" type="file" accept="image/jpeg,image/png" ${c.logo_path ? "" : "required"}><span id="o-logo-prev"></span></div>
+          <p class="sub" style="margin:4px 0 0">Japan uses your logo to tell suppliers apart. / Logo digunakan untuk membedakan pemasok.</p></div>` : `<p class="status err">Your account is not linked to a company yet. Please contact Artisans Production. / Akun Anda belum terhubung dengan perusahaan. Silakan hubungi Artisans Production.</p>`}
         <button class="btn saff big" type="submit">Save and continue / Simpan dan lanjutkan</button><div class="status" id="st-onb"></div></form></div>`;
-    logoPreview($("o-logo"), $("o-logo-prev"));
+    if (c) logoPreview($("o-logo"), $("o-logo-prev"));
     $("f-onb").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-onb").querySelector("button"), $("st-onb"), "Saving… / Menyimpan…", async () => {
-      if (pw) {
-        if ($("o-p1").value !== $("o-p2").value) throw { userMsg: "The two passwords do not match. / Kata sandi tidak sama." };
-        if ($("o-p1").value.length < 8) throw { userMsg: "Use at least 8 characters. / Minimal 8 karakter." };
+      const needPw = mustChangePassword() && $("o-p1");
+      if (needPw) {
+        if ($("o-p1").value.length < 8) throw { userMsg: "Use at least 8 characters. / Gunakan minimal 8 karakter." };
+        if ($("o-p1").value !== $("o-p2").value) throw { userMsg: "The two passwords do not match. / Kedua kata sandi tidak cocok." };
       }
-      const patch = {}; for (const [k, l, req] of ONB) { patch[k] = $("o-" + k).value.trim(); if (req && !patch[k]) throw { userMsg: "Please fill in: " + l }; }
-      const f = $("o-logo").files?.[0];
-      if (!f && !c.logo_path) throw { userMsg: "Please choose your company logo (JPG). / Pilih logo perusahaan (JPG)." };
-      if (f) await uploadLogo(c, f);
-      if (pw) {
+      const patch = {};
+      if (c) {
+        for (const [k, l, req] of ONB) { patch[k] = $("o-" + k).value.trim(); if (req && !patch[k]) throw { userMsg: "Please fill in / Harap isi: " + l }; }
+        if (!$("o-logo").files?.[0] && !c.logo_path) throw { userMsg: "Please choose your company logo (JPG). / Pilih logo perusahaan (JPG)." };
+      }
+      if (needPw) {
         const { data, error } = await sb.auth.updateUser({ password: $("o-p1").value, data: { must_change_password: false } });
-        if (error) throw { userMsg: "Could not change the password: " + error.message };
+        if (error) throw { userMsg: "Could not change the password / Gagal mengganti kata sandi: " + error.message };
         if (data?.user) S.user = data.user;
+        $("o-pw").remove(); // done: a retry only saves the company profile
       }
+      if (!c) { route(); return; }
+      const f = $("o-logo").files?.[0];
+      if (f) { await uploadLogo(c, f); $("o-logo").value = ""; $("o-logo").required = false; }
       patch.profile_completed_at = new Date().toISOString();
       const { error } = await sb.from("companies").update(patch).eq("id", c.id);
-      if (error) throw { userMsg: "Could not save: " + error.message };
-      Object.assign(S.company, patch);
-      toast("Setup complete ✓ / Selesai", "Thank you. You can now see requests from Japan.");
+      if (error) throw { userMsg: "Could not save / Gagal menyimpan: " + error.message };
+      Object.assign(c, patch);
+      toast("Setup complete ✓ / Pengaturan selesai ✓", "Thank you. You can now see requests from Japan. / Terima kasih. Sekarang Anda dapat melihat permintaan dari Jepang.");
       location.hash = "#/"; route();
     }); };
   }
@@ -1495,14 +1509,13 @@ ${src}`, { effort: "low" });
     const h = location.hash || "#/";
     if (h.startsWith("#/update-password")) return viewUpdatePassword();
     if (!S.user) {
-      if (h.startsWith("#/register")) return viewRegister();
       if (h.startsWith("#/reset")) return viewReset();
       if (/^#\/(a|p)\//.test(h)) pendingHash = h;
       return viewLogin();
     }
     if (FROM_INVITE && S.user && !sessionStorage.getItem("fb-invite-done")) { try { sessionStorage.setItem("fb-invite-done", "1"); } catch {} return viewUpdatePassword(); }
     if (fromLogin && pendingHash) { const x = pendingHash; pendingHash = null; if (location.hash !== x) { location.hash = x; return; } }
-    if (!S.profile) { app.innerHTML = `<div class="card">Your account is being set up. Please reload in a moment. / アカウントを準備中です。</div>`; return; }
+    if (!S.profile) { app.innerHTML = `<div class="card">Your account is being set up. Please reload in a moment. / Akun Anda sedang disiapkan. Muat ulang sebentar lagi. / アカウントを準備中です。</div>`; return; }
     $("topbar").hidden = false;
     $("me-name").textContent = (S.profile.full_name || S.profile.email || "") + (S.company ? ` — ${S.company.name}` : "");
     const parts = h.slice(2).split("/");
@@ -1518,7 +1531,7 @@ ${src}`, { effort: "low" });
     }
     if (!(await agreementsOk())) return viewAgreementGate();
     if (needsOnboarding()) return viewOnboarding();
-    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahan"], ["#/password", "Password"]]);
+    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahan"], ["#/password", "Password / Kata sandi"]]);
     if (parts[0] === "password") return viewUpdatePassword(true);
     if (parts[0] === "a" && parts[1]) return supplierAssignment(parts[1]);
     if (parts[0] === "company") return supplierCompany();
@@ -1528,13 +1541,16 @@ ${src}`, { effort: "low" });
   window.addEventListener("hashchange", () => route());
 
   /* Live notifications while the page is open */
+  // Realtime sends only the primary key in "old" under RLS, so compare with what this browser last saw.
+  const seen = {};
   function live() {
+    sb.from("assignments").select("id, status, shipped_at, feedback_at").then(({ data }) => (data || []).forEach((a) => (seen[a.id] = a)));
     sb.channel("assignments").on("postgres_changes", { event: "UPDATE", schema: "public", table: "assignments" }, (m) => {
-      const n = m.new, o = m.old || {};
+      const n = m.new, o = seen[n.id] || {}; seen[n.id] = { id: n.id, status: n.status, shipped_at: n.shipped_at, feedback_at: n.feedback_at };
       if (S.isAdmin && n.status === "submitted" && o.status !== "submitted") toast(`${coName(n.company_id)} から提出がありました`, "マスター画面・STEP 2 で確認できます。", "info");
-      if (!S.isAdmin && n.status === "requested" && o.status !== "requested") toast("New request from Japan", "Permintaan baru dari Jepang.", "info");
+      if (!S.isAdmin && n.status === "requested" && o.status !== "requested") toast("New request from Japan / Permintaan baru dari Jepang", "Please open it from Requests. / Silakan buka dari menu Requests / Permintaan.", "info");
       if (S.isAdmin && n.shipped_at && !o.shipped_at) toast(`${coName(n.company_id)} がサンプルを発送しました`, `追跡番号：${n.shipment?.tracking || ""}`, "info");
-      if (!S.isAdmin && n.feedback_at && n.feedback_at !== o.feedback_at) toast("Feedback from Japan", "Umpan balik dari Jepang telah diterima.", "info");
+      if (!S.isAdmin && n.feedback_at && n.feedback_at !== o.feedback_at) toast("Feedback from Japan / Umpan balik dari Jepang", "Feedback has been received. / Umpan balik telah diterima.", "info");
     }).subscribe();
   }
 

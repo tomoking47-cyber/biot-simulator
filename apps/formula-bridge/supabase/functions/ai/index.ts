@@ -16,6 +16,21 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 
+// Long AI calls (a plan draft can take minutes): send a space every 10 s so the platform's idle timeout does not
+// cut the connection, then the JSON result (leading spaces are valid JSON). Errors arrive as {"error": …} with 200.
+function keepAlive(work: Promise<Response>): Response {
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    async start(c) {
+      const t = setInterval(() => { try { c.enqueue(enc.encode(" ")); } catch { /* closed */ } }, 10_000);
+      try { c.enqueue(enc.encode(await (await work).text())); }
+      catch (e) { c.enqueue(enc.encode(JSON.stringify({ error: "upstream", message: String(e) }))); }
+      finally { clearInterval(t); c.close(); }
+    },
+  });
+  return new Response(stream, { status: 200, headers: { ...CORS, "Content-Type": "application/json" } });
+}
+
 const EFFORTS = new Set(["low", "medium", "high"]);
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/gif", "image/webp"]);
 const MAX_FILES_CHARS = 20_000_000;
@@ -55,7 +70,7 @@ async function claude(prompt: string, effort: string, body: Body) {
   } catch (e) {
     if (e instanceof Anthropic.RateLimitError) return json({ error: "rate_limited" }, 429);
     if (e instanceof Anthropic.AuthenticationError) return json({ error: "not_configured", message: "invalid API key" }, 503);
-    if (e instanceof Anthropic.BadRequestError) return json({ error: "bad_request", message: e.message }, 400);
+    if (e instanceof Anthropic.BadRequestError) return json({ error: /credit balance/i.test(e.message) ? "no_credit" : "bad_request", message: e.message }, 400);
     if (e instanceof Anthropic.APIError) return json({ error: "upstream", message: e.message }, 502);
     return json({ error: "upstream", message: String(e) }, 502);
   }
@@ -94,7 +109,7 @@ async function gemini(prompt: string, search: boolean) {
   });
   if (r.status === 400 || r.status === 404) return json({ error: "bad_request", message: (await r.text()).slice(0, 500) }, 400);
   if (r.status === 401 || r.status === 403) return json({ error: "not_configured", message: "invalid Gemini API key" }, 503);
-  if (r.status === 429) { const t = await r.text(); return json(/RESOURCE_EXHAUSTED|quota|billing/i.test(t) && !/per minute/i.test(t) ? { error: "no_credit", message: t.slice(0, 300) } : { error: "rate_limited", message: t.slice(0, 300) }, 429); }
+  if (r.status === 429) { const t = await r.text(); return json(/RESOURCE_EXHAUSTED|quota|billing/i.test(t) && !/per ?minute/i.test(t) ? { error: "no_credit", message: t.slice(0, 300) } : { error: "rate_limited", message: t.slice(0, 300) }, 429); }
   if (!r.ok) return json({ error: "upstream", message: (await r.text()).slice(0, 500) }, 502);
   const j = await r.json();
   const cand = j.candidates?.[0];
@@ -149,7 +164,7 @@ Deno.serve(async (req) => {
     ]);
     return json(out);
   }
-  if (provider === "openai") return openai(prompt, effort);
-  if (provider === "gemini") return gemini(prompt, body.search !== false);
-  return claude(prompt, effort, body);
+  if (provider === "openai") return keepAlive(openai(prompt, effort));
+  if (provider === "gemini") return keepAlive(gemini(prompt, body.search !== false));
+  return keepAlive(claude(prompt, effort, body));
 });

@@ -44,6 +44,8 @@ Deno.serve(async (req) => {
   const password = tempPassword();
   const { data, error } = await service.auth.admin.createUser({
     email, password, email_confirm: true,
+    // fb_supplier: only accounts created here get a supplier company (users cannot set app_metadata themselves).
+    app_metadata: { fb_supplier: true },
     // must_change_password: the supplier sets their own password (and completes the company profile) on first sign-in.
     user_metadata: {
       must_change_password: true,
@@ -52,5 +54,15 @@ Deno.serve(async (req) => {
     },
   });
   if (error) return json({ error: /already|registered|exists/i.test(error.message) ? "already_registered" : "create_failed", message: error.message }, 400);
-  return json({ ok: true, user_id: data.user?.id, email, password });
+  // Supabase may add app_metadata after the user row is inserted, so the sign-up trigger cannot be relied on to
+  // create the company: make sure the new supplier is linked to its company here.
+  const uid = data.user?.id;
+  const { data: prof } = await service.from("profiles").select("company_id").eq("id", uid ?? "").maybeSingle();
+  if (uid && !prof?.company_id) {
+    const { data: co, error: e1 } = await service.from("companies").insert({ name: s("company_name"), contact_name: s("full_name"), contact_email: email }).select("id").single();
+    if (e1) return json({ error: "create_failed", message: "company: " + e1.message }, 500);
+    const { error: e2 } = await service.from("profiles").upsert({ id: uid, role: "supplier", company_id: co.id, email, full_name: s("full_name") });
+    if (e2) return json({ error: "create_failed", message: "profile: " + e2.message }, 500);
+  }
+  return json({ ok: true, user_id: uid, email, password });
 });
