@@ -6,7 +6,7 @@
   const q = new URLSearchParams(location.search);
   if (!q.has("demo")) return;
   const role = q.get("demo") === "supplier" ? "supplier" : "admin";
-  const svgLogo = (bg, t) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='${bg}'/><text x='50' y='62' font-family='Arial' font-weight='700' font-size='34' fill='#fff' text-anchor='middle'>${t}</text></svg>`);
+  const svgLogo = (bg, t) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='${bg}'/><text x='50' y='62' font-family='Arial' font-weight='700' font-size='34' fill='#fff' text-anchor='middle'>${t}</text></svg>`);
   const DEMO_LOGOS = { "demo/logo-a.jpg": svgLogo("#1F6F5C", "BN"), "demo/logo-c.jpg": svgLogo("#8A3B8F", "SK") };
   const KEY = "fb-demo-db-v5";
   const now = Date.now(), ago = (h) => new Date(now - h * 3600e3).toISOString();
@@ -60,7 +60,7 @@
         .map(([key, title, lead, bullets]) => ({ key, title, lead, bullets, sources: [] })) } }],
     market: [], mail_log: [], label_names: [], admin_emails: [{ email: "demo-admin@example.com" }],
     settings: [{ key: "dev_email", value: "dev@example.co.jp" }, { key: "app_url", value: location.origin }],
-    terms: [["nda", "Confidentiality Agreement (NDA)", "Perjanjian Kerahasiaan (NDA)", "秘密保持契約（NDA）"], ["purchase", "Declaration of Purchase by Artisans Production", "Pernyataan Pembelian oleh Artisans Production", "原料購入に関する当社宣言書"], ["ip", "Ownership of Adopted Formulas", "Kepemilikan Formula yang Diadopsi", "採用処方の帰属に関する合意"]]
+    terms: [["nda", "Confidentiality Agreement (NDA)", "Perjanjian Kerahasiaan (NDA)", "秘密保持契約（NDA）"], ["purchase", "Declaration of Raw Material Purchase by Artisans Production", "Pernyataan Pembelian Bahan Baku oleh Artisans Production", "原料購入に関する当社宣言書"], ["ip", "Ownership of Adopted Formulas", "Kepemilikan Formula yang Diadopsi", "採用処方の帰属に関する合意"]]
       .map(([doc, en, idt, ja]) => ({ doc, version: "demo", current: true, title_en: en, title_id: idt, title_ja: ja, text_en: "(Demo) The full text is shown on the real agreement page.", text_id: "(Demo) Teks lengkap ditampilkan di halaman persetujuan yang sebenarnya.", text_ja: "（デモ）本番の合意画面には全文が表示されます。" })),
     agreement_log: ["nda", "purchase", "ip"].map((doc, i) => ({ id: i + 1, user_id: SUP, company_id: CA, doc, version: "demo", accepted_at: ago(200) })),
   };
@@ -171,9 +171,9 @@
     const bar = document.createElement("div");
     bar.className = "notice info";
     bar.style.margin = "12px 0 0";
-    bar.innerHTML = `<b>デモ画面</b>（サンプルデータ。サーバーへの保存・メール送信・AI機能は動きません。編集内容はこのタブの中だけに残ります）
-      <a href="?demo=admin#/">日本側（管理）画面を見る</a>　／　<a href="?demo=supplier#/">インドネシア側（PT Demo Bahan Nusantara）の画面を見る</a>　／
-      <button class="linkbtn" id="demo-reset" type="button">サンプルを初期状態に戻す</button>`;
+    bar.innerHTML = `<b>デモ画面 / Demo / Demo</b>（サンプルデータ。サーバーへの保存・メール送信は行われず、AIは見本の結果だけを返します。編集内容はこのタブの中だけに残ります。 / Sample data only — nothing is saved or sent. / Hanya data contoh — tidak ada yang disimpan atau dikirim.）
+      <a href="?demo=admin#/">日本側（管理）画面を見る / Japan side</a>　／　<a href="?demo=supplier#/">インドネシア側（PT Demo Bahan Nusantara）の画面を見る / Supplier side / Sisi pemasok</a>　／
+      <button class="linkbtn" id="demo-reset" type="button">サンプルを初期状態に戻す / Reset / Atur ulang</button>`;
     document.querySelector(".wrap").prepend(bar);
     document.getElementById("demo-reset").onclick = () => { try { sessionStorage.removeItem(KEY); } catch {} location.reload(); };
   });

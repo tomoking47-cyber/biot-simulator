@@ -145,6 +145,12 @@ Deno.serve(async (req) => {
     if (provider !== "claude" && provider !== "labels") return json({ error: "forbidden" }, 403);
     const { count } = await service.from("assignments").select("id", { count: "exact", head: true }).eq("company_id", me?.company_id ?? "").neq("status", "draft");
     if (!count) return json({ error: "forbidden", message: "AI is available after a request has been received." }, 403);
+    // Only after the current agreements (NDA etc.) have been accepted, as for the requests themselves.
+    const [{ data: cur }, { data: acc }] = await Promise.all([
+      service.from("terms").select("doc, version").eq("current", true),
+      service.from("agreement_log").select("doc, version").eq("user_id", who.user.id),
+    ]);
+    if (!(cur ?? []).every((t: any) => (acc ?? []).some((l: any) => l.doc === t.doc && l.version === t.version))) return json({ error: "forbidden", message: "Please accept the agreements first." }, 403);
   }
 
   // Admin check of the AI setup: which keys are present and whether each one answers. Never returns key values.

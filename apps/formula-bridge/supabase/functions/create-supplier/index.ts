@@ -43,6 +43,7 @@ Deno.serve(async (req) => {
     const password = tempPassword();
     const { error } = await service.auth.admin.updateUserById(p.id, { password, user_metadata: { must_change_password: true } });
     if (error) return json({ error: "create_failed", message: error.message }, 500);
+    await service.rpc("revoke_user_sessions", { p_user: p.id }); // the old password and any open session stop working
     return json({ ok: true, user_id: p.id, email, password, reissued: true });
   }
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !s("company_name") || !s("full_name")) {
@@ -87,7 +88,7 @@ Deno.serve(async (req) => {
     app_metadata: { fb_supplier: true },
     user_metadata: meta,
   });
-  if (error) return json({ error: /already|registered|exists/i.test(error.message) ? "already_registered" : "create_failed", message: error.message }, 400);
+  if (error) { const dup = /already|registered|exists/i.test(error.message); return json({ error: dup ? "already_registered" : "create_failed", message: error.message }, dup ? 400 : 500); }
   // Supabase may add app_metadata after the user row is inserted, so the sign-up trigger cannot be relied on to
   // create the company: make sure the new supplier is linked to its company here. On failure, remove the half-made
   // account so that Japan can simply register again.
