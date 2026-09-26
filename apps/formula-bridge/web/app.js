@@ -262,14 +262,14 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     $("f-login").onsubmit = async (e) => {
       e.preventDefault();
       const st = $("st-login"), btn = e.submitter || $("f-login").querySelector("button[type=submit]");
-      if (btn.disabled) return; btn.disabled = true; st.className = "status"; st.textContent = "Signing in… / Masuk…";
+      if (btn.disabled) return; btn.disabled = true; st.className = "status"; st.textContent = "Signing in… / Sedang masuk… / ログインしています…";
       let error; signingIn = true;
       try { ({ error } = await sb.auth.signInWithPassword({ email: $("l-email").value.trim(), password: $("l-pass").value })); }
       catch (x) { error = { message: String(x?.message || x) }; }
       finally { btn.disabled = false; }
       if (error) signingIn = false;
       if (error) { st.className = "status err"; st.textContent = /confirm/i.test(error.message) ? "Please confirm your email first (check your inbox). / Harap konfirmasi email Anda terlebih dahulu. / 確認メールのリンクを先に開いてください。" : /invalid login credentials/i.test(error.message) ? "Email or password is incorrect. / Email atau kata sandi salah. / メールアドレスかパスワードが違います。"
-        : "Could not sign in: " + error.message + " / Gagal masuk. Silakan coba lagi. / ログインできませんでした。もう一度お試しください。"; return; }
+        : "Could not sign in. Please try again. / Gagal masuk. Silakan coba lagi. / ログインできませんでした。もう一度お試しください。 (" + error.message + ")"; return; }
       try { await afterSignIn(); } finally { signingIn = false; }
     };
   }
@@ -278,12 +278,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     $("topbar").hidden = true;
     app.innerHTML = `<div class="auth card"><h1>Reset password / Atur ulang kata sandi / パスワード再設定</h1>
       <form id="f-reset"><div class="field"><label for="r-email">Email</label><input id="r-email" type="email" required></div>
-      <div class="row"><button class="btn" type="submit">Send reset link / Kirim tautan</button><a href="#/login" class="linkbtn">Back / Kembali</a></div>
+      <div class="row"><button class="btn" type="submit">Send reset link / Kirim tautan atur ulang / 再設定メールを送る</button><a href="#/login" class="linkbtn">Back / Kembali / 戻る</a></div>
       <div class="status" id="st-reset"></div></form></div>`;
     $("f-reset").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-reset").querySelector("button"), $("st-reset"), "Sending… / Mengirim… / 送信しています…", async () => {
       const { error } = await sb.auth.resetPasswordForEmail($("r-email").value.trim(), { redirectTo: location.origin + location.pathname + "#/update-password" });
       if (error) throw { userMsg: "Could not send / Gagal mengirim / 送信できませんでした: " + error.message };
-      $("st-reset").className = "status"; $("st-reset").textContent = "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みなら再設定メールを送りました。";
+      $("st-reset").className = "status"; $("st-reset").textContent = "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みのアドレスであれば、再設定用のメールをお送りしました。";
     }); };
   }
   function viewUpdatePassword(inApp) {
@@ -409,12 +409,12 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
     // itself keeps going for the next save.
     let last = Promise.resolve(); const me = {};
     const run = () => { pending = false;
-      last = chain.then(fn).then(() => { if (!pending) unsaved.delete(me); autosave("ok"); if (st) st.textContent = "Saved / Tersimpan / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
-        (e) => { pending = true; autosave("error"); console.error(e);
+      const p = last = chain.then(fn).then(() => { if (last !== p) return; if (!pending) unsaved.delete(me); autosave("ok"); if (st) st.textContent = "Saved / Tersimpan / 保存しました " + new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }); },
+        (e) => { if (last === p) { pending = true; autosave("error"); } console.error(e);
           const why = /adopted formula is locked/.test(e?.message || "") ? "This formula has been adopted by Japan and can no longer be changed. / Formula ini telah diadopsi oleh Jepang dan tidak dapat diubah lagi. / 採用・確定済みのため変更できません。" : (e?.message || e?.userMsg || "");
-          if (st) st.textContent = "Could not save / Gagal menyimpan / 保存できませんでした";
+          if (st && last === p) st.textContent = "Could not save / Gagal menyimpan / 保存できませんでした";
           throw { userMsg: "Could not save / Gagal menyimpan / 保存できませんでした: " + why }; });
-      chain = last.catch(() => {}); return last; };
+      chain = p.catch(() => {}); return p; };
     // Save now (used before signing out so the last edit is not lost).
     me.flush = () => { clearTimeout(t); return pending ? run().catch(() => {}) : last.catch(() => {}); };
     return { soon() { pending = true; unsaved.add(me); autosave("saving"); if (st) st.textContent = "Saving… / Menyimpan… / 保存中…"; clearTimeout(t); t = setTimeout(() => run().catch(() => {}), 1000); }, now() { clearTimeout(t); return pending ? run() : last; } };
@@ -1702,7 +1702,7 @@ ${JSON.stringify(critique)}`, { effort: "high" }));
       const tests = sp.tests || [], img = (sp.files || []).find((f) => /^image\/(png|jpe?g|gif)/.test(f.type || ""));
       if (tests.length) sl("evidence").table = { headers: ["試験機関", "試験項目", "方法", "結果", "日付"], rows: tests.map((t) => [t.lab, t.item, t.method, t.result, t.date].map((x) => String(x || ""))) };
       else if (img) { sl("evidence").imagePath = img.path; sl("evidence").imageCaption = img.desc || img.name; }
-      if (research) { const rc = Object.entries(pick(research.competitors)).flatMap(([m, arr]) => (arr || []).slice(0, 4).map((c) => [MK[m] || m, c.name + (c.price ? `（${c.price}）` : ""), (c.verified ? "" : "【要確認】") + (c.note || "") + ` ［${c.source || ""}］`])); if (rc.length && !compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要・出典"], rows: rc, caption: `Gemini による Google 検索（${research.asOf || today()}時点）` }; }
+      if (research) { const rc = Object.entries(pick(research.competitors)).flatMap(([m, arr]) => (arr || []).slice(0, 4).map((c) => [MK[m] || m, String(c.name || "【要確認】") + (c.price ? `（${c.price}）` : ""), (c.verified ? "" : "【要確認】") + (c.note || "") + ` ［${c.source || ""}］`])); if (rc.length && !compRows.length) sl("competitors").table = { headers: ["市場", "企業・ブランド", "概要・出典"], rows: rc, caption: `Gemini による Google 検索（${research.asOf || today()}時点）` }; }
       P.plan = { title: String(plan.title || p.name), subtitle: String(plan.subtitle || ""), date: today(), slides,
         council: { at: new Date().toISOString(), log, attachments: files.names,
           research: research ? { model: research.model, asOf: research.asOf, queries: research.queries.slice(0, 8), sources: research.sources.slice(0, 20), verified: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].filter((x) => x.verified).length, items: [...Object.values(research.markets).flatMap((m) => m.stats), ...Object.values(research.competitors).flat(), ...research.trends, ...research.regulatory].length } : null,
