@@ -4,25 +4,29 @@
 //   event "shipped": a supplier shipped the sample → email Japan's development address with the tracking number.
 //   event "feedback": Japan sent feedback → email the supplier company.
 //   event "test":     an admin checks the mail setup → email Japan's development address.
-// Sends through the company's own mail server when SMTP_HOST is set (port 465, SSL),
-// otherwise through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
+// Sends through the company's own mail server when SMTP_HOST is set (port 465, SSL; nodemailer encodes Japanese
+// subjects correctly), otherwise through Resend when RESEND_API_KEY is set; otherwise reports not_configured.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
+import nodemailer from "npm:nodemailer@6.9.16";
+import { Buffer } from "node:buffer";
 
 type Att = { filename: string; content: Uint8Array; contentType: string };
 function b64(u: Uint8Array) { let s = ""; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode(...u.subarray(i, i + 0x8000)); return btoa(s); }
+// Anything that ends up in a mail header: no line breaks (header injection), bounded length.
+const hdr = (v: unknown) => String(v ?? "").replace(/[\r\n\t]+/g, " ").trim().slice(0, 300);
 async function sendMail(from: string, to: string[], subject: string, html: string, atts: Att[] = []): Promise<{ ok: boolean; detail: string } | null> {
+  subject = hdr(subject);
   const host = Deno.env.get("SMTP_HOST");
   if (host) {
-    const client = new SMTPClient({ connection: { hostname: host, port: Number(Deno.env.get("SMTP_PORT") || 465), tls: true,
-      auth: { username: Deno.env.get("SMTP_USER") ?? "", password: Deno.env.get("SMTP_PASS") ?? "" } } });
+    const port = Number(Deno.env.get("SMTP_PORT") || 465);
+    const tx = nodemailer.createTransport({ host, port, secure: port === 465, auth: { user: Deno.env.get("SMTP_USER") ?? "", pass: Deno.env.get("SMTP_PASS") ?? "" } });
     try {
-      await client.send({ from, to, subject, html, content: "auto", attachments: atts.map((a) => ({ filename: a.filename, content: a.content, encoding: "binary" as const, contentType: a.contentType })) });
+      await tx.sendMail({ from, to: to.join(", "), subject, html, attachments: atts.map((a) => ({ filename: a.filename, content: Buffer.from(a.content), contentType: a.contentType })) });
       return { ok: true, detail: "smtp" + (atts.length ? ` (+${atts.length} files)` : "") };
     }
     catch (e) { return { ok: false, detail: "smtp: " + String(e) }; }
-    finally { try { await client.close(); } catch { /* already closed */ } }
+    finally { try { tx.close(); } catch { /* already closed */ } }
   }
   const key = Deno.env.get("RESEND_API_KEY");
   if (!key) return null;
@@ -88,28 +92,32 @@ Deno.serve(async (req) => {
     const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
     to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
     const link = `${appUrl}/#/a/${a.id}`;
-    const brief = String((a.request_snapshot as any)?.brief?.en ?? "");
-    subject = `[Formula Bridge] New development request from Japan: ${pj?.name ?? ""}`;
-    html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p>
-      <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Jepang.</p>
+    const brief = String((a.request_snapshot as any)?.brief?.en ?? ""), briefId = String((a.request_snapshot as any)?.brief?.id ?? "");
+    subject = `[Formula Bridge] New development request from Japan / Permintaan pengembangan baru dari Jepang: ${pj?.name ?? ""}`;
+    html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p>
+      <p>You have received a new formula development request from Artisans Production Co., Ltd. (Japan).<br>Anda menerima permintaan pengembangan formula baru dari Artisans Production Co., Ltd. (Jepang).</p>
       <p><a href="${esc(link)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open the request / Buka permintaan</a></p>
       ${(a.request_snapshot as any)?.request?.requester ? `<p>Requested by / Diminta oleh: <b>${esc((a.request_snapshot as any).request.requester)}</b> (Artisans Production Co., Ltd.)</p>` : ""}
-      <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.</p>
+      <p style="color:#555">Please sign in with your registered email and password, then fill in the development page in English.<br>Silakan masuk dengan email dan kata sandi terdaftar Anda, lalu isi halaman pengembangan dalam bahasa Inggris.</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(brief.slice(0, 4000))}</pre>
+      ${briefId ? `<pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(briefId.slice(0, 4000))}</pre>` : ""}
       <p style="color:#888;font-size:12px">This request is confidential. / Permintaan ini bersifat rahasia.</p>`;
   } else if (body.event === "submit") {
     if (me.role !== "admin" && me.company_id !== a.company_id) return json({ error: "forbidden" }, 403);
+    if (a.status !== "submitted") return json({ error: "not_submitted" }, 409);
     const dev = String(conf.dev_email || Deno.env.get("DEV_EMAIL") || "");
     if (!dev) return json({ sent: false, reason: "no_dev_email" });
     to = dev.split(/[,\s]+/).filter(Boolean);
     subject = `[処方ブリッジ] ${co?.name ?? ""} から開発内容の提出がありました：${pj?.name ?? ""}`;
     // The formula Excel + PDF made on submit are attached (max ~15 MB in total).
     let total = 0;
-    for (const f of ((a.supplier as any)?.files ?? []).filter((f: any) => f?.auto && typeof f.path === "string" && f.path.startsWith(a.company_id + "/")).slice(0, 4)) {
+    for (const f of ((a.supplier as any)?.files ?? []).filter((f: any) => f?.auto && typeof f.path === "string" && f.path.startsWith(a.company_id + "/") && !f.path.includes("..")).slice(0, 4)) {
       const { data: blob } = await service.storage.from("attachments").download(f.path);
       if (!blob) continue;
       const u = new Uint8Array(await blob.arrayBuffer()); total += u.length; if (total > 15 * 1024 * 1024) break;
-      atts.push({ filename: String(f.name || f.path.split("/").pop()).replace(/[^\x20-\x7E]+/g, "_"), content: u, contentType: String(f.type || "application/octet-stream") });
+      const ext = String(f.path).endsWith(".pdf") ? "pdf" : "xlsx";
+      atts.push({ filename: (String(f.name || "").replace(/[^\w.-]+/g, "_").replace(/_+/g, "_").slice(0, 80) || "formula") .replace(/\.(pdf|xlsx)$/i, "") + "." + ext,
+        content: u, contentType: ext === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
     }
     html = `<p>インドネシアの ${esc(co?.name)}（担当：${esc(me.full_name || me.email)}）から、案件「${esc(pj?.name)}」の開発内容が提出されました。</p>
       ${atts.length ? `<p>処方表（Excel・PDF）を添付しています：${atts.map((x) => esc(x.filename)).join("、")}</p>` : ""}
@@ -124,7 +132,7 @@ Deno.serve(async (req) => {
     subject = `[処方ブリッジ] サンプル発送完了：${co?.name ?? ""}／${pj?.name ?? ""}（追跡番号 ${sh.tracking ?? ""}）`;
     const row = (k: string, v: unknown) => `<tr><td style="padding:4px 12px 4px 0;color:#666">${k}</td><td style="padding:4px 0"><b>${esc(v || "—")}</b></td></tr>`;
     html = `<p>インドネシアの ${esc(co?.name)} から、案件「${esc(pj?.name)}」のサンプル発送完了の連絡がありました。</p>
-      <table style="border-collapse:collapse;font-family:Arial,sans-serif">${row("運送会社", sh.carrier)}${row("追跡番号（トラッキング番号）", sh.tracking)}${row("発送日", sh.date)}${row("サンプル数量", sh.qty)}${row("備考", sh.note)}${row("連絡者", me.full_name || me.email)}</table>
+      <table style="border-collapse:collapse;font-family:Arial,sans-serif">${row("運送会社", sh.carrier)}${row("追跡番号", sh.tracking)}${row("発送日", sh.date)}${row("サンプル数量", sh.qty)}${row("備考", sh.note)}${row("連絡者", me.full_name || me.email)}</table>
       <p>サンプル到着後は、処方ブリッジの STEP 2 から必ずフィードバックを送ってください。</p>
       <p><a href="${esc(appUrl)}/#/p/${esc(a.project_id)}/dev" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">処方ブリッジで確認する</a></p>`;
   } else if (body.event === "feedback") {
@@ -132,12 +140,13 @@ Deno.serve(async (req) => {
     const { data: people } = await service.from("profiles").select("email").eq("company_id", a.company_id);
     to = [...new Set([co?.contact_email, ...(people ?? []).map((p) => p.email)].filter(Boolean) as string[])];
     const fb = a.feedback as Record<string, string>;
-    subject = `[Formula Bridge] Feedback from Japan: ${pj?.name ?? ""}`;
-    html = `<p>Dear ${esc(co?.contact_name || co?.name)},</p><p>Artisans Production Co., Ltd. (Japan) has sent feedback on your sample. / Jepang telah mengirim umpan balik atas sampel Anda.</p>
-      <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}</p>
+    subject = `[Formula Bridge] Feedback from Japan / Umpan balik dari Jepang: ${pj?.name ?? ""}`;
+    const decId = fb.decision_id || ({ "採用候補": "Kandidat untuk diadopsi", "再試作を依頼": "Mohon revisi dan kirim sampel baru", "不採用": "Tidak diadopsi kali ini", "採用（本処方は当社に帰属）": "Diadopsi — sesuai perjanjian Kepemilikan Formula yang Diadopsi, formula ini kini menjadi milik Artisans Production Co., Ltd." } as Record<string, string>)[fb.decision] || "";
+    html = `<p>Dear ${esc(co?.contact_name || co?.name)}, / Yth. ${esc(co?.contact_name || co?.name)},</p><p>Artisans Production Co., Ltd. (Japan) has sent feedback on your sample.<br>Artisans Production Co., Ltd. (Jepang) telah mengirimkan umpan balik atas sampel Anda.</p>
+      <p><b>Decision / Keputusan:</b> ${esc(fb.decision_en || "")}${decId ? ` / ${esc(decId)}` : ""}</p>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.en)}</pre>
       <pre style="white-space:pre-wrap;font-family:Arial,sans-serif;background:#f4f6f8;padding:12px;border-radius:6px">${esc(fb.id || "")}</pre>
-      <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open in Formula Bridge</a></p>`;
+      <p><a href="${esc(appUrl)}/#/a/${esc(a.id)}" style="display:inline-block;background:#23507A;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">Open in Formula Bridge / Buka di Formula Bridge</a></p>`;
   } else {
     return json({ error: "bad_request" }, 400);
   }

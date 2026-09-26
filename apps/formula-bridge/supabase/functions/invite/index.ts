@@ -25,7 +25,7 @@ Deno.serve(async (req) => {
   let body: { email?: string };
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
   const email = String(body.email ?? "").trim().toLowerCase();
-  const { data: allowed } = await service.from("admin_emails").select("email").ilike("email", email).maybeSingle();
+  const { data: allowed } = await service.from("admin_emails").select("email").eq("email", email).maybeSingle();
   if (!email || !allowed) return json({ error: "not_allowed", message: "Add the address to the administrator list first." }, 400);
 
   const { data: settings } = await service.from("settings").select("key, value").eq("key", "app_url");
