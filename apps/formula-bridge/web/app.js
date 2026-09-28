@@ -257,6 +257,7 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       </form>
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
       <p class="sub" style="margin:0">${FLAG_ID} Supplier accounts are issued by Artisans Production. Please contact your representative in Japan.<br>Akun pemasok diterbitkan oleh Artisans Production. Silakan hubungi perwakilan Anda di Jepang.<br>仕入先のアカウントは株式会社Artisans Productionが発行します。日本の担当者にお問い合わせください。</p>
+      <p class="sub" style="margin:8px 0 0"><a href="guide/supplier.html" target="_blank" rel="noopener">User guide / Panduan / 使い方ガイド →</a></p>
     </div>`;
     $("to-reset").onclick = () => (location.hash = "#/reset");
     $("f-login").onsubmit = async (e) => {
@@ -1072,10 +1073,10 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       try { await uploadLogo(c, f); toast("完了：ロゴを登録しました", c.name); adminCompanies(); } catch (err) { toast("ロゴを登録できませんでした", err?.userMsg || String(err), "info"); }
     };
     const loginMsg = (name, email, password, reissued) => {
-      const url = location.origin + location.pathname;
+      const url = location.origin + location.pathname, guide = url.replace(/[^/]*$/, "") + "guide/supplier.html";
       return reissued
         ? `Dear ${name || "Sir/Madam"} / Yth. ${name || "Bapak/Ibu"},\n\nArtisans Production Co., Ltd. (Japan) has issued a new temporary password for your Formula Bridge account.\nArtisans Production Co., Ltd. (Jepang) telah menerbitkan kata sandi sementara yang baru untuk akun Formula Bridge Anda.\n\nURL: ${url}\nEmail: ${email}\nTemporary password / Kata sandi sementara: ${password}\n\nPlease sign in and set your own password.\nSilakan masuk dan buat kata sandi Anda sendiri.\n\nThis information is confidential. / Informasi ini bersifat rahasia.`
-        : `Dear ${name || "Sir/Madam"} / Yth. ${name || "Bapak/Ibu"},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge, platform pengembangan formula kami.\n\nURL: ${url}\nEmail: ${email}\nTemporary password / Kata sandi sementara: ${password}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, Declaration of Raw Material Purchase, Ownership of Adopted Formulas).\n3. Set your own password and complete your company profile (address, NIB, halal status, main raw materials and your company logo as a JPG).\n\n1. Masuk dengan email dan kata sandi sementara di atas.\n2. Baca dan setujui ketiga perjanjian (NDA, Pernyataan Pembelian Bahan Baku, Kepemilikan Formula yang Diadopsi).\n3. Buat kata sandi baru dan lengkapi profil perusahaan (alamat, NIB, status halal, bahan baku utama, dan logo perusahaan dalam format JPG).\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
+        : `Dear ${name || "Sir/Madam"} / Yth. ${name || "Bapak/Ibu"},\n\nArtisans Production Co., Ltd. (Japan) has created your account on Formula Bridge, our formula development platform.\nArtisans Production Co., Ltd. (Jepang) telah membuat akun Anda di Formula Bridge, platform pengembangan formula kami.\n\nURL: ${url}\nEmail: ${email}\nTemporary password / Kata sandi sementara: ${password}\nUser guide / Panduan: ${guide}\n\n1. Sign in with the email and temporary password above.\n2. Read and accept the three agreements (NDA, Declaration of Raw Material Purchase, Ownership of Adopted Formulas).\n3. Set your own password and complete your company profile (address, NIB, halal status, main raw materials and your company logo as a JPG or PNG).\n\n1. Masuk dengan email dan kata sandi sementara di atas.\n2. Baca dan setujui ketiga perjanjian (NDA, Pernyataan Pembelian Bahan Baku, Kepemilikan Formula yang Diadopsi).\n3. Buat kata sandi baru dan lengkapi profil perusahaan (alamat, NIB, status halal, bahan baku utama, dan logo perusahaan dalam format JPG atau PNG).\n\nThis information is confidential. / Informasi ini bersifat rahasia.`;
     };
     const showLogin = (msg, statusText) => {
       $("st-sup").className = "status"; $("st-sup").textContent = statusText;
@@ -1850,7 +1851,8 @@ ${src}`, { effort: "medium" });
   /* ---------------- Router ---------------- */
   function nav(items) {
     const h = location.hash || "#/";
-    $("nav").innerHTML = items.map(([href, label]) => `<a href="${href}" class="${h === href || (href !== "#/" && h.startsWith(href)) || (href === "#/" && /^#\/(p|a)\//.test(h)) ? "on" : ""}">${label}</a>`).join("");
+    // Links that are not app routes (the user guides) open in a new tab.
+    $("nav").innerHTML = items.map(([href, label]) => href.startsWith("#") ? `<a href="${href}" class="${h === href || (href !== "#/" && h.startsWith(href)) || (href === "#/" && /^#\/(p|a)\//.test(h)) ? "on" : ""}">${label}</a>` : `<a href="${href}" target="_blank" rel="noopener">${label}</a>`).join("");
   }
   let pendingHash = null;
   async function route(fromLogin) {
@@ -1868,7 +1870,7 @@ ${src}`, { effort: "medium" });
     $("me-name").textContent = (S.profile.full_name || S.profile.email || "") + (S.company ? ` — ${S.company.name}` : "");
     const parts = h.slice(2).split("/");
     if (S.isAdmin) {
-      nav([["#/", "マスター画面"], ["#/companies", "登録企業"], ["#/translate", "翻訳ツール"], ["#/settings", "設定"], ["#/password", "パスワード変更"]]);
+      nav([["#/", "マスター画面"], ["#/companies", "登録企業"], ["#/translate", "翻訳ツール"], ["#/settings", "設定"], ["#/password", "パスワード変更"], ["guide/japan.html", "使い方"]]);
       if (parts[0] === "password") return viewUpdatePassword(true);
       if (parts[0] === "p" && parts[1]) return adminProject(parts[1], parts[2]);
       if (parts[0] === "companies") return adminCompanies();
@@ -1879,7 +1881,7 @@ ${src}`, { effort: "medium" });
     }
     if (!(await agreementsOk())) return viewAgreementGate();
     if (needsOnboarding()) return viewOnboarding();
-    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahkan"], ["#/password", "Password / Kata sandi"]]);
+    nav([["#/", "Requests / Permintaan"], ["#/company", "Company / Perusahaan"], ["#/translate", "Translate / Terjemahkan"], ["#/password", "Password / Kata sandi"], ["guide/supplier.html", "Guide / Panduan"]]);
     if (parts[0] === "password") return viewUpdatePassword(true);
     if (parts[0] === "a" && parts[1]) return supplierAssignment(parts[1]);
     if (parts[0] === "company") return supplierCompany();
