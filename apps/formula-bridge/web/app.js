@@ -286,13 +286,17 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
       $("st-reset").className = "status"; $("st-reset").textContent = "If the address is registered, a reset link has been sent. / Jika alamat terdaftar, tautan telah dikirim. / 登録済みのアドレスであれば、再設定用のメールをお送りしました。";
     }); };
   }
+  // Password rule (same as Supabase Auth: minimum length 10, "Letters and digits").
+  const PW_RULE = "At least 10 characters, including letters and numbers. / Minimal 10 karakter, berisi huruf dan angka. / 10文字以上で、英字と数字の両方を含めてください。";
+  const pwProblem = (p) => p.length < 10 || !/[a-z]/i.test(p) || !/[0-9]/.test(p) ? PW_RULE : "";
   function viewUpdatePassword(inApp) {
     $("topbar").hidden = !inApp;
     app.innerHTML = `<div class="auth card"><h1>New password / Kata sandi baru / 新しいパスワード</h1>
-      <form id="f-up"><div class="field"><label for="u-pass">New password (min. 8 characters) / Kata sandi baru (min. 8 karakter)</label><input id="u-pass" type="password" minlength="8" required autocomplete="new-password"></div>
+      <form id="f-up"><div class="field"><label for="u-pass">New password / Kata sandi baru / 新しいパスワード</label><input id="u-pass" type="password" minlength="10" required autocomplete="new-password"></div><p class="sub">${PW_RULE}</p>
       <button class="btn" type="submit">Save / Simpan / 保存</button><div class="status" id="st-up"></div></form></div>`;
     $("f-up").onsubmit = async (e) => {
       e.preventDefault();
+      const bad = pwProblem($("u-pass").value); if (bad) { $("st-up").className = "status err"; $("st-up").textContent = bad; return; }
       const { data, error } = await sb.auth.updateUser({ password: $("u-pass").value, data: { must_change_password: false } });
       if (error) { $("st-up").className = "status err"; $("st-up").textContent = error.message; return; }
       if (data?.user) S.user = data.user;
@@ -1800,8 +1804,8 @@ ${src}`, { effort: "medium" });
     $("nav").innerHTML = "";
     const c = S.company; if (c) await loadLogos([c]);
     const pwBlock = () => `<div id="o-pw"><h2 style="font-size:16px;margin:14px 0 6px">1. Your new password / Kata sandi baru Anda</h2>
-        <div class="grid2"><div class="field"><label for="o-p1">New password (min. 8 characters) / Kata sandi baru (min. 8 karakter) *</label><input id="o-p1" type="password" minlength="8" required autocomplete="new-password"></div>
-          <div class="field"><label for="o-p2">New password again / Ulangi kata sandi baru *</label><input id="o-p2" type="password" minlength="8" required autocomplete="new-password"></div></div></div>`;
+        <div class="grid2"><div class="field"><label for="o-p1">New password / Kata sandi baru *</label><input id="o-p1" type="password" minlength="10" required autocomplete="new-password"></div>
+          <div class="field"><label for="o-p2">New password again / Ulangi kata sandi baru *</label><input id="o-p2" type="password" minlength="10" required autocomplete="new-password"></div></div><p class="sub">${PW_RULE}</p></div>`;
     app.innerHTML = `<div class="auth card en" style="max-width:760px"><h1>${FLAG_ID}Welcome — first-time setup / Selamat datang — pengaturan awal</h1>
       <p class="lang-note">Please complete these steps once. You can see requests from Japan after this. / Harap lengkapi langkah berikut satu kali sebelum melihat permintaan dari Jepang.</p>
       <form id="f-onb" autocomplete="off">
@@ -1817,7 +1821,7 @@ ${src}`, { effort: "medium" });
     $("f-onb").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-onb").querySelector("button"), $("st-onb"), "Saving… / Menyimpan…", async () => {
       const needPw = mustChangePassword() && $("o-p1");
       if (needPw) {
-        if ($("o-p1").value.length < 8) throw { userMsg: "Use at least 8 characters. / Gunakan minimal 8 karakter." };
+        if (pwProblem($("o-p1").value)) throw { userMsg: PW_RULE };
         if ($("o-p1").value !== $("o-p2").value) throw { userMsg: "The two passwords do not match. / Kedua kata sandi tidak cocok." };
       }
       const patch = {};
