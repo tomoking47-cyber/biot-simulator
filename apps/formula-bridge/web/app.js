@@ -589,12 +589,15 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
           <span class="muted" style="font-size:12.5px">Save the formula as / Simpan sebagai:</span><button type="button" class="btn ghost" id="f-xlsx">Excel</button><button type="button" class="btn ghost" id="f-pdf">PDF</button></div>
         <p class="sub" style="margin:6px 0 0">When you press “Submit to Japan”, the formula is also sent to Japan as Excel and PDF automatically. / Saat Anda menekan “Kirim ke Jepang”, formula juga otomatis dikirim ke Jepang dalam format Excel dan PDF.</p>
         <div class="status" id="st-toja"></div></div>
-      <div class="card"><h2>${FLAG_ID}C. Raw material highlights / Keunggulan bahan baku</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Attach graphs in section E. / Keunggulan bahan baku utama dan data Anda (efikasi, mekanisme, dosis). Lampirkan grafik di bagian E.</p>
-        <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row / Tambah baris</button></div></div>
-      <div class="card"><h2>${FLAG_ID}D. Third-party test data / Data uji pihak ketiga</h2><p class="sub">Tests by independent laboratories (patch test, efficacy, stability, microbiology…). Attach reports in section E. / Uji oleh laboratorium independen (uji tempel, efikasi, stabilitas, mikrobiologi…). Lampirkan laporan di bagian E.</p>
-        <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-tests">＋ Add row / Tambah baris</button></div></div>
+      <div class="card"><h2>${FLAG_ID}C. Raw material highlights / Keunggulan bahan baku</h2><p class="sub">Features of key raw materials and your data (efficacy, mechanism, dosage). Drop your data files (graphs, data sheets…) in the box below. / Keunggulan bahan baku utama dan data Anda (efikasi, mekanisme, dosis). Letakkan file data (grafik, lembar data…) di kotak di bawah.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-materials"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-materials">＋ Add row / Tambah baris</button></div>
+        <div class="drop att-drop" id="drop-c" tabindex="0" role="button" aria-label="Upload files"><b>Drop raw material data here, or tap to choose / Letakkan data bahan baku di sini atau ketuk untuk memilih</b><span>PDF, Excel, Word, PowerPoint, images… several files at once, max 25 MB each. / Beberapa file sekaligus, maks. 25 MB per file. / 原料資料をここにドロップ（複数可）</span><input type="file" id="drop-c-in" multiple hidden></div><div class="status" id="st-drop-c" role="status" aria-live="polite"></div></div>
+      <div class="card"><h2>${FLAG_ID}D. Third-party test data / Data uji pihak ketiga</h2><p class="sub">Tests by independent laboratories (patch test, efficacy, stability, microbiology…). Drop the reports in the box below. / Uji oleh laboratorium independen (uji tempel, efikasi, stabilitas, mikrobiologi…). Letakkan laporan di kotak di bawah.</p>
+        <div class="tbl-wrap"><table class="edit" id="t-tests"></table></div><div class="row" style="margin-top:8px"><button class="btn ghost" id="add-tests">＋ Add row / Tambah baris</button></div>
+        <div class="drop att-drop" id="drop-d" tabindex="0" role="button" aria-label="Upload files"><b>Drop third-party test reports here, or tap to choose / Letakkan laporan uji pihak ketiga di sini atau ketuk untuk memilih</b><span>PDF, Excel, Word, PowerPoint, images… several files at once, max 25 MB each. / Beberapa file sekaligus, maks. 25 MB per file. / 第三者機関の試験データをここにドロップ（複数可）</span><input type="file" id="drop-d-in" multiple hidden></div><div class="status" id="st-drop-d" role="status" aria-live="polite"></div></div>
       <div class="card"><h2>${FLAG_ID}E. Attachments / Lampiran</h2><p class="sub">Data sheets, graphs, specifications, sales materials, third-party reports, SDS, COA (max 25 MB each). / Lembar data, grafik, spesifikasi, materi penjualan, laporan pihak ketiga, SDS, COA (maks. 25 MB per file).</p>
         <div class="files" id="files"></div>
+        <div class="drop att-drop" id="drop-e" tabindex="0" role="button" aria-label="Upload files"><b>Drop any other files here (SDS, COA, specifications, graphs, sales materials…) / Letakkan file lain di sini (SDS, COA, spesifikasi, grafik, materi penjualan…)</b><span>PDF, Excel, Word, PowerPoint, images… several files at once, max 25 MB each. / Beberapa file sekaligus, maks. 25 MB per file. / その他の資料をここにドロップ（種類は自動で判定）</span><input type="file" id="drop-e-in" multiple hidden></div><div class="status" id="st-drop-e" role="status" aria-live="polite"></div>
         <div class="upl"><div class="field" style="margin:0"><label for="f-cat">Category / Kategori</label><select id="f-cat"><option value="Raw material data">Raw material data / Data bahan baku</option><option value="Graph / chart">Graph / chart / Grafik</option><option value="Specification">Specification / Spesifikasi</option><option value="Sales material">Sales material / Materi penjualan</option><option value="Third-party report">Third-party report / Laporan pihak ketiga</option><option value="SDS">SDS</option><option value="COA">COA</option><option value="Other">Other / Lainnya</option></select></div>
           <div class="field" style="margin:0"><label for="f-desc">Description / Keterangan</label><input id="f-desc" placeholder="e.g. Hydration graph, 4 weeks, n=20 / contoh: grafik hidrasi, 4 minggu, n=20"></div>
           <label class="btn saff" style="position:relative">Upload file / Unggah file<input type="file" id="f-file" multiple style="position:absolute;width:1px;height:1px;opacity:0"></label></div>
@@ -812,19 +815,44 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       }
     };
     renderFiles();
-    $("f-file").onchange = async (e) => {
-      const files = [...(e.target.files || [])]; e.target.value = ""; const st = $("st-upl");
-      for (const f of files) {
-        st.className = "status"; st.textContent = `Uploading / Mengunggah ${f.name}…`;
+    // Attachments: the button in E, or files dropped on the boxes in C (raw material data), D (third-party reports) and E
+    // (category guessed from the file name). Several files at a time.
+    // (?<![a-z]) … (?![a-z]) instead of \b, so that "Ceramide_COA.pdf" (underscore) is recognised too.
+    const guessCat = (n, fallback) => /(?<![a-z])C\.?O\.?A(?![a-z])|certificate of analysis|sertifikat analisis/i.test(n) ? "COA" : /(?<![a-z])M?SDS(?![a-z])|safety data/i.test(n) ? "SDS"
+      : /(?<![a-z])specs?(?![a-z])|specification|spesifikasi/i.test(n) ? "Specification" : /report|laporan|patch|clinical|klinis|(?<![a-z])HRIPT(?![a-z])|efficacy|efikasi|stability|stabilitas|microbio|mikrobio/i.test(n) ? "Third-party report"
+      : /graph|chart|grafik/i.test(n) ? "Graph / chart" : /brochure|brosur|catalog|katalog|presentation|presentasi/i.test(n) ? "Sales material" : fallback;
+    const uploadAtt = async (files, st, catOf, desc = "") => {
+      const done = [], bad = [];
+      for (const [i, f] of files.entries()) {
+        if (f.size > 25 * 1024 * 1024) { bad.push(`${f.name}: larger than 25 MB / lebih dari 25 MB`); continue; }
+        st.className = "status"; st.textContent = `Uploading / Mengunggah ${files.length > 1 ? `${i + 1}/${files.length} ` : ""}${f.name}…`;
         const path = `${a.company_id}/${aid}/${Date.now()}_${f.name.replace(/[^\w.\-]+/g, "_")}`;
         const { error } = await sb.storage.from("attachments").upload(path, f, { contentType: f.type || undefined });
-        if (error) { st.className = "status err"; st.textContent = `${f.name}: upload failed / gagal diunggah (${error.message})`; continue; }
-        sp.files.push({ path, name: f.name, cat: $("f-cat").value, desc: $("f-desc").value.trim(), type: f.type, size: f.size });
+        if (error) { bad.push(`${f.name}: upload failed / gagal diunggah (${error.message})`); continue; }
+        const cat = catOf(f.name);
+        sp.files.push({ path, name: f.name, cat, desc, type: f.type, size: f.size });
         renderFiles(); save.soon();
-        try { await save.now(); st.textContent = `Uploaded / Terunggah: ${f.name}`; } catch { st.className = "status err"; st.textContent = `${f.name}: could not save / gagal menyimpan`; }
+        try { await save.now(); done.push(`${f.name} (${cat})`); } catch { bad.push(`${f.name}: could not save / gagal menyimpan`); }
       }
+      st.className = bad.length ? "status err" : "status";
+      st.textContent = (done.length ? `✓ Uploaded / Terunggah: ${done.join(", ")}. ` : "") + bad.join(" · ");
+      if (done.length) toast(`✓ ${done.length} file(s) uploaded / file terunggah`, "See E. Attachments / Lihat E. Lampiran");
+    };
+    $("f-file").onchange = async (e) => {
+      const files = [...(e.target.files || [])]; e.target.value = "";
+      const cat = $("f-cat").value; await uploadAtt(files, $("st-upl"), () => cat, $("f-desc").value.trim());
       $("f-desc").value = "";
     };
+    [["c", () => "Raw material data"], ["d", () => "Third-party report"], ["e", (n) => guessCat(n, "Other")]].forEach(([k, catOf]) => {
+      const z = $("drop-" + k), inp = $("drop-" + k + "-in"), st = $("st-drop-" + k);
+      const go = async (files) => { if (!files.length || z.classList.contains("busy")) return; z.classList.add("busy"); st.className = "status"; try { await uploadAtt(files, st, catOf); } finally { z.classList.remove("busy"); } };
+      z.onclick = () => inp.click();
+      z.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inp.click(); } };
+      inp.onchange = (e) => { const fs = [...(e.target.files || [])]; e.target.value = ""; go(fs); };
+      ["dragenter", "dragover"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.add("over"); }));
+      ["dragleave", "drop"].forEach((ev) => z.addEventListener(ev, (e) => { e.preventDefault(); z.classList.remove("over"); }));
+      z.addEventListener("drop", (e) => go([...(e.dataTransfer?.files || [])]));
+    });
 
     const sh = Object.assign({}, a.shipment || {});
     const SH = ["carrier", "tracking", "date", "qty", "note"];
@@ -1889,6 +1917,8 @@ ${src}`, { effort: "medium" });
     return supplierHome();
   }
   window.addEventListener("hashchange", () => route());
+  // A file dropped outside a drop box would make the browser open it and leave the app: ignore such drops.
+  ["dragover", "drop"].forEach((ev) => window.addEventListener(ev, (e) => { if (e.dataTransfer?.types?.includes?.("Files") && !e.target.closest?.(".drop")) { e.preventDefault(); if (ev === "dragover") e.dataTransfer.dropEffect = "none"; } }));
 
   /* Live notifications while the page is open */
   // Realtime sends only the primary key in "old" under RLS, so compare with what this browser last saw.
