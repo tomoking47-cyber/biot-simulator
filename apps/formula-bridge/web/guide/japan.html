@@ -1,0 +1,55 @@
+<!doctype html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>処方ブリッジ 使い方（日本側）</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=Shippori+Mincho:wght@500;600&family=Noto+Sans+JP:wght@400;500&family=Jost:wght@400;500&family=IBM+Plex+Mono:wght@400&display=swap"><style>
+:root{color-scheme:light;--ground:#F6F2EA;--paper:#FFFDF9;--ink:#1E1C19;--ink-2:#57524A;--ink-3:#8D877C;--line:#E2DACB;--gold:#A4854B;--gold-soft:#F3ECDD;--ok:#3F5F4B;--red:#CE1126}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"Jost","Noto Sans JP","Helvetica Neue",Arial,sans-serif;font-size:15px;line-height:1.6}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 16px 64px}
+header{border-bottom:1px solid var(--line);padding-bottom:18px;margin-bottom:22px}
+.brand{font-family:"Cormorant Garamond",serif;font-weight:600;letter-spacing:.3em;font-size:18px;border-left:1px solid var(--gold);padding-left:14px}
+h1{font-family:"Cormorant Garamond","Shippori Mincho",serif;font-weight:600;font-size:30px;line-height:1.25;margin:10px 0 4px}
+h1 small{display:block;font-size:18px;color:var(--ink-2);font-weight:500}
+.meta{color:var(--ink-3);font-size:13px;margin:6px 0 0}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.bar a{display:inline-block;background:var(--ink);color:#fff;text-decoration:none;padding:9px 16px;border-radius:2px;font-size:14px;letter-spacing:.04em}
+.bar a.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:18px 0 8px;padding:0;list-style:none}
+.flow li{background:var(--paper);border:1px solid var(--line);border-top:4px solid var(--red);border-radius:2px;padding:10px 10px 12px;font-size:13px;line-height:1.45}
+.flow li.jp{border-top-color:#BC002D;background:#fff}
+.flow b{display:block;font-size:12px;color:var(--gold);letter-spacing:.08em;margin-bottom:4px}
+.flow span{display:block}.flow span+span{color:var(--ink-2)}
+.toc{columns:2;column-gap:28px;margin:18px 0 0;padding-left:20px;font-size:14px}
+.toc a{color:var(--ink)}
+section.step{background:var(--paper);border:1px solid var(--line);border-radius:2px;padding:20px 20px 22px;margin:18px 0;break-inside:avoid-page}
+.step h2{display:flex;gap:12px;align-items:baseline;margin:0 0 12px;font-weight:500;font-size:19px;line-height:1.35}
+.step h2 .n{flex:none;font-family:"IBM Plex Mono",monospace;font-size:13px;color:#fff;background:var(--gold);border-radius:2px;padding:2px 8px}
+.step h2 .t span{display:block}.step h2 .t span+span{font-size:15px;color:var(--ink-2)}
+.shot{display:block;max-width:100%;max-height:560px;margin:4px 0 14px;border:1px solid var(--line);border-radius:2px;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.langs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.lang h3{margin:0 0 6px;font-size:12px;letter-spacing:.12em;color:var(--ink-3);font-weight:500;border-bottom:1px solid var(--line);padding-bottom:4px}
+.lang ol{margin:0;padding-left:18px}.lang li{margin:0 0 6px;font-size:14px}
+.lang.ja{font-family:"Noto Sans JP",sans-serif}
+.tip{margin:10px 0 0;background:var(--gold-soft);border-radius:2px;padding:8px 12px;font-size:13.5px}
+.tip span{display:block}
+.flag{display:inline-block;width:1.4em;height:.95em;border-radius:2px;box-shadow:0 0 0 1px var(--line);vertical-align:-.1em;margin-right:.35em}
+.flag.id{background:linear-gradient(#CE1126 50%,#fff 50%)}
+.flag.jp{background:#fff radial-gradient(circle,#BC002D 0 28%,transparent 30%)}
+.flag.en{width:auto;height:auto;padding:0 4px;font-style:normal;font-size:10px;line-height:1.5;letter-spacing:.06em;color:#fff;background:#57524A;box-shadow:none;vertical-align:1px}
+footer{color:var(--ink-3);font-size:12.5px;margin-top:28px;border-top:1px solid var(--line);padding-top:12px}
+@media (max-width:760px){.langs{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}.toc{columns:1}h1{font-size:25px}}
+@media print{@page{size:A4;margin:12mm}body{background:#fff;font-size:10pt}.wrap{padding:0;max-width:none}.bar{display:none}
+ section.step{border:0;border-top:1px solid var(--line);padding:10px 0 4px;margin:8px 0}.shot{max-height:98mm;box-shadow:none}
+ .lang li{font-size:9.3pt;margin-bottom:3px}.flow li{font-size:9pt}.step h2{font-size:13pt}.tip{font-size:9pt}.toc{font-size:10pt}
+ a{color:inherit;text-decoration:none}
+ .langs{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.flow{grid-template-columns:repeat(5,minmax(0,1fr))}.toc{columns:2}h1{font-size:20pt}}
+</style></head><body><div class="wrap">
+<header><div class="brand">BIOT</div><h1>処方ブリッジ — 使い方（日本側・社内用）<small>Artisans Production 社内向け</small></h1>
+<p class="meta">https://formula-bridge-eight.vercel.app ・ 社外秘：このページは仕入先に送らないでください（他社名が写っています）。</p>
+<div class="bar"><a href="https://formula-bridge-eight.vercel.app">処方ブリッジを開く</a><a class="ghost" href="supplier.html">仕入先向けガイド（3か国語）</a><a class="ghost" href="formula-bridge-guide-japan.pdf" download>PDF</a></div></header>
+<p>仕入先の画面での操作は「仕入先向けガイド」に、インドネシア語・英語・日本語で並べて載せています。相手と電話やWhatsAppで話すときは、同じ番号の手順を見ながら案内できます。</p>
+<section class="step" id="jp-overview"><h2><span class="n">01</span><span class="t"><span>全体の流れ（日本側）</span></span></h2><img class="shot" src="img/20-jp-master.jpg" alt="全体の流れ（日本側）" loading="lazy"><div class="lang ja"><ol><li>マスター画面で、依頼している全社の状況（依頼・開発中・提出済み・フィードバック未実施）を一覧できます。</li><li>流れ：①仕入先を登録 → ②STEP 1 で依頼を作って送る → ③STEP 2 で各社の提出を確認しフィードバック → ④STEP 3 で完成処方 → ⑤STEP 4 で企画書。</li><li>画面上部の「FB（フィードバック）未実施」の帯には、提出またはサンプル発送があったのに、フィードバックをまだ送っていない会社が表示されます。必ず送ってください。</li></ol></div></section>
+<section class="step" id="jp-companies"><h2><span class="n">02</span><span class="t"><span>① 仕入先を登録する（初回のみ）</span></span></h2><img class="shot" src="img/21-jp-companies.jpg" alt="① 仕入先を登録する（初回のみ）" loading="lazy"><div class="lang ja"><ol><li>メニュー「登録企業」→「仕入先の企業を登録する」に、会社名・担当者名・担当者のメールアドレス（ログインIDになります）を入れて「登録してログイン情報を発行」を押します。</li><li>表示された案内文（URL・メール・仮パスワード入り、英語とインドネシア語）を相手に送ります。仮パスワードはメールではなく、WhatsApp や電話など別の手段で伝えてください。</li><li>相手がパスワードを忘れたら、同じ画面の「仮パスワードを再発行」を押し、新しい仮パスワードを伝えます。</li><li>あわせて、仕入先向けガイド（このページのPDF）を送ると、相手が迷わず始められます。</li></ol></div></section>
+<section class="step" id="jp-step1"><h2><span class="n">03</span><span class="t"><span>② STEP 1：依頼を作って送る</span></span></h2><img class="shot" src="img/22-jp-step1.jpg" alt="② STEP 1：依頼を作って送る" loading="lazy"><div class="lang ja"><ol><li>「＋ 新規案件」で案件を作り、開発依頼の内容（コンセプト・目標原価・スケジュールなど）を日本語で入力します。</li><li>「依頼書を作成（英語・インドネシア語）」で依頼書を作り、「日本語（確認用）」で意味を確認します。</li><li>「依頼先を選んで送る」で会社を選び、「依頼先を確認する」→ 送信。相手には入力用リンクがメールで届きます。</li></ol></div></section>
+<section class="step" id="jp-step2"><h2><span class="n">04</span><span class="t"><span>③ STEP 2：各社の提出を確認する</span></span></h2><img class="shot" src="img/23-jp-step2.jpg" alt="③ STEP 2：各社の提出を確認する" loading="lazy"><div class="lang ja"><ol><li>会社のタブを切り替えて、各社が入力した A〜F（製品概要・処方・原料の特長・試験・添付・発送）を見ます。</li><li>処方は「日本語表示名称に変換」で日本語名を付け、Excel・PDF でも保存できます。</li><li>サンプルが届いたら、下のフィードバック欄に進みます。</li></ol></div></section>
+<section class="step" id="jp-feedback"><h2><span class="n">05</span><span class="t"><span>③ STEP 2：フィードバックを送る（必須）</span></span></h2><img class="shot" src="img/26-jp-feedback.jpg" alt="③ STEP 2：フィードバックを送る（必須）" loading="lazy"><div class="lang ja"><ol><li>判定（採用候補・再試作を依頼・不採用・採用（本処方は当社に帰属））を選び、コメントを日本語で書きます。</li><li>「翻訳して確認する」を押すと、英語とインドネシア語に訳され、別のAIが訳をチェックします。訳し戻しの日本語も確認できます。</li><li>内容を確認して送ると、相手にメールが届き、相手の画面にも表示されます。</li></ol></div></section>
+<section class="step" id="jp-step3"><h2><span class="n">06</span><span class="t"><span>④ STEP 3：完成処方を作る</span></span></h2><img class="shot" src="img/24-jp-step3.jpg" alt="④ STEP 3：完成処方を作る" loading="lazy"><div class="lang ja"><ol><li>採用する会社を1社選ぶと、その処方がベースとして取り込まれます。当社で加える原料を追記し、「水で100%に調整」で合計を100%にします。</li><li>「全原料の表示名称を確認」で日本語表示名称を確認します。「要確認」は出典リンクを開いて目で確認し、「確認済みにする」を押します。</li><li>全成分表示は配合量の多い順に自動で作られます。すべてそろったら「完成処方を確定」を押します。</li></ol></div></section>
+<section class="step" id="jp-step4"><h2><span class="n">07</span><span class="t"><span>⑤ STEP 4：企画書を作る</span></span></h2><img class="shot" src="img/25-jp-step4.jpg" alt="⑤ STEP 4：企画書を作る" loading="lazy"><div class="lang ja"><ol><li>「企画書を作成」で、市場調査 → 下書き → 査読 → 仕上げ の4工程をAIが行います（3〜6分、AIの利用料がかかります）。</li><li>できた企画書（10ページ）は PowerPoint と Word でダウンロードできます。【要確認】の箇所は人の目で確認してください。</li></ol></div></section>
+<footer>スクリーンショットはデモ用のサンプルデータです。 © Artisans Production Co., Ltd. 社外秘</footer></div></body></html>
