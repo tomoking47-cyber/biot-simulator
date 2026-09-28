@@ -59,6 +59,9 @@ Supabase（データベース・会員管理）と、公開用のサイトで動
 1. Supabase の「Authentication」→「Sign In / Providers」を開きます。
 2. 「Allow new users to sign up」をオフにして保存します。
    → 画面に登録ボタンはありませんが、裏口からの登録を止めるための設定です。招待や当社からの企業登録は、オフにしても使えます。
+3. 同じ画面の「Email」を開き、「Minimum password length」を **10**、「Password requirements」を **「Letters and digits」**（英字と数字）にして保存します。
+   → アプリの画面も「10文字以上・英字と数字を含む」で確認します。大文字は不要なので、相手にも覚えやすいルールです。
+   （流出パスワードを拒否する「Prevent use of leaked passwords」は有料プラン（Pro）の機能のため、今は使いません。）
 
 ### 5-2. 管理者アカウントを作る
 1. 処方ブリッジの「設定」→「管理者（日本側）のメールアドレス」にアドレスを追加し、「招待メールを送る」を押します。

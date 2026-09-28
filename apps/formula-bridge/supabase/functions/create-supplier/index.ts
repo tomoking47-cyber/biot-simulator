@@ -17,7 +17,8 @@ const json = (body: unknown, status = 200) =>
 function tempPassword() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
   const bytes = crypto.getRandomValues(new Uint8Array(12));
-  return "Fb-" + Array.from(bytes, (b) => chars[b % chars.length]).join("");
+  // Always has letters ("Fb") and a digit, so it meets the Auth password rule (10+ characters, letters and digits).
+  return "Fb-" + Array.from(bytes, (b) => chars[b % chars.length]).join("") + "23456789"[bytes[0] % 8];
 }
 
 Deno.serve(async (req) => {
