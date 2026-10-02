@@ -43,15 +43,24 @@ Supabase（データベース・会員管理）と、公開用のサイトで動
    - `OPENAI_API_KEY`：OpenAI の鍵（`sk-…`）。
    - 任意：`GEMINI_MODEL`（既定 `gemini-3.1-pro-preview`）、`OPENAI_MODEL`（既定 `gpt-5`）。新しいモデルに変えるときは、ここにモデル名を入れるだけで切り替わります。
 
-### 4. メール送信の設定（Resend）※送信元アドレスが決まってから
-1. https://resend.com に登録し、「Domains」で会社のドメインを追加します。
-   表示される DNS の設定を、ドメインの管理会社の画面に貼り付けます。
-2. 「API Keys」で鍵を作ります（`re_…` で始まる文字列）。
-3. Supabase「Edge Functions」→「Secrets」に、名前 `RESEND_API_KEY` で登録します。
-4. Supabase「Authentication」→「Emails」→「SMTP Settings」で「Enable custom SMTP」をオンにして、次を入れます。
-   - Host: `smtp.resend.com`　Port: `465`　Username: `resend`　Password: 手順2の鍵
-   - Sender email: `noreply@御社ドメイン`　Sender name: `Formula Bridge`
-   → これで、管理者の **招待メール** と **パスワード再設定メール** が届くようになります。
+### 4. メール送信の設定（お名前メール推奨。Resend でも可）
+アプリのメール（招待・提出・発送・フィードバック）と、Supabase のメール（管理者の招待・パスワード再設定）の2か所に、同じ送信サーバーを設定します。
+
+**A. お名前メール（推奨）**
+1. お名前.com の「お名前メール」コントロールパネルで、送信専用のアドレス（例：`noreply@御社ドメイン`）を作り、パスワードを控えます。
+2. 同じ画面の「メールソフト設定」などに表示される **送信サーバー名**（SMTP サーバー）を控えます。ポートは `465`（SSL）を使います。
+3. Supabase「Edge Functions」→「Secrets」に次の5つを登録します。
+   - `SMTP_HOST`：送信サーバー名　`SMTP_PORT`：`465`
+   - `SMTP_USER`：手順1のアドレス（全部）　`SMTP_PASS`：手順1のパスワード
+   - `SMTP_FROM`：`処方ブリッジ Formula Bridge <手順1のアドレス>`
+4. Supabase「Authentication」→「Emails」→「SMTP Settings」で「Enable custom SMTP」をオンにし、同じ送信サーバー・ポート 465・ユーザー名・パスワード、Sender email（手順1のアドレス）、Sender name（`Formula Bridge`）を入れて保存します。
+5. 処方ブリッジの「設定」→「メールの設定」で送信元を手順1のアドレスにし、「テストメールを送る」で届くか確かめます。
+   ※ お名前メールに「海外からの送信を制限する」設定がある場合は、オフにしてください（Supabase のサーバーは海外にあります）。
+
+**B. Resend（メールが迷惑メールに入りやすい場合など）**
+1. https://resend.com に登録し、「Domains」で会社のドメインを追加し、表示される DNS の設定をドメインの管理画面に貼り付けます。
+2. 「API Keys」で鍵（`re_…`）を作り、Supabase「Edge Functions」→「Secrets」に `RESEND_API_KEY` として登録します（このときは `SMTP_HOST` は登録しません）。
+3. Supabase「Authentication」→「Emails」→「SMTP Settings」：Host `smtp.resend.com`、Port `465`、Username `resend`、Password は鍵。
 
 > **それはNG**：「Confirm email（メール確認）」をオフにしてはいけません。オフにすると、他人が社長のメールアドレスで先に登録して管理者になりすませてしまいます。
 
