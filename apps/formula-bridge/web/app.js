@@ -223,7 +223,9 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   async function loadMe() {
     const { data: { session } } = await sb.auth.getSession();
     S.user = session?.user || null;
-    if (!S.user) { S.profile = null; S.isAdmin = false; return; }
+    if (!S.user) { S.profile = null; S.isAdmin = false; S.mfa = null; S.mfaSent = false; return; }
+    // Two-step sign-in: until this session has passed the emailed code, the database shows nothing (see viewMfa).
+    if (!S.mfa) { try { const { data } = await sb.functions.invoke("mfa", { body: { action: "status" } }); S.mfa = data?.verified ? true : { email: data?.email || "" }; } catch { S.mfa = { email: "" }; } }
     const { data: p } = await sb.from("profiles").select("*").eq("id", S.user.id).maybeSingle();
     S.profile = p; S.isAdmin = p?.role === "admin";
     S.company = null;
@@ -238,11 +240,49 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
   sb.auth.onAuthStateChange((ev, session) => setTimeout(async () => {
     if (ev === "PASSWORD_RECOVERY") { location.hash = "#/update-password"; return; }
     const uid = session?.user?.id || null;
-    if (ev === "SIGNED_OUT") { if (S.user) { stopLive(); S.user = null; S.profile = null; S.company = null; S.isAdmin = false; route(); } return; }
+    if (ev === "SIGNED_OUT") { if (S.user) { stopLive(); S.user = null; S.profile = null; S.company = null; S.isAdmin = false; S.mfa = null; S.mfaSent = false; route(); } return; }
     if (ev === "SIGNED_IN" && !signingIn && uid && uid !== S.user?.id) { await afterSignIn(); return; } // signed in from another tab
     if (uid && uid === S.user?.id && session?.user) S.user = session.user; // same user (tab switch, token refresh): keep the screen as it is
   }, 0));
   async function afterSignIn() { await loadMe(); if (S.isAdmin) await loadCompanies(); if (S.user) live(); route(true); }
+
+  // Step 2 of signing in: a 6-digit code emailed to the person's address (once per sign-in).
+  async function viewMfa() {
+    $("topbar").hidden = true;
+    const masked = S.mfa?.email || "";
+    app.innerHTML = `<div class="auth card"><div style="margin-bottom:10px">${LOGO}</div>
+      <h1>Check your email / Periksa email Anda / メールを確認</h1>
+      <p class="lang-note">${FLAG_JP}${FLAG_ID} For your security, enter the 6-digit code we emailed${masked ? ` to <b>${esc(masked)}</b>` : ""}. / Demi keamanan, masukkan kode 6 digit yang kami kirim ke email Anda. / 安全のため、メールに届いた6桁のコードを入力してください。</p>
+      <form id="f-mfa" autocomplete="off"><div class="field"><label for="m-code">Code / Kode / コード</label>
+        <input id="m-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required style="font-family:var(--mono);font-size:24px;letter-spacing:.4em;max-width:220px"></div>
+        <div class="row"><button class="btn saff" type="submit">Confirm / Konfirmasi / 確認する</button><span class="spacer"></span><button type="button" class="linkbtn" id="m-resend">Send a new code / Kirim kode baru / コードを再送</button></div>
+        <div class="status" id="st-mfa" role="status" aria-live="polite"></div></form>
+      <p class="sub" style="margin-top:14px">The code is valid for 10 minutes. Check the spam folder too. / Kode berlaku 10 menit. Periksa juga folder spam. / コードの有効期限は10分です。迷惑メールフォルダもご確認ください。</p>
+      <button type="button" class="linkbtn" id="m-out">Sign out / Keluar / ログアウト</button></div>`;
+    const st = $("st-mfa");
+    const send = async () => {
+      st.className = "status"; st.textContent = "Sending the code… / Mengirim kode… / コードを送っています…";
+      const { data, error } = await sb.functions.invoke("mfa", { body: { action: "send" } });
+      let code = null; if (error) { try { code = (await error.context.json())?.error; } catch { code = "network"; } }
+      if (data?.verified) { S.mfa = true; await afterSignIn(); return; } // no mail server configured yet
+      st.className = code ? "status err" : "status";
+      st.textContent = !code ? "✓ Code sent. / Kode terkirim. / コードを送りました。" : code === "too_many" ? "Too many codes. Please wait 15 minutes. / Terlalu banyak kode. Tunggu 15 menit. / 送信回数が多すぎます。15分お待ちください。"
+        : "Could not send the code. Please try again. / Gagal mengirim kode. Coba lagi. / コードを送れませんでした。もう一度お試しください。";
+    };
+    $("m-resend").onclick = (e) => busy(e.currentTarget, null, "", send);
+    $("m-out").onclick = async () => { await sb.auth.signOut(); S.mfa = null; S.mfaSent = false; location.hash = "#/login"; route(); };
+    $("f-mfa").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-mfa").querySelector("button"), st, "Checking… / Memeriksa… / 確認しています…", async () => {
+      const { data, error } = await sb.functions.invoke("mfa", { body: { action: "verify", code: $("m-code").value.trim() } });
+      let code = null, left = null; if (error) { try { const j = await error.context.json(); code = j?.error; left = j?.left; } catch { code = "network"; } }
+      if (data?.verified) { S.mfa = true; toast("Signed in ✓ / Berhasil masuk ✓ / ログインしました", ""); await afterSignIn(); return; }
+      throw { userMsg: code === "wrong_code" ? `The code is not correct.${left != null ? ` (${left} left / sisa ${left} / 残り${left}回)` : ""} / Kode salah. / コードが違います。`
+        : code === "expired" ? "The code has expired. Press “Send a new code”. / Kode kedaluwarsa. Tekan “Kirim kode baru”. / コードの期限が切れました。「コードを再送」を押してください。"
+        : code === "too_many" ? "Too many tries. Press “Send a new code”. / Terlalu banyak percobaan. Tekan “Kirim kode baru”. / 試行回数が多すぎます。「コードを再送」を押してください。"
+        : "Could not check the code. Please try again. / Gagal memeriksa kode. Coba lagi. / 確認できませんでした。もう一度お試しください。" };
+    }); };
+    $("m-code").focus();
+    if (!S.mfaSent) { S.mfaSent = true; await send(); } // once per sign-in; "Send a new code" for more
+  }
 
   function viewLogin() {
     $("topbar").hidden = true;
@@ -1984,6 +2024,7 @@ ${src}`, { effort: "medium" });
       if (/^#\/(a|p)\//.test(h)) pendingHash = h;
       return viewLogin();
     }
+    if (S.mfa !== true) return viewMfa();
     if (FROM_INVITE && S.user) { let done = false; try { done = !!sessionStorage.getItem("fb-invite-done"); sessionStorage.setItem("fb-invite-done", "1"); } catch {} if (!done) return viewUpdatePassword(); }
     if (fromLogin && pendingHash) { const x = pendingHash; pendingHash = null; if (location.hash !== x) { location.hash = x; return; } }
     if (!S.profile) { app.innerHTML = `<div class="card">Your account is being set up. Please reload in a moment. / Akun Anda sedang disiapkan. Muat ulang sebentar lagi. / アカウントを準備中です。しばらくしてから再読み込みしてください。<div class="row" style="margin-top:10px"><button class="btn ghost" id="np-out">Sign out / Keluar / ログアウト</button></div></div>`; $("np-out").onclick = () => $("signout").click(); return; }
