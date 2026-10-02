@@ -19,6 +19,9 @@ Deno.serve(async (req) => {
   const jwt = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
   const { data: who } = await service.auth.getUser(jwt);
   if (!who?.user) return json({ error: "unauthorized" }, 401);
+  // Two-step sign-in: this sign-in session must have passed the emailed code (see the mfa function).
+  { let sid = ""; try { sid = String(JSON.parse(atob(jwt.split(".")[1].replace(/-/g, "+").replace(/_/g, "/"))).session_id || ""); } catch { /* no session id */ }
+    if (!(await service.from("mfa_sessions").select("session_id").eq("session_id", sid).eq("user_id", who.user.id).maybeSingle()).data) return json({ error: "mfa_required" }, 401); }
   const { data: me } = await service.from("profiles").select("role").eq("id", who.user.id).single();
   if (me?.role !== "admin") return json({ error: "forbidden" }, 403);
 

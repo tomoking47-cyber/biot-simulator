@@ -159,6 +159,8 @@
         ? { data: { ok: true, company: { name: "PT Demo Bahan Nusantara" }, can_manage: true, me: SUP, members: [
             { id: SUP, email: "demo-a@example.com", full_name: "Budi (demo)", rep: true, joined: true, last_sign_in_at: ago(2) },
             { id: "u-demo-sup2", email: "rina@example.com", full_name: "Rina (demo)", rep: false, joined: false, last_sign_in_at: null }] }, error: null }
+        : name === "mfa"
+        ? { data: { ok: true, verified: true }, error: null }
         : name === "create-supplier" && opts?.body?.action === "signup"
         ? { data: { ok: true }, error: null }
         : name === "create-supplier" && opts?.body?.action === "link"
