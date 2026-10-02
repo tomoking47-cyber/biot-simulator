@@ -1148,11 +1148,11 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     const agreed = (cid, doc) => { const v = terms.find((t) => t.doc === doc)?.version; return (logs || []).filter((l) => l.company_id === cid && l.doc === doc && (!v || l.version === v)).sort((a, b) => String(b.accepted_at).localeCompare(String(a.accepted_at)))[0]; };
     app.innerHTML = `<div class="who jp">${FLAG_JP}登録企業</div>
       <form class="card" id="f-sup" autocomplete="off" style="margin-bottom:14px"><h2>${FLAG_JP}＋ 仕入先の企業を登録する</h2>
-        <p class="sub">会社名・担当者名・メールアドレスを入れて登録すると、相手に<b>招待メールが自動で届きます</b>。相手はメールのボタンから入り、3つの合意書（NDA・購入宣言・処方の帰属）への同意、自分のパスワード設定、会社情報の入力を行います。仮パスワードのやりとりは不要です。</p>
+        <p class="sub">会社名・代表者名・メールアドレスを入れて登録すると、相手に<b>招待メールが自動で届きます</b>。相手はメールのボタンから入り、3つの合意書（NDA・購入宣言・処方の帰属）への同意、自分のパスワード設定、会社情報の入力を行います。仮パスワードのやりとりは不要です。</p>
         <div class="grid3">
           <div class="field"><label for="s-company_name">会社名 *</label><input id="s-company_name" required placeholder="PT ○○○ Indonesia"></div>
-          <div class="field"><label for="s-full_name">担当者名 *</label><input id="s-full_name" required></div>
-          <div class="field"><label for="s-email">担当者のメールアドレス *（ログインIDになります）</label><input id="s-email" type="email" required></div>
+          <div class="field"><label for="s-full_name">代表者名 *</label><input id="s-full_name" required></div>
+          <div class="field"><label for="s-email">代表者のメールアドレス *（ログインIDになります）</label><input id="s-email" type="email" required></div>
         </div>
         <div class="notice info" style="margin:0 0 12px">ここで登録した人がその会社の<b>代表者</b>になります。代表者は、自社の担当者を自分で追加・削除できます（各社の詳細画面の「ログインできる担当者」から日本側でも追加できます）。</div>
         <button class="btn saff" type="submit">登録して招待メールを送る</button><div class="status" id="st-sup"></div>
