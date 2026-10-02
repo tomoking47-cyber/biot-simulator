@@ -613,3 +613,4 @@ nav.steps :is(button,a).done[aria-selected="true"],nav.steps :is(button,a)[aria-
 .jchk.web { color: var(--gold); border-color: var(--gold); }
 .jchk.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); font-weight: 600; }
 a.jsrc { font-size: 11px; color: var(--ink-3); margin-right: 4px; word-break: break-all; }
+.jp-only{display:inline-block;margin-left:6px;padding:0 6px;border:1px solid var(--warn);border-radius:2px;color:var(--warn);font-size:11px;letter-spacing:.02em;vertical-align:1px}

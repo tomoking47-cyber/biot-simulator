@@ -8,16 +8,17 @@
   const role = q.get("demo") === "supplier" ? "supplier" : "admin";
   const svgLogo = (bg, t) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='${bg}'/><text x='50' y='62' font-family='Arial' font-weight='700' font-size='34' fill='#fff' text-anchor='middle'>${t}</text></svg>`);
   const DEMO_LOGOS = { "demo/logo-a.jpg": svgLogo("#1F6F5C", "BN"), "demo/logo-c.jpg": svgLogo("#8A3B8F", "SK") };
-  const KEY = "fb-demo-db-v6";
+  const KEY = "fb-demo-db-v7";
   const now = Date.now(), ago = (h) => new Date(now - h * 3600e3).toISOString();
 
   const CA = "c-demo-a", CB = "c-demo-b", CC = "c-demo-c", P1 = "p-demo-1", ADMIN = "u-demo-admin", SUP = "u-demo-sup";
   const brief = {
-    en: "FORMULA DEVELOPMENT REQUEST (DEMO)\n\nProduct category: Facial lotion (toner), 150 mL\nBenchmark: moisturizing lotion sold at Japanese drugstores\nTarget sensory profile: slightly viscous, absorbs quickly, non-sticky finish, fragrance-free\nKey ingredients: ceramide NP, niacinamide\nAvoid: parabens, mineral oil, ethanol\nTarget raw material cost: JPY 100 per unit / finished product: JPY 250 per unit\nTrial sample by: end of October 2026\n\nPlease submit in English (the Indonesian ingredient name, Nama bahan, stays in Indonesian): product features, formula (% w/w, INCI, Nama bahan), raw material data and graphs, specifications/SDS/COA, sales materials, third-party test data.",
-    id: "PERMINTAAN PENGEMBANGAN FORMULA (DEMO)\n\nKategori produk: Losion wajah (toner), 150 mL\nProduk acuan: losion pelembap yang dijual di toko obat Jepang\nSensasi pemakaian: agak kental, cepat meresap, tidak lengket, tanpa pewangi\nBahan utama: seramida NP, niasinamida\nHindari: paraben, minyak mineral, etanol\nTarget biaya bahan baku: JPY 100 per unit / produk jadi: JPY 250 per unit\nSampel uji coba paling lambat: akhir Oktober 2026\n\nHarap kirim dalam bahasa Inggris (Nama bahan tetap dalam bahasa Indonesia): fitur produk, formula (% w/w, INCI, Nama bahan), data dan grafik bahan baku, spesifikasi/SDS/COA, materi penjualan, data uji pihak ketiga.",
-    ja: "（デモ）処方開発依頼書\n化粧水 150mL／ややとろみ・さっぱり・無香料／セラミドNP・ナイアシンアミド／原料費100円・完成品コスト250円／10月末に試作",
+    en: "FORMULA DEVELOPMENT REQUEST (DEMO)\n\nProduct category: Facial lotion (toner), 150 mL\nBenchmark: moisturizing lotion sold at Japanese drugstores\nTarget sensory profile: slightly viscous, absorbs quickly, non-sticky finish, fragrance-free\nKey ingredients: ceramide NP, niacinamide\nAvoid: parabens, mineral oil, ethanol\n\nPlease submit in English (the Indonesian ingredient name, Nama bahan, stays in Indonesian): product features, formula (% w/w, INCI, Nama bahan), raw material data and graphs, specifications/SDS/COA, sales materials, third-party test data.",
+    id: "PERMINTAAN PENGEMBANGAN FORMULA (DEMO)\n\nKategori produk: Losion wajah (toner), 150 mL\nProduk acuan: losion pelembap yang dijual di toko obat Jepang\nSensasi pemakaian: agak kental, cepat meresap, tidak lengket, tanpa pewangi\nBahan utama: seramida NP, niasinamida\nHindari: paraben, minyak mineral, etanol\n\nHarap kirim dalam bahasa Inggris (Nama bahan tetap dalam bahasa Indonesia): fitur produk, formula (% w/w, INCI, Nama bahan), data dan grafik bahan baku, spesifikasi/SDS/COA, materi penjualan, data uji pihak ketiga.",
+    noCost: true,
+    ja: "（デモ）処方開発依頼書\n化粧水 150mL／ややとろみ・さっぱり・無香料／セラミドNP・ナイアシンアミド",
   };
-  const snapshot = { name: "【デモ】セラミド保湿化粧水", brief: { en: brief.en, id: brief.id }, request: { costRaw: "100円", costFin: "250円", price: "1,980円", vol: "150mL", date: "2026年10月末" } };
+  const snapshot = { name: "【デモ】セラミド保湿化粧水", brief: { en: brief.en, id: brief.id }, request: { requester: "Demo (Artisans Production)" } };
   const F = (phase, idName, inci, pct, fn, ja) => ({ phase, trade: inci + " (demo)", idName, inci, maker: "Demo", pct, fn, ja, jaNote: "" });
   const formula = [F("A", "Air", "Water", "83.7", "Solvent", "水"), F("A", "Butilen glikol", "Butylene Glycol", "6", "Humectant", "BG"), F("A", "Gliserin", "Glycerin", "4", "Humectant", "グリセリン"),
     F("A", "Niasinamida", "Niacinamide", "3", "Skin conditioning", "ナイアシンアミド"), F("A", "Pentilen glikol", "Pentylene Glycol", "2", "Humectant", "ペンチレングリコール"), F("A", "Karbomer", "Carbomer", "0.3", "Thickener", "カルボマー"),
@@ -154,6 +155,12 @@
             { phase: "A", trade: "BG (demo)", idName: "Butilen glikol", inci: "Butylene Glycol", maker: "Demo Chem", amt: "60", fn: "Humectant" },
             { phase: "B", trade: "", idName: "Niasinamida", inci: "Niacinamide", maker: "Demo Chem", amt: "30", fn: "Skin conditioning" },
             { phase: "C", trade: "", idName: "Fenoksietanol", inci: "Phenoxyethanol", maker: "Demo Chem", amt: "5", fn: "Preservative" }] }) }, error: null }
+        : name === "create-supplier" && opts?.body?.action === "list_members"
+        ? { data: { ok: true, company: { name: "PT Demo Bahan Nusantara" }, can_manage: true, me: SUP, members: [
+            { id: SUP, email: "demo-a@example.com", full_name: "Budi (demo)", rep: true, joined: true, last_sign_in_at: ago(2) },
+            { id: "u-demo-sup2", email: "rina@example.com", full_name: "Rina (demo)", rep: false, joined: false, last_sign_in_at: null }] }, error: null }
+        : name === "create-supplier" && opts?.body?.action === "link"
+        ? { data: { ok: true }, error: null }
         : name === "notify" || name === "invite"
         ? { data: { sent: false, reason: "demo" }, error: null }
         : { data: null, error: { context: { json: async () => ({ error: "demo" }) } } },
