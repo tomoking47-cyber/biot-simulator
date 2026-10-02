@@ -8,8 +8,9 @@ e = html.escape
 # ---------------------------------------------------------------- supplier guide (3 languages)
 # Each step: (anchor, {id,en,ja} title, image or None, [ {id,en,ja} bullet ], optional {id,en,ja} tip)
 S = [
-("login", {"id": "Undangan dan masuk", "en": "Invitation and sign-in", "ja": "招待メールとログイン"}, "01-login", [
- {"id": "Anda akan menerima email undangan dari Artisans Production. Tekan tombol “Sign in to Formula Bridge / Masuk ke Formula Bridge” di email tersebut — Anda langsung masuk, tanpa kata sandi sementara.", "en": "You will receive an invitation email from Artisans Production. Press “Sign in to Formula Bridge / Masuk ke Formula Bridge” in the email — you are signed in directly, no temporary password needed.", "ja": "Artisans Production から招待メールが届きます。メールの「Sign in to Formula Bridge / Masuk ke Formula Bridge」ボタンを押すと、そのままログインできます（仮パスワードは不要です）。"},
+("login", {"id": "Mendaftar dan masuk", "en": "Register and sign in", "ja": "登録とログイン"}, "01-login", [
+ {"id": f"Perusahaan baru: buka {URL}, tekan “Register your company / Daftarkan perusahaan Anda”, lalu isi nama perusahaan, nama Anda, dan email kantor. Anda menjadi perwakilan perusahaan.", "en": f"New company: open {URL}, press “Register your company / Daftarkan perusahaan Anda” and enter your company name, your name and work email. You become your company's representative.", "ja": f"初めての会社は、{URL} を開いて「Register your company / 会社を登録する」を押し、会社名・氏名・会社のメールアドレスを入れます。登録した人がその会社の代表者になります。"},
+ {"id": "Anda akan menerima email (setelah mendaftar, atau undangan dari Artisans Production / rekan Anda). Tekan tombol “Sign in to Formula Bridge / Masuk ke Formula Bridge” di email tersebut — Anda langsung masuk, tanpa kata sandi sementara.", "en": "You will receive an email (after registering, or an invitation from Artisans Production or a colleague). Press “Sign in to Formula Bridge / Masuk ke Formula Bridge” in the email — you are signed in directly, no temporary password needed.", "ja": "登録後（または Artisans Production・同僚からの招待で）メールが届きます。メールの「Sign in to Formula Bridge / Masuk ke Formula Bridge」ボタンを押すと、そのままログインできます（仮パスワードは不要です）。"},
  {"id": f"Setelah itu, masuk di {URL} dengan email dan kata sandi yang Anda buat sendiri (langkah 03), lalu tekan “Sign in / Masuk / ログイン”.", "en": f"After that, sign in at {URL} with your email and the password you set yourself (step 03), then press “Sign in / Masuk / ログイン”.", "ja": f"2回目からは {URL} を開き、メールアドレスと自分で決めたパスワード（手順03）を入れて「Sign in / Masuk / ログイン」を押します。"},
  {"id": "Tombol di email hanya berlaku satu kali dan untuk waktu terbatas. Lupa kata sandi atau tombol tidak berfungsi? Tekan “Forgot password? / Lupa kata sandi?” di layar masuk dan masukkan email Anda — tautan masuk baru akan dikirim.", "en": "The button in the email works once, for a limited time. Forgot your password, or the button no longer works? Press “Forgot password? / Lupa kata sandi?” on the sign-in page and enter your email — a new sign-in link is sent.", "ja": "メールのボタンは1回だけ・期限付きで有効です。パスワードを忘れた、またはボタンが使えないときは、ログイン画面の「Forgot password? / Lupa kata sandi?」でメールアドレスを入れると、新しいログイン用リンクが届きます。"},
 ]),
@@ -175,8 +176,9 @@ J = [
  "流れ：①仕入先を登録 → ②STEP 1 で依頼を作って送る → ③STEP 2 で各社の提出を確認しフィードバック → ④STEP 3 で完成処方 → ⑤STEP 4 で企画書。",
  "画面上部の「FB（フィードバック）未実施」の帯には、提出またはサンプル発送があったのに、フィードバックをまだ送っていない会社が表示されます。必ず送ってください。",
 ]),
-("jp-companies", "① 仕入先を登録する（初回のみ）", "21-jp-companies", [
- "メニュー「登録企業」→「仕入先の企業を登録する」に、会社名・代表者名・メールアドレス（ログインIDになります）を入れて「登録して招待メールを送る」を押します。仮パスワードのやりとりは不要です。",
+("jp-companies", "① 仕入先の登録（日本側の作業は不要）", "21-jp-companies", [
+ "仕入先は、ログイン画面の「Register your company / 会社を登録する」から自分で登録します。登録されると開発用メールにお知らせが届きます（対応は不要）。登録しただけの会社は、日本から依頼を送るまで何も見られず、AI・ファイル添付も使えません。",
+ "日本側から代わりに登録したいときだけ、メニュー「登録企業」→「仕入先の企業を登録する（任意）」に、会社名・代表者名・メールアドレスを入れて「登録して招待メールを送る」を押します。",
  "相手には英語・インドネシア語の招待メールが自動で届き、ボタンから入って合意・パスワード設定・会社情報の入力を行います。",
  "メール送信がまだ設定されていない間は、画面にログイン用リンクが表示されます。WhatsApp などで本人だけに送ってください（1回だけ・期限付きで有効）。",
  "相手がパスワードを忘れたときは、相手自身がログイン画面の「Forgot password?」で新しいリンクを受け取れます。日本側からは一覧の「招待メールを再送」でも送れます。",

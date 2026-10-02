@@ -257,7 +257,9 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
         <div class="status" id="st-login" role="status" aria-live="polite"></div>
       </form>
       <hr style="border:0;border-top:1px solid var(--line);margin:16px 0">
-      <p class="sub" style="margin:0">${FLAG_ID} Supplier accounts are issued by Artisans Production. Please contact your representative in Japan.<br>Akun pemasok diterbitkan oleh Artisans Production. Silakan hubungi perwakilan Anda di Jepang.<br>仕入先のアカウントは株式会社Artisans Productionが発行します。日本の担当者にお問い合わせください。</p>
+      <p style="margin:0 0 6px"><b>${FLAG_ID} New supplier? / Pemasok baru? / 初めての仕入先の方</b></p>
+      <a class="btn saff" href="#/register" style="display:inline-block;text-decoration:none">Register your company / Daftarkan perusahaan Anda / 会社を登録する</a>
+      <p class="sub" style="margin:8px 0 0">Already registered colleagues can add you from “Company / Perusahaan → Team / Tim”. / Rekan yang sudah terdaftar dapat menambahkan Anda dari “Company / Perusahaan → Team / Tim”. / 同じ会社の方がすでに登録済みなら、その方が「Company → Team」から追加できます。</p>
       <p class="sub" style="margin:8px 0 0"><a href="guide/supplier.html" target="_blank" rel="noopener">User guide / Panduan / 使い方ガイド →</a></p>
     </div>`;
     $("to-reset").onclick = () => (location.hash = "#/reset");
@@ -274,6 +276,34 @@ ${langs.map((k) => `訳文（${LANG_NAME[k]}・${k}）:\n${outs[k]}`).join("\n\n
         : "Could not sign in. Please try again. / Gagal masuk. Silakan coba lagi. / ログインできませんでした。もう一度お試しください。 (" + error.message + ")"; return; }
       try { await afterSignIn(); } finally { signingIn = false; }
     };
+  }
+
+  // A supplier registers its own company. The server emails a one-time sign-in link (which proves the address); the
+  // agreements, password and company profile follow in the first-time setup. Nothing is visible until Japan sends a request.
+  function viewRegister() {
+    $("topbar").hidden = true;
+    app.innerHTML = `<div class="auth card en"><div style="margin-bottom:10px">${LOGO}</div>
+      <h1>${FLAG_ID}Register your company / Daftarkan perusahaan Anda</h1>
+      <p class="lang-note">For raw material suppliers working with Artisans Production Co., Ltd. (Japan). / Untuk pemasok bahan baku yang bekerja sama dengan Artisans Production Co., Ltd. (Jepang). / 仕入先（原料メーカー）向けの登録です。</p>
+      <form id="f-reg" autocomplete="on">
+        <div class="field"><label for="g-company">Company name / Nama perusahaan *</label><input id="g-company" required maxlength="200" autocomplete="organization" placeholder="PT …"></div>
+        <div class="field"><label for="g-name">Your name / Nama Anda *</label><input id="g-name" required maxlength="120" autocomplete="name"></div>
+        <div class="field"><label for="g-email">Work email / Email kantor *</label><input id="g-email" type="email" required autocomplete="email"></div>
+        <p class="sub">We will email you a sign-in link. Then you accept the agreements, set your password and complete your company profile. You become your company's representative and can add colleagues later. / Kami akan mengirim tautan masuk ke email Anda. Setelah itu Anda menyetujui perjanjian, membuat kata sandi, dan melengkapi profil perusahaan. Anda menjadi perwakilan perusahaan dan dapat menambahkan rekan nanti.</p>
+        <div class="row"><button class="btn saff" type="submit">Register / Daftar / 登録する</button><a href="#/login" class="linkbtn">Back / Kembali / 戻る</a></div>
+        <div class="status" id="st-reg" role="status" aria-live="polite"></div></form></div>`;
+    $("f-reg").onsubmit = (e) => { e.preventDefault(); busy(e.submitter || $("f-reg").querySelector("button"), $("st-reg"), "Registering… / Mendaftar… / 登録しています…", async () => {
+      const body = { action: "signup", company_name: $("g-company").value.trim(), full_name: $("g-name").value.trim(), email: $("g-email").value.trim() };
+      const { data, error } = await sb.functions.invoke("create-supplier", { body });
+      const code = await fnErr(data, error);
+      if (code) throw { userMsg: code === "mail_not_ready" ? "Registration is not open yet. Please contact Artisans Production. / Pendaftaran belum dibuka. Silakan hubungi Artisans Production. / 現在は登録を受け付けていません。"
+        : code === "too_many" ? "Too many attempts. Please try again in an hour. / Terlalu banyak percobaan. Coba lagi dalam satu jam. / 時間をおいてお試しください。"
+        : code === "bad_request" ? "Please fill in every field. / Harap isi semua kolom. / すべての欄を入力してください。"
+        : "Could not register. Please try again. / Gagal mendaftar. Coba lagi. / 登録できませんでした。もう一度お試しください。" };
+      $("f-reg").innerHTML = `<div class="notice info" style="margin:0"><b>✓ Check your email / Periksa email Anda / メールをご確認ください</b><br>
+        We sent a sign-in link to ${esc(body.email)}. Open it to continue (check the spam folder too). / Kami telah mengirim tautan masuk ke ${esc(body.email)}. Buka tautan itu untuk melanjutkan (periksa juga folder spam).</div>
+        <p style="margin-top:12px"><a href="guide/supplier.html" target="_blank" rel="noopener">User guide / Panduan / 使い方ガイド →</a></p>`;
+    }); };
   }
 
   function viewReset() {
@@ -1147,7 +1177,7 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     // Only an acceptance of the current version counts (a new version must be accepted again).
     const agreed = (cid, doc) => { const v = terms.find((t) => t.doc === doc)?.version; return (logs || []).filter((l) => l.company_id === cid && l.doc === doc && (!v || l.version === v)).sort((a, b) => String(b.accepted_at).localeCompare(String(a.accepted_at)))[0]; };
     app.innerHTML = `<div class="who jp">${FLAG_JP}登録企業</div>
-      <form class="card" id="f-sup" autocomplete="off" style="margin-bottom:14px"><h2>${FLAG_JP}＋ 仕入先の企業を登録する</h2>
+      <form class="card" id="f-sup" autocomplete="off" style="margin-bottom:14px"><h2>${FLAG_JP}＋ 仕入先の企業を登録する（任意）</h2><div class="notice info" style="margin:0 0 10px">仕入先は、ログイン画面の「Register your company / 会社を登録する」から<b>自分で登録できます</b>（日本側の作業は不要です。登録されると開発用メールにお知らせが届きます）。ここは、日本側から代わりに登録したいときだけ使います。</div>
         <p class="sub">会社名・代表者名・メールアドレスを入れて登録すると、相手に<b>招待メールが自動で届きます</b>。相手はメールのボタンから入り、3つの合意書（NDA・購入宣言・処方の帰属）への同意、自分のパスワード設定、会社情報の入力を行います。仮パスワードのやりとりは不要です。</p>
         <div class="grid3">
           <div class="field"><label for="s-company_name">会社名 *</label><input id="s-company_name" required placeholder="PT ○○○ Indonesia"></div>
@@ -1950,6 +1980,7 @@ ${src}`, { effort: "medium" });
     if (h.startsWith("#/update-password")) return viewUpdatePassword();
     if (!S.user) {
       if (h.startsWith("#/reset")) return viewReset();
+      if (h.startsWith("#/register")) return viewRegister();
       if (/^#\/(a|p)\//.test(h)) pendingHash = h;
       return viewLogin();
     }

@@ -6,6 +6,8 @@
 //   "remove_member"  admin, or the representative for their own colleagues: remove a person (the representative stays).
 //   "link"           anyone (from the sign-in page, "Forgot password?"): emails a new sign-in link to a supplier, or a
 //                    password reset email to anyone else. Always answers ok, so it does not reveal who is registered.
+//   "signup"         anyone (the "Register your company" page): a supplier registers its own company and receives a
+//                    sign-in link by email; Japan's development address is told. Needs a mail server (else mail_not_ready).
 // The representative is the person whose address is the company's contact email.
 // A sign-in link signs the person in once; the app then asks them to accept the agreements, set their own password and
 // (the first time) complete the company profile. When no mail server is configured yet, the link is returned to the admin
@@ -80,6 +82,60 @@ Deno.serve(async (req) => {
     } else if (p) {
       const { error } = await service.auth.resetPasswordForEmail(email, { redirectTo: appUrl + "/" });
       await service.from("mail_log").insert({ kind: "reset", to_email: email, subject: "Supabase password reset", ok: !error, detail: error ? error.message : "sent by Supabase Auth" });
+    }
+    return json({ ok: true });
+  }
+
+  // ---- Self-registration of a new supplier company (no sign-in needed) ----
+  // The person proves the address is theirs by using the emailed link. A new company sees nothing until Japan sends it a
+  // request, and AI and file attachments stay off until then, so a stranger who registers gains nothing.
+  if (action === "signup") {
+    if (!EMAIL.test(email) || !s("company_name") || !s("full_name") || s("company_name").length > 200 || s("full_name").length > 120) return json({ error: "bad_request" }, 400);
+    if (!Deno.env.get("SMTP_HOST") && !Deno.env.get("RESEND_API_KEY")) return json({ error: "mail_not_ready" }, 503);
+    const hourAgo = new Date(Date.now() - 3600e3).toISOString();
+    const [{ count: mine }, { count: all }] = await Promise.all([
+      service.from("mail_log").select("id", { count: "exact", head: true }).eq("to_email", email).in("kind", ["account", "reset"]).gte("created_at", hourAgo),
+      service.from("mail_log").select("id", { count: "exact", head: true }).eq("kind", "signup").gte("created_at", hourAgo),
+    ]);
+    if ((mine ?? 0) >= 3 || (all ?? 0) >= 20) return json({ error: "too_many" }, 429);
+    // An address that already has an account gets a sign-in link instead (the answer is the same, so it reveals nothing).
+    const { data: ex } = await service.from("profiles").select("id, role, company_id, full_name").eq("email", email).maybeSingle();
+    const isAdm = (!!ex && ex.role === "admin") || !!(await service.from("admin_emails").select("email").eq("email", email).maybeSingle()).data;
+    if (isAdm) return json({ ok: true });
+    if (ex?.company_id) {
+      const { data: co } = await service.from("companies").select("name").eq("id", ex.company_id).maybeSingle();
+      try { await invite(ex.id, email, ex.full_name || "", co?.name || "", "again"); } catch (e) { console.error(e); }
+      return json({ ok: true });
+    }
+    if (ex) await service.auth.admin.deleteUser(ex.id); // an account left without a company (stopped halfway)
+    const { data, error } = await service.auth.admin.createUser({ email, email_confirm: true, app_metadata: { fb_supplier: true },
+      user_metadata: { must_change_password: true, full_name: s("full_name"), company: { name: s("company_name") }, self_registered: true } });
+    if (error) return json({ error: "create_failed" }, 500);
+    const uid = data.user.id;
+    const { data: prof } = await service.from("profiles").select("company_id").eq("id", uid).maybeSingle();
+    let newCid = prof?.company_id as string | undefined;
+    if (!newCid) {
+      const { data: co, error: e1 } = await service.from("companies").insert({ name: s("company_name"), contact_name: s("full_name"), contact_email: email }).select("id").single();
+      const { error: e2 } = e1 ? { error: e1 } : await service.from("profiles").upsert({ id: uid, role: "supplier", company_id: co.id, email, full_name: s("full_name") });
+      if (e1 || e2) { if (co) await service.from("companies").delete().eq("id", co.id); await service.auth.admin.deleteUser(uid); return json({ error: "create_failed" }, 500); }
+      newCid = co.id;
+    }
+    let sent = false;
+    try { sent = !!(await invite(uid, email, s("full_name"), s("company_name"), "new")).emailed; } catch (e) { console.error(e); }
+    if (!sent) { // nothing half-made is left behind
+      await service.auth.admin.deleteUser(uid); await service.from("companies").delete().eq("id", newCid);
+      return json({ error: "mail_failed" }, 502);
+    }
+    await service.from("mail_log").insert({ kind: "signup", to_email: email, subject: "self-registration: " + s("company_name"), ok: true, detail: "" });
+    // Tell Japan's development address (information only — nothing to do).
+    const dev = String(conf.dev_email || Deno.env.get("DEV_EMAIL") || "").split(/[,\s]+/).filter(Boolean);
+    if (dev.length) {
+      const subj = `[処方ブリッジ] 新しい仕入先が登録しました：${s("company_name")}`;
+      const r = await sendMail(sender, dev, subj, `<p>インドネシアの仕入先が、処方ブリッジに自分で登録しました（対応は不要です）。</p>
+        <p>会社名：<b>${esc(s("company_name"))}</b><br>担当者：${esc(s("full_name"))}<br>メール：${esc(email)}</p>
+        <p>この会社に依頼を送るまで、相手は何も見られません（AI・ファイル添付も使えません）。心当たりのない登録は「登録企業」から確認してください。</p>
+        <p><a href="${esc(appUrl)}/#/companies">処方ブリッジで確認する</a></p>`);
+      await service.from("mail_log").insert({ kind: "signup_notice", to_email: dev.join(","), subject: subj, ok: !!r?.ok, detail: r ? r.detail : "mail server not configured" });
     }
     return json({ ok: true });
   }
