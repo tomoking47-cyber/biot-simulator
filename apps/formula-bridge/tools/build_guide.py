@@ -8,10 +8,10 @@ e = html.escape
 # ---------------------------------------------------------------- supplier guide (3 languages)
 # Each step: (anchor, {id,en,ja} title, image or None, [ {id,en,ja} bullet ], optional {id,en,ja} tip)
 S = [
-("login", {"id": "Masuk", "en": "Sign in", "ja": "ログイン"}, "01-login", [
- {"id": f"Buka {URL} di komputer atau ponsel.", "en": f"Open {URL} on a computer or phone.", "ja": f"パソコンかスマートフォンで {URL} を開きます。"},
- {"id": "Masukkan email dan kata sandi sementara yang diberikan oleh Artisans Production, lalu tekan “Sign in / Masuk / ログイン”.", "en": "Enter the email and the temporary password you received from Artisans Production, then press “Sign in / Masuk / ログイン”.", "ja": "Artisans Production から受け取ったメールアドレスと仮パスワードを入力し、「Sign in / Masuk / ログイン」を押します。"},
- {"id": "Lupa kata sandi? Tekan “Forgot password? / Lupa kata sandi?” untuk menerima tautan atur ulang melalui email. Jika email tidak datang, hubungi perwakilan Anda di Jepang; kami akan menerbitkan kata sandi sementara yang baru.", "en": "Forgot your password? Press “Forgot password? / Lupa kata sandi?” to receive a reset link by email. If no email arrives, contact your representative in Japan; we will issue a new temporary password.", "ja": "パスワードを忘れたときは「Forgot password? / Lupa kata sandi?」を押すと、再設定用のメールが届きます。届かないときは日本の担当者に連絡してください。新しい仮パスワードを発行します。"},
+("login", {"id": "Undangan dan masuk", "en": "Invitation and sign-in", "ja": "招待メールとログイン"}, "01-login", [
+ {"id": "Anda akan menerima email undangan dari Artisans Production. Tekan tombol “Sign in to Formula Bridge / Masuk ke Formula Bridge” di email tersebut — Anda langsung masuk, tanpa kata sandi sementara.", "en": "You will receive an invitation email from Artisans Production. Press “Sign in to Formula Bridge / Masuk ke Formula Bridge” in the email — you are signed in directly, no temporary password needed.", "ja": "Artisans Production から招待メールが届きます。メールの「Sign in to Formula Bridge / Masuk ke Formula Bridge」ボタンを押すと、そのままログインできます（仮パスワードは不要です）。"},
+ {"id": f"Setelah itu, masuk di {URL} dengan email dan kata sandi yang Anda buat sendiri (langkah 03), lalu tekan “Sign in / Masuk / ログイン”.", "en": f"After that, sign in at {URL} with your email and the password you set yourself (step 03), then press “Sign in / Masuk / ログイン”.", "ja": f"2回目からは {URL} を開き、メールアドレスと自分で決めたパスワード（手順03）を入れて「Sign in / Masuk / ログイン」を押します。"},
+ {"id": "Tombol di email hanya berlaku satu kali dan untuk waktu terbatas. Lupa kata sandi atau tombol tidak berfungsi? Tekan “Forgot password? / Lupa kata sandi?” di layar masuk dan masukkan email Anda — tautan masuk baru akan dikirim.", "en": "The button in the email works once, for a limited time. Forgot your password, or the button no longer works? Press “Forgot password? / Lupa kata sandi?” on the sign-in page and enter your email — a new sign-in link is sent.", "ja": "メールのボタンは1回だけ・期限付きで有効です。パスワードを忘れた、またはボタンが使えないときは、ログイン画面の「Forgot password? / Lupa kata sandi?」でメールアドレスを入れると、新しいログイン用リンクが届きます。"},
 ]),
 ("agree", {"id": "Menyetujui 3 perjanjian (hanya sekali)", "en": "Agree to the 3 agreements (once only)", "ja": "3つの合意書に同意する（初回のみ）"}, "02-agreements", [
  {"id": "Saat pertama kali masuk, tiga perjanjian ditampilkan: Perjanjian Kerahasiaan (NDA), Pernyataan Pembelian Bahan Baku, dan Kepemilikan Formula yang Diadopsi.", "en": "The first time you sign in, three agreements are shown: the Confidentiality Agreement (NDA), the Declaration of Raw Material Purchase, and the Ownership of Adopted Formulas.", "ja": "初めてログインすると、3つの合意書（秘密保持契約・原料購入に関する宣言・採用処方の帰属）が表示されます。"},
@@ -73,6 +73,7 @@ S = [
 ("menus", {"id": "Menu lainnya", "en": "Other menus", "ja": "そのほかのメニュー"}, "15-company", [
  {"id": "“Company / Perusahaan”: ubah telepon, alamat, logo, dll., lalu tekan “Save / Simpan”. Untuk mengubah nama perusahaan atau email kontak, hubungi Artisans Production.", "en": "“Company / Perusahaan”: update phone, address, logo, etc., then press “Save / Simpan”. To change the company name or contact email, contact Artisans Production.", "ja": "「Company / Perusahaan」：電話・住所・ロゴなどを変更し、「Save / Simpan」を押します。会社名と連絡先メールの変更は Artisans Production に連絡してください。"},
  {"id": "“Translate / Terjemahkan”: menerjemahkan antara bahasa Jepang dan bahasa Indonesia.", "en": "“Translate / Terjemahkan”: translates between Japanese and Indonesian.", "ja": "「Translate / Terjemahkan」：日本語とインドネシア語を相互に翻訳できます。"},
+ {"id": "“Company / Perusahaan” → “Team / Tim”: daftar rekan yang dapat masuk. Perwakilan perusahaan dapat menambah rekan (email undangan dikirim otomatis) dan menghapusnya. Semua anggota tim melihat semua permintaan untuk perusahaan Anda.", "en": "“Company / Perusahaan” → “Team / Tim”: the colleagues who can sign in. Your company's representative can add colleagues (an invitation email is sent automatically) and remove them. Everyone in the team sees all requests sent to your company.", "ja": "「Company / Perusahaan」→「Team / Tim」：ログインできる同僚の一覧です。代表者は同僚を追加（招待メールが自動で届きます）・削除できます。同じ会社の全員が、自社あての依頼をすべて見られます（他社の情報は見えません）。"},
  {"id": "“Password / Kata sandi”: ganti kata sandi Anda.", "en": "“Password / Kata sandi”: change your password.", "ja": "「Password / Kata sandi」：パスワードを変更できます。"},
 ]),
 ]
@@ -175,10 +176,12 @@ J = [
  "画面上部の「FB（フィードバック）未実施」の帯には、提出またはサンプル発送があったのに、フィードバックをまだ送っていない会社が表示されます。必ず送ってください。",
 ]),
 ("jp-companies", "① 仕入先を登録する（初回のみ）", "21-jp-companies", [
- "メニュー「登録企業」→「仕入先の企業を登録する」に、会社名・担当者名・担当者のメールアドレス（ログインIDになります）を入れて「登録してログイン情報を発行」を押します。",
- "表示された案内文（URL・メール・仮パスワード入り、英語とインドネシア語）を相手に送ります。仮パスワードはメールではなく、WhatsApp や電話など別の手段で伝えてください。",
- "相手がパスワードを忘れたら、同じ画面の「仮パスワードを再発行」を押し、新しい仮パスワードを伝えます。",
- "あわせて、仕入先向けガイド（このページのPDF）を送ると、相手が迷わず始められます。",
+ "メニュー「登録企業」→「仕入先の企業を登録する」に、会社名・代表者名・メールアドレス（ログインIDになります）を入れて「登録して招待メールを送る」を押します。仮パスワードのやりとりは不要です。",
+ "相手には英語・インドネシア語の招待メールが自動で届き、ボタンから入って合意・パスワード設定・会社情報の入力を行います。",
+ "メール送信がまだ設定されていない間は、画面にログイン用リンクが表示されます。WhatsApp などで本人だけに送ってください（1回だけ・期限付きで有効）。",
+ "相手がパスワードを忘れたときは、相手自身がログイン画面の「Forgot password?」で新しいリンクを受け取れます。日本側からは一覧の「招待メールを再送」でも送れます。",
+ "担当者の追加・削除は、各社の詳細画面（マスター画面で会社をクリック）の「ログインできる担当者」から行えます。仕入先の代表者も自分で追加・削除できます。同じ会社の担当者は全員、その会社あての依頼をすべて見られます（他社の情報は見えません）。",
+ "希望原料費・完成品コスト・販売価格・試作希望日は「日本側のみ」の項目で、仕入先には表示されません（依頼書にも入りません）。",
 ]),
 ("jp-step1", "② STEP 1：依頼を作って送る", "22-jp-step1", [
  "「＋ 新規案件」で案件を作り、開発依頼の内容（コンセプト・目標原価・スケジュールなど）を日本語で入力します。",
