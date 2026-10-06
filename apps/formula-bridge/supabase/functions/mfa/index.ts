@@ -55,12 +55,14 @@ Deno.serve(async (req) => {
     const { data: settings } = await service.from("settings").select("key, value").eq("key", "from_email");
     const from = String(settings?.[0]?.value || Deno.env.get("FROM_EMAIL") || "Formula Bridge <onboarding@resend.dev>");
     const sender = Deno.env.get("SMTP_HOST") ? String(Deno.env.get("SMTP_FROM") || from) : from;
-    const subject = `[Formula Bridge] Sign-in code / Kode masuk / ログイン確認コード: ${code}`;
+    // No digits in the subject and a plain-text part: mail filters treat "code in the subject" HTML-only mail as spam.
+    const subject = "[Formula Bridge] Sign-in code / Kode masuk / ログイン確認コード";
     const html = `<p>Your sign-in code / Kode masuk Anda / ログイン確認コード:</p>
       <p style="font-size:28px;letter-spacing:.3em;font-weight:700;font-family:monospace">${code}</p>
       <p style="color:#555">Enter it on the Formula Bridge screen within 10 minutes.<br>Masukkan di layar Formula Bridge dalam 10 menit.<br>10分以内に処方ブリッジの画面に入力してください。</p>
       <p style="color:#888;font-size:12px">If you did not try to sign in, someone may know your password: change it now and tell Artisans Production.<br>Jika Anda tidak mencoba masuk, mungkin ada orang lain yang mengetahui kata sandi Anda: segera ganti kata sandi dan beri tahu Artisans Production.<br>心当たりがない場合はパスワードが漏れている可能性があります。すぐにパスワードを変更してください。</p>`;
-    const res = await sendMail(sender, [email], subject, html);
+    const text = `Your sign-in code / Kode masuk Anda / ログイン確認コード: ${code}\n\nEnter it on the Formula Bridge screen within 10 minutes.\nMasukkan di layar Formula Bridge dalam 10 menit.\n10分以内に処方ブリッジの画面に入力してください。\n\nIf you did not try to sign in, change your password now. / Jika Anda tidak mencoba masuk, segera ganti kata sandi. / 心当たりがない場合は、すぐにパスワードを変更してください。\n`;
+    const res = await sendMail(sender, [email], subject, html, [], text);
     await service.from("mail_log").insert({ kind: "mfa", to_email: email, subject: "[Formula Bridge] Sign-in code", ok: !!res?.ok, detail: res ? res.detail : "mail server not configured" });
     if (!res?.ok) return json({ error: "send_failed" }, 502);
     return json({ ok: true, sent: true });
