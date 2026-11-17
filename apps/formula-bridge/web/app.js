@@ -1300,6 +1300,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
         <div class="row"><button class="btn" type="submit">保存</button><button class="btn ghost" type="button" id="mail-test">テストメールを送る</button></div><div class="status" id="st-set"></div></form>
       <div class="card"><h2>AIの接続確認</h2><p class="sub">企画書は Claude・GPT・Gemini の3社のAIを使います。鍵（APIキー）が登録されているか、実際につながるかを確認します（鍵の中身は表示しません）。</p>
         <button class="btn ghost" type="button" id="ai-test">3社のAIの接続を確認する</button><div class="status" id="st-ai"></div></div>
+      <div class="card"><h2>BIOT OS との連携（化粧品開発スケジュール）</h2><p class="sub">各案件の進み具合（依頼・提出・サンプル発送・フィードバック・採用・完成処方・企画書）を、BIOT OS が読み取れるようにしています。金額・原価・連絡先・ファイルは渡しません。案件の「開発スケジュールの商品」と「発売目標月」（STEP 1）で、スケジュールのどの行に載るかが決まります。</p>
+        <div class="field"><label>BIOT OS が読む場所</label><input readonly class="mono" value="${esc(FB_CONFIG.supabaseUrl + "/functions/v1/biotos-feed")}"></div>
+        <button class="btn ghost" type="button" id="os-test">BIOT OS に渡す内容を確認する</button><div class="status" id="st-os"></div><div id="os-prev"></div></div>
       <div class="card"><h2>表示名称の辞書</h2><p class="sub">出典ページで確認できた名称と、当社で確認した名称が保存され、次回の変換で自動的に使われます。誤りがあれば削除してください（次回は改めて調べ直します）。</p>
         <div class="field"><label for="dic-q">絞り込み（INCI名・表示名称）</label><input id="dic-q" placeholder="例: Glycerin / グリセリン"></div>
         <div class="tbl-wrap"><table class="view" id="dic"></table></div><div class="status" id="st-dic"></div></div>
@@ -1312,6 +1315,14 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
       <div class="card"><h2>メール送信の記録（最新20件）</h2><div class="tbl-wrap"><table class="view"><thead><tr><th>日時</th><th>種類</th><th>宛先</th><th>件名</th><th>結果</th></tr></thead><tbody>
         ${(logs || []).map((l) => `<tr><td>${dt(l.created_at)}</td><td>${{ request: "依頼", submit: "提出", shipped: "発送", feedback: "フィードバック", test: "テスト", invite: "招待" }[l.kind] || esc(l.kind)}</td><td>${esc(l.to_email)}</td><td>${esc(l.subject)}</td><td>${l.ok ? '<span class="chip done">送信済み</span>' : `<span class="chip draft" title="${esc(l.detail)}">未送信</span>`}</td></tr>`).join("") || `<tr><td colspan="5" class="empty">まだありません</td></tr>`}
       </tbody></table></div></div></div>`;
+    $("os-test").onclick = async () => {
+      const st = $("st-os"); st.className = "status"; st.textContent = "確認しています…";
+      const { data, error } = await sb.functions.invoke("biotos-feed", { body: {} });
+      if (error || !data?.projects) { st.className = "status err"; st.textContent = "確認できませんでした。もう一度押してください。"; return; }
+      st.textContent = (data.token_configured ? "BIOT OS からの接続：設定済み ✓" : "BIOT OS からの接続：未設定（BIOT OS 側で合言葉を設定すると読めるようになります）") + `　案件 ${data.projects.length}件`;
+      const noLink = data.projects.filter((p) => !p.schedule_item).length;
+      $("os-prev").innerHTML = `${noLink ? `<p class="hint">「開発スケジュールの商品」が未入力の案件が ${noLink}件あります（BIOT OS では「未分類」に載ります）。</p>` : ""}<div class="tbl-wrap"><table class="view"><thead><tr><th>案件</th><th>スケジュールの商品</th><th>発売目標月</th><th>進み具合</th><th>依頼先</th><th>最終更新</th></tr></thead><tbody>${data.projects.map((p) => `<tr><td><a href="#/p/${esc(p.id)}/req">${esc(p.name)}</a></td><td>${esc(p.schedule_item || "未分類")}</td><td>${esc(p.target_month || "—")}</td><td>${esc(p.stage_ja)}</td><td>${p.suppliers.length}社</td><td>${d(p.last_activity)}</td></tr>`).join("") || '<tr><td colspan="6" class="empty">案件はまだありません</td></tr>'}</tbody></table></div>`;
+    };
     $("f-set").onsubmit = async (e) => {
       e.preventDefault();
       const up = [["dev_email", $("s-dev").value.trim()], ["from_email", $("s-from").value.trim()], ["app_url", $("s-url").value.trim()]].map(([key, value]) => ({ key, value }));
@@ -1376,6 +1387,9 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
   const MK = { jp: "日本国内", id: "インドネシア", asia: "その他アジア" };
   // Shown to Japan only: never put into the request brief or the snapshot that suppliers can read.
   const JAPAN_ONLY = ["costRaw", "costFin", "price", "date"];
+  // Product lines of the 2026 cosmetics schedule ("２０２６年 化粧品スケジュール"). A project names the line it belongs to,
+  // so BIOT OS can place it on that schedule (biotos-feed function). Japan-side only, like the costs.
+  const SCHEDULE_ITEMS = ["Genrever", "Hakua マスク", "Hakua 美容液", "Hakua 化粧水", "Hakua クリーム", "Hakua 香水", "Hakua nagi（鎮静）", "Genrever000", "Genrever001", "Genreverシャンプー", "Genreverトリートメント", "GenreverPRO001", "ハル シリーズ", "Vivea", "シゲ香水", "リップ", "LUNANOX 50ml", "LUNANOX 5ml", "ヘアバーム", "アズール", "パルファム 5ml", "パルファム 50ml", "ミスト", "オールインワン", "REJU", "Amazon クリーム", "Amazon 美容液", "Amazon ヘアバーム", "Amazon 香水", "Amazon その他", "Miamyu", "Manorol"];
 
   async function adminProject(pid, step) {
     await loadCompanies();
@@ -1411,6 +1425,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     pv.innerHTML = `<div class="who jp ${done.req ? "is-done" : ""}">${FLAG_JP}日本側が入力する画面<small>依頼先の各社は、自社あての依頼だけを見られます</small><span class="state">${done.req ? "完了 ✓" : "入力中"}</span></div>
     <div class="cols"><form class="card" id="f-req" autocomplete="off"><h2>${FLAG_JP}開発依頼の内容</h2><p class="sub">入力は自動で保存されます。<span class="saved" id="saved"></span></p>
       <div class="field"><label for="r-name">案件名</label><input id="r-name" value="${esc(p.name)}"></div>
+      <div class="grid2"><div class="field"><label for="r-scheduleItem">開発スケジュールの商品（BIOT OS） <small class="jp-only">日本側のみ</small></label><input id="r-scheduleItem" list="dl-schedule" value="${esc(r.scheduleItem || "")}" placeholder="一覧から選ぶか入力"><datalist id="dl-schedule">${SCHEDULE_ITEMS.map((x) => `<option value="${esc(x)}">`).join("")}</datalist></div>
+        <div class="field"><label for="r-targetMonth">発売目標月 <small class="jp-only">日本側のみ</small></label><input id="r-targetMonth" type="month" value="${/^\d{4}-\d{2}$/.test(r.targetMonth || "") ? esc(r.targetMonth) : ""}"></div></div>
       <div class="field"><label for="r-requester">依頼者（当社の担当者名）*</label><input id="r-requester" value="${esc(r.requester ?? S.profile?.full_name ?? "")}" placeholder="例：長野 智樹"></div>
       ${REQ_LABELS.map(([k, l]) => `<div class="field"><label for="r-${k}">${l}${k === "date" ? " <small>（カレンダーから選択）</small>" : ""}${JAPAN_ONLY.includes(k) ? ' <small class="jp-only">日本側のみ・仕入先には表示されません</small>' : ""}</label>${["feel", "claim", "avoid", "note"].includes(k) ? `<textarea id="r-${k}">${esc(r[k] || "")}</textarea>`
         : k === "date" ? `<input id="r-date" type="date" min="${today()}" value="${/^\d{4}-\d{2}-\d{2}$/.test(r.date || "") ? esc(r.date) : ""}">${r.date && !/^\d{4}-\d{2}-\d{2}$/.test(r.date) ? `<span class="hint">以前の入力：${esc(r.date)}（カレンダーで選び直してください）</span>` : ""}`
@@ -1430,6 +1446,8 @@ Reply with JSON only: {"unit":"%","items":[{"phase":"","trade":"","idName":"","i
     if (r.requester == null) { r.requester = $("r-requester").value; save.soon(); }
     $("r-requester").oninput = (e) => { r.requester = e.target.value; save.soon(); };
     REQ_LABELS.forEach(([k]) => ($("r-" + k)[k === "date" ? "onchange" : "oninput"] = (e) => { r[k] = e.target.value; save.soon(); }));
+    $("r-scheduleItem").oninput = (e) => { r.scheduleItem = e.target.value.trim(); save.soon(); };
+    $("r-targetMonth").onchange = (e) => { r.targetMonth = e.target.value; save.soon(); };
     $("r-markets").onchange = () => { r.markets = [...$("r-markets").querySelectorAll("input:checked")].map((i) => i.value); save.soon(); };
     let bl = "en";
     const renderBrief = () => { $("brief").textContent = brief[bl] || "まだ作成していません。左を記入して「依頼書を作成」を押してください。"; $("brief").classList.toggle("ja", bl === "ja" || !brief[bl]); document.querySelectorAll("[data-b]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.b === bl))); };

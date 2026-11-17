@@ -210,7 +210,8 @@ html,body{min-height:100%}
 .topbar nav{display:flex;gap:4px;flex-wrap:wrap}
 .topbar nav a{color:var(--ink-2);text-decoration:none;font-size:14px;padding:6px 12px;border-radius:999px}
 .topbar nav a.on{background:var(--ink);color:var(--ground)}
-.topbar .me{margin-left:auto;display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink-2)}
+.topbar .me{margin-left:auto;display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:13px;color:var(--ink-2);min-width:0;max-width:100%}
+.topbar .me #me-name{overflow-wrap:anywhere}
 .auth{max-width:560px;margin:24px auto}
 .auth h1{font-size:24px;margin:0 0 4px}
 .auth .lang-note{font-size:13px;color:var(--ink-3);margin:0 0 14px}
@@ -326,6 +327,8 @@ td.miss{background:#FFF6D6}
   #app table.view tbody td::before,#app table.master tbody td::before{display:block;margin-bottom:2px}
   #app table.view tbody td.no::before,#app table.master tbody td.no::before{display:inline;margin-right:8px}
   #app table tbody td:not([data-l]){display:block}
+  #app table tbody td,#app table tbody td *{overflow-wrap:anywhere}
+  #app table tbody td,#app table tbody td .chip{white-space:normal;max-width:100%}
   #app table tbody td:not([data-l])::before{content:none}
   #app table tbody td.no{font-weight:700;color:var(--ink);border-bottom:1px solid var(--line-2)!important;padding-bottom:6px!important;margin-bottom:2px}
   #app table tbody td:last-child:has(> .x){display:flex;justify-content:flex-end}

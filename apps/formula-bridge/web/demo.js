@@ -161,6 +161,8 @@
             { id: "u-demo-sup2", email: "rina@example.com", full_name: "Rina (demo)", rep: false, joined: false, last_sign_in_at: null }] }, error: null }
         : name === "mfa"
         ? { data: { ok: true, verified: true }, error: null }
+        : name === "biotos-feed"
+        ? { data: { source: "formula-bridge", generated_at: new Date().toISOString(), token_configured: false, projects: (db.projects || []).map((p) => ({ id: p.id, name: p.name, schedule_item: p.request?.scheduleItem || null, target_month: p.request?.targetMonth || null, stage: "requested", stage_ja: "仕入先が開発中", suppliers: (db.assignments || []).filter((a) => a.project_id === p.id && a.status !== "draft").map(() => ({})), last_activity: p.updated_at || p.created_at })) }, error: null }
         : name === "create-supplier" && opts?.body?.action === "signup"
         ? { data: { ok: true }, error: null }
         : name === "create-supplier" && opts?.body?.action === "link"
